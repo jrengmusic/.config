@@ -12,7 +12,8 @@
     "warning": "#E8A87C",
     "config": "#9D7EA8",
     "red": "#FF0000",
-    "cyan": "#00FFFF"
+    "cyan": "#00FFFF",
+    "mattwhite": "#FEFFD2"
   },
   "blocks": [
     {
@@ -34,7 +35,7 @@
         {
           "style": "plain",
           "foreground": "p:frostbite",
-          "template": " {{ if eq .Folder .UserName }}<p:blueBikini>\ueb06 </>{{ else if eq .Folder \".config\" }}<p:blueBikini>\uf013 </> {{ .Folder }}{{ else if eq .Folder \"kuassa\" }}<p:preciousPersimmon>\udb81\udd06 </> {{ .Folder }}{{ else if eq .Folder \"dev\" }}<p:red>\uf17f </> {{ .Folder }}{{ else if eq .Folder \"inf\" }}<p:cyan>\uedfe </> {{ .Folder }}{{ else if eq .Folder \"kitty\" }}<p:blueBikini>\uea85 </> {{ .Folder }}{{ else if eq .Folder \"wezterm\" }}<p:blueBikini>\uea85 </> {{ .Folder }}{{ else if eq .Folder \"tmux\" }}<p:blueBikini>\uebc8 </> {{ .Folder }}{{ else if eq .Folder \"nvim\" }}<p:blueBikini>\ue62b </> {{ .Folder }}{{ else if eq .Folder \"tit\" }}<p:blueBikini>\udb80\udea2 </> {{ .Folder }}{{ else if eq .Folder \"omp\" }}<p:blueBikini>\ue691 </> {{ .Folder }}{{ else if matchP \"kuassa|inf\" .AbsolutePWD }}<p:preciousPersimmon>\udb86\udc6b </> {{ .Folder }}{{ else }}<p:silkstar>\udb80\ude56 </> {{ .Folder }}{{ end }} ",
+          "template": " {{ if eq .Folder .UserName }}<p:blueBikini>\ueb06 </>{{ else if eq .Folder \".config\" }}<p:blueBikini>\uf013 </> {{ .Folder }}{{ else if eq .Folder \"cake\" }}<p:mattwhite>\ue63e </> {{ .Folder }}{{ else if eq .Folder \"kuassa\" }}<p:preciousPersimmon>\udb81\udd06 </> {{ .Folder }}{{ else if eq .Folder \"dev\" }}<p:red>\uf17f </> {{ .Folder }}{{ else if eq .Folder \"inf\" }}<p:cyan>\uedfe </> {{ .Folder }}{{ else if eq .Folder \"kitty\" }}<p:blueBikini>\uea85 </> {{ .Folder }}{{ else if eq .Folder \"wezterm\" }}<p:blueBikini>\uea85 </> {{ .Folder }}{{ else if eq .Folder \"tmux\" }}<p:blueBikini>\uebc8 </> {{ .Folder }}{{ else if eq .Folder \"nvim\" }}<p:blueBikini>\ue62b </> {{ .Folder }}{{ else if eq .Folder \"tit\" }}<p:blueBikini>\udb80\udea2 </> {{ .Folder }}{{ else if eq .Folder \"omp\" }}<p:blueBikini>\ue691 </> {{ .Folder }}{{ else if matchP \"kuassa|inf\" .AbsolutePWD }}<p:preciousPersimmon>\udb86\udc6b </> {{ .Folder }}{{ else }}<p:silkstar>\udb80\ude56 </> {{ .Folder }}{{ end }} ",
           "type": "path"
         }
       ],
