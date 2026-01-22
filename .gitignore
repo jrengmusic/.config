@@ -1,0 +1,19 @@
+# Ignore everything
+*
+
+# Whitelist directories
+!kitty/
+!kitty/**
+!omp/
+!omp/**
+!nvim/
+!nvim/**
+!wezterm/
+!wezterm/**
+!tmux/
+!tmux/**
+!hammerspoon/
+!hammerspoon/**
+
+# Keep .gitignore itself
+!.gitignore
