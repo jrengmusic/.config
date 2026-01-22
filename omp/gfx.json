@@ -1,0 +1,82 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "name": "gfx",
+  "palette": {
+    "paradiso": "#4E8C93",
+    "mediterranea": "#33535B",
+    "frostbite": "#B3F9F5",
+    "silkstar": "#F3F5C5",
+    "blueBikini": "#00C8D8",
+    "preciousPersimmon": "#FC704C",
+    "accent": "#FEF5ED",
+    "warning": "#E8A87C",
+    "config": "#9D7EA8",
+    "red": "#FF0000",
+    "cyan": "#00FFFF"
+  },
+  "blocks": [
+    {
+      "alignment": "left",
+      "newline": false,
+      "segments": [
+        {
+          "style": "plain",
+          "foreground": "p:mediterranea",
+          "template": "╭─",
+          "type": "text"
+        },
+        {
+          "style": "plain",
+          "foreground": "p:mediterranea",
+          "template": " \uf292 ",
+          "type": "root"
+        },
+        {
+          "style": "plain",
+          "foreground": "p:frostbite",
+          "template": " {{ if eq .Folder .UserName }}<p:blueBikini>\ueb06 </>{{ else if eq .Folder \".config\" }}<p:blueBikini>\uf013 </> {{ .Folder }}{{ else if eq .Folder \"kuassa\" }}<p:preciousPersimmon>\udb81\udd06 </> {{ .Folder }}{{ else if eq .Folder \"dev\" }}<p:red>\uf17f </> {{ .Folder }}{{ else if eq .Folder \"inf\" }}<p:cyan>\uedfe </> {{ .Folder }}{{ else if eq .Folder \"kitty\" }}<p:blueBikini>\uea85 </> {{ .Folder }}{{ else if eq .Folder \"wezterm\" }}<p:blueBikini>\uea85 </> {{ .Folder }}{{ else if eq .Folder \"tmux\" }}<p:blueBikini>\uebc8 </> {{ .Folder }}{{ else if eq .Folder \"nvim\" }}<p:blueBikini>\ue62b </> {{ .Folder }}{{ else if eq .Folder \"tit\" }}<p:blueBikini>\udb80\udea2 </> {{ .Folder }}{{ else if eq .Folder \"omp\" }}<p:blueBikini>\ue691 </> {{ .Folder }}{{ else if matchP \"kuassa|inf\" .AbsolutePWD }}<p:preciousPersimmon>\udb86\udc6b </> {{ .Folder }}{{ else }}<p:silkstar>\udb80\ude56 </> {{ .Folder }}{{ end }} ",
+          "type": "path"
+        }
+      ],
+      "type": "prompt"
+    },
+    {
+      "alignment": "right",
+      "newline": false,
+      "segments": [
+        {
+          "type": "git",
+          "style": "plain",
+          "foreground": "p:mediterranea",
+          "template": "{{ .HEAD | replace \"\uE725 \" \"<p:frostbite>\uE725 </><p:paradiso>\" }}</>{{ if .Ahead }} ⬆ {{ .Ahead }}{{ end }}{{ if .Behind }} ⬇ {{ .Behind }}{{ end }}{{ if .Working.Changed }} <p:preciousPersimmon>● {{ .Working.Modified }}</>{{ end }} ",
+          "properties": {
+            "fetch_status": true,
+            "fetch_push_status": true,
+            "branch_icon": "\uE725 "
+          }
+        }
+      ],
+      "type": "prompt"
+    },
+    {
+      "alignment": "left",
+      "newline": true,
+      "segments": [
+        {
+          "style": "plain",
+          "foreground": "p:mediterranea",
+          "template": "╰─ ",
+          "type": "text"
+        }
+      ],
+      "type": "prompt"
+    }
+  ],
+  "console_title_template": "{{ .Folder }}",
+  "transient_prompt": {
+    "background": "transparent",
+    "foreground": "p:mediterranea",
+    "template": "\ue285 "
+  },
+  "version": 4
+}
