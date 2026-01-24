@@ -12,6 +12,7 @@ function M.detectProjectType()
   
   -- First check: existing config file
   local dawConfig = root .. '/.nvim-dap-config'
+  
   if vim.fn.filereadable(dawConfig) == 1 then
     local ok, config = pcall(dofile, dawConfig)
     if ok and config then

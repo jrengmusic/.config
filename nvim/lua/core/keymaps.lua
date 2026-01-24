@@ -316,17 +316,17 @@ function M.setupDap()
            vim.notify('Build successful! Launching DAW...', vim.log.levels.INFO)
            vim.fn.jobstart({ cfg.dawPath })
            
-           -- Run correct DAP config based on format
-           local configName = dapConfig.getConfigNameForFormat(cfg.format)
-           vim.defer_fn(function()
-             for _, dapCfg in ipairs(dap.configurations.cpp) do
-               if dapCfg.name == configName then
-                 dap.run(dapCfg)
-                 return
-               end
-             end
-             vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
-           end, 2000)
+            -- Run correct DAP config based on format
+            local configName = dapConfig.getConfigNameForFormat(cfg.format)
+            vim.defer_fn(function()
+              for _, dapCfg in ipairs(dap.configurations.cpp) do
+                if dapCfg.name == configName then
+                  dap.run(dapCfg)
+                  return
+                end
+              end
+              vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+            end, 2000)
          end)
        end
 
