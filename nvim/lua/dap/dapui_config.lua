@@ -72,6 +72,39 @@ function M.setup()
     vim.fn.system('hs -c "require(\'debug-layout\').focusNvimPane()"')
   end
 
+  -- Float standalone app windows (don't tile them in PaperWM)
+  dap.listeners.after.launch.standalone_float = function(session, body)
+    -- Only for standalone projects
+    local projectType = dapConfig.detectProjectType()
+    if projectType ~= 'standalone' then
+      return
+    end
+    
+    -- Extract app name from executable path
+    -- For macOS: /path/to/MyApp.app/Contents/MacOS/MyApp → "MyApp"
+    local config = session.config
+    local program = config.program
+    
+    if type(program) == 'function' then
+      program = program()
+    end
+    
+    if not program then
+      return
+    end
+    
+    -- Extract app name (works for .app bundles or executables)
+    local appName = program:match('/([^/]+)%.app/') or program:match('/([^/]+)$')
+    
+    if appName then
+      -- Call Hammerspoon to float this app and bring to front
+      local cmd = string.format('/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs -c "require(\'debug-layout\').floatStandaloneApp(\'%s\')"', appName)
+      vim.defer_fn(function()
+        vim.fn.system(cmd)
+      end, 1000)
+    end
+  end
+
   -- Breakpoint signs
   vim.fn.sign_define('DapBreakpoint', { text = '●', texthl = 'DapBreakpoint', linehl = '', numhl = '' })
   vim.fn.sign_define('DapBreakpointCondition', { text = '◆', texthl = 'DapBreakpointCondition', linehl = '', numhl = '' })

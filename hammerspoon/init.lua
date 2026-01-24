@@ -1,6 +1,9 @@
 -- JRENG! (C) MMXV
 ---------------------------------------------------------------------------------------------
 
+-- Load IPC module for CLI access (hs -c "command")
+require("hs.ipc")
+
 hs.alert.defaultStyle.radius = 18
 hs.alert.defaultStyle.fillColor.alpha = 0.5
 hs.alert.defaultStyle.strokeWidth = 0
@@ -63,9 +66,6 @@ hotkeys:enter()
 -- S P O O N S
 ----------------------------------------------------------------
 
-local followFocus = hs.loadSpoon("MouseFollowsFocus")
--- followFocus:start()
-
 -- local hCal = hs.loadSpoon('HCalendar')
 -- hCal:start()
 ---------------------------------------------------------------
@@ -85,4 +85,7 @@ else
 end
 
 -- Close console on launch (prevents it from auto-opening)
-hs.console.hswindow():close()
+local consoleWin = hs.console.hswindow()
+if consoleWin then
+  consoleWin:close()
+end

@@ -108,4 +108,55 @@ function M.focusNvimPane()
   end
 end
 
+-- Float standalone app windows (don't tile in PaperWM)
+-- Generic: works for any app by name
+function M.floatStandaloneApp(appName)
+  -- Check if PaperWM is available
+  if not PaperWM or not PaperWM.window_filter then
+    return
+  end
+  
+  -- Use PaperWM's window filter to exclude this app (same method as DAWs)
+  PaperWM.window_filter = PaperWM.window_filter:setAppFilter(appName, false)
+  hs.alert.show(string.format('Floating %s', appName), 1)
+  
+  -- Bring app to front (wait for window to appear)
+  local function activateApp()
+    local app = hs.application.find(appName)
+    
+    if app then
+      local windows = app:allWindows()
+      
+      if #windows > 0 then
+        -- Activate app to bring windows to front
+        app:activate()
+        
+        -- Remove from PaperWM management if it got tiled
+        local floated = 0
+        for _, win in ipairs(windows) do
+          if PaperWM.windows and PaperWM.windows[win:id()] then
+            PaperWM.windows[win:id()] = nil
+            floated = floated + 1
+          end
+        end
+        
+        -- Force retile to remove floated windows from layout
+        if floated > 0 then
+          local space = hs.spaces.focusedSpace()
+          local screen = hs.screen.mainScreen()
+          if PaperWM.tiling and PaperWM.tiling.tileSpace then
+            PaperWM.tiling.tileSpace(space, screen)
+          end
+        end
+      else
+        -- Windows not ready yet, retry
+        hs.timer.doAfter(0.5, activateApp)
+      end
+    end
+  end
+  
+  -- Start activation with small delay
+  hs.timer.doAfter(0.2, activateApp)
+end
+
 return M
