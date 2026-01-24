@@ -3,11 +3,60 @@
 local M = {}
 
 -- ============================================================================
+-- PROJECT TYPE DETECTION
+-- ============================================================================
+
+-- Detect if project is plugin or standalone by checking CMakeLists.txt
+function M.detectProjectType()
+  local root = vim.fn.getcwd()
+  local cmakeFile = root .. '/CMakeLists.txt'
+  
+  if vim.fn.filereadable(cmakeFile) ~= 1 then
+    vim.notify('No CMakeLists.txt found', vim.log.levels.WARN)
+    return nil -- Cannot detect
+  end
+  
+  local content = table.concat(vim.fn.readfile(cmakeFile), '\n')
+  
+  -- Check for JUCE plugin markers
+  if content:match('juce_add_plugin') then
+    vim.notify('Detected: JUCE Plugin project', vim.log.levels.INFO)
+    return 'plugin'
+  end
+  
+  -- Check for JUCE standalone app markers
+  if content:match('juce_add_console_app') or content:match('juce_add_gui_app') then
+    vim.notify('Detected: JUCE Standalone App project', vim.log.levels.INFO)
+    return 'standalone'
+  end
+  
+  -- Fallback: check build directory for what exists
+  local buildDir = root .. '/Builds/Ninja'
+  if vim.fn.isdirectory(buildDir .. '/Debug/Standalone') == 1 or 
+     vim.fn.isdirectory(buildDir .. '/Release/Standalone') == 1 then
+    return 'standalone'
+  end
+  
+  if vim.fn.isdirectory(buildDir .. '/Debug/VST3') == 1 or 
+     vim.fn.isdirectory(buildDir .. '/Debug/AU') == 1 or
+     vim.fn.isdirectory(buildDir .. '/Release/VST3') == 1 or
+     vim.fn.isdirectory(buildDir .. '/Release/AU') == 1 then
+    return 'plugin'
+  end
+  
+  return nil -- Cannot detect
+end
+
+-- ============================================================================
 -- CONFIG FILE MANAGEMENT (SSOT)
 -- ============================================================================
 
 local function getConfigFilePath()
   return vim.fn.getcwd() .. '/.nvim-dap-config'
+end
+
+local function getStandaloneConfigFilePath()
+  return vim.fn.getcwd() .. '/.nvim-standalone-config'
 end
 
 -- Load .nvim-dap-config as Lua table
@@ -26,7 +75,7 @@ function M.loadDawConfig(callback)
   -- File exists but has invalid Lua syntax → delete and show dialog immediately
   local ok, config = pcall(dofile, configFile)
   if not ok then
-    vim.notify('DAP config corrupted. Reconfiguring...', vim.log.levels.WARN)
+    vim.notify('DAP config corrupted. Reconfiguring...')
     vim.fn.delete(configFile)
     M.showDawFormatDialog(callback)
     return nil
@@ -34,7 +83,7 @@ function M.loadDawConfig(callback)
   
   -- Config returned nil → delete and show dialog immediately
   if not config then
-    vim.notify('DAP config empty. Reconfiguring...', vim.log.levels.WARN)
+    vim.notify('DAP config empty. Reconfiguring...')
     vim.fn.delete(configFile)
     M.showDawFormatDialog(callback)
     return nil
@@ -42,35 +91,35 @@ function M.loadDawConfig(callback)
   
   -- Missing format field → show dialog immediately
   if not config.format or config.format == '' then
-    vim.notify('DAP config missing format. Reconfiguring...', vim.log.levels.WARN)
+    vim.notify('DAP config missing format. Reconfiguring...')
     M.showDawFormatDialog(callback)
     return nil
   end
   
   -- Missing daw field → show dialog immediately
   if not config.daw or config.daw == '' then
-    vim.notify('DAP config missing daw. Reconfiguring...', vim.log.levels.WARN)
+    vim.notify('DAP config missing daw. Reconfiguring...')
     M.showDawFormatDialog(callback)
     return nil
   end
   
   -- Missing dawPath field → show dialog immediately
   if not config.dawPath or config.dawPath == '' then
-    vim.notify('DAP config missing dawPath. Reconfiguring...', vim.log.levels.WARN)
+    vim.notify('DAP config missing dawPath. Reconfiguring...')
     M.showDawFormatDialog(callback)
     return nil
   end
   
   -- Invalid dawPath → show dialog immediately
   if vim.fn.filereadable(config.dawPath) ~= 1 then
-    vim.notify('DAP config dawPath invalid: ' .. config.dawPath .. '. Reconfiguring...', vim.log.levels.WARN)
+    vim.notify('DAP config dawPath invalid: ' .. config.dawPath .. '. Reconfiguring...')
     M.showDawFormatDialog(callback)
     return nil
   end
   
   -- Missing buildScheme field → show dialog immediately
   if not config.buildScheme or config.buildScheme == '' then
-    vim.notify('DAP config missing buildScheme. Reconfiguring...', vim.log.levels.WARN)
+    vim.notify('DAP config missing buildScheme. Reconfiguring...')
     M.showDawFormatDialog(callback)
     return nil
   end
@@ -99,7 +148,7 @@ function M.saveDawConfig(format, daw, dawPath, buildScheme)
   
   local ok, err = pcall(vim.fn.writefile, vim.split(content, '\n'), configFile)
   if not ok then
-    vim.notify('Failed to write DAP config (disk/permissions issue): ' .. tostring(err), vim.log.levels.ERROR)
+    vim.notify('Failed to write DAP config (disk/permissions issue): ' .. tostring(err))
     return false
   end
   
@@ -113,7 +162,7 @@ function M.showDawFormatDialog(callback)
   
   vim.ui.select(formats, { prompt = 'Select plugin format:' }, function(format)
     if not format then
-      vim.notify('DAP config cancelled', vim.log.levels.WARN)
+      vim.notify('DAP config cancelled')
       return
     end
     
@@ -121,7 +170,7 @@ function M.showDawFormatDialog(callback)
     local schemes = { 'Debug', 'Release' }
     vim.ui.select(schemes, { prompt = 'Select build scheme:' }, function(buildScheme)
       if not buildScheme then
-        vim.notify('DAP config cancelled', vim.log.levels.WARN)
+        vim.notify('DAP config cancelled')
         return
       end
       
@@ -129,7 +178,7 @@ function M.showDawFormatDialog(callback)
       local apps_dir = '/Applications'
       local handle = io.popen('find "' .. apps_dir .. '" -maxdepth 2 -name "*.app" -type d 2>/dev/null')
       if not handle then
-        vim.notify('Failed to list applications', vim.log.levels.ERROR)
+        vim.notify('Failed to list applications')
         return
       end
       
@@ -140,7 +189,7 @@ function M.showDawFormatDialog(callback)
       handle:close()
       
       if #apps == 0 then
-        vim.notify('No applications found in ' .. apps_dir, vim.log.levels.WARN)
+        vim.notify('No applications found in ' .. apps_dir)
         return
       end
       
@@ -150,7 +199,7 @@ function M.showDawFormatDialog(callback)
         format = 'file',
         confirm = function(picker, item)
           if not item or not item.file then
-            vim.notify('DAP config cancelled: No DAW selected', vim.log.levels.WARN)
+            vim.notify('DAP config cancelled: No DAW selected')
             picker:close()
             return
           end
@@ -165,7 +214,7 @@ function M.showDawFormatDialog(callback)
           
           -- Verify path exists - if not, show dialog again
           if vim.fn.filereadable(dawPath) ~= 1 then
-            vim.notify('DAW executable not found: ' .. dawPath .. '. Try again.', vim.log.levels.ERROR)
+            vim.notify('DAW executable not found: ' .. dawPath .. '. Try again.')
             picker:close()
             vim.defer_fn(function() M.showDawFormatDialog(callback) end, 100)
             return
@@ -181,7 +230,7 @@ function M.showDawFormatDialog(callback)
             return
           end
           
-          vim.notify(string.format('DAP config saved: %s + %s (%s)', format, daw, buildScheme), vim.log.levels.INFO)
+          vim.notify(string.format('DAP config saved: %s + %s (%s)', format, daw, buildScheme))
           
           if callback then
             callback({ format = format, daw = daw, dawPath = dawPath, buildScheme = buildScheme })
@@ -198,8 +247,15 @@ end
 -- DAP CONFIGURATIONS
 -- ============================================================================
 
--- Helper to get DAW PID from config
+-- Helper to get DAW PID from config (PLUGIN-ONLY)
 local function getDawPid()
+  
+  -- Check project type - only valid for plugin projects
+  local projectType = M.detectProjectType()
+  if projectType ~= 'plugin' then
+    error('This DAP config is for plugin projects only. Use "Launch Standalone" for standalone apps.')
+  end
+  
   local config = M.loadDawConfig()
   if not config then
     return nil
@@ -230,21 +286,37 @@ function M.setup()
       request = 'launch',
       program = function()
         local root = vim.fn.getcwd()
+        -- JUCE standalone apps are in *_App_artefacts/Debug|Release/*.app or *.exe
         local patterns = {
-          -- macOS
-          root .. '/Builds/Ninja/*artefacts*/Debug/Standalone/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/*artefacts*/Release/Standalone/*.app/Contents/MacOS/*',
+          -- macOS (look for _App_artefacts, not Standalone subdirectory)
+          root .. '/Builds/Ninja/*App_artefacts*/Debug/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/*App_artefacts*/Release/*.app/Contents/MacOS/*',
+          -- Fallback: any artefacts folder with .app directly
+          root .. '/Builds/Ninja/*artefacts*/Debug/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/*artefacts*/Release/*.app/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/*artefacts*/Debug/Standalone/*.exe',
-          root .. '/Builds/Ninja/*artefacts*/Release/Standalone/*.exe',
+          root .. '/Builds/Ninja/*App_artefacts*/Debug/*.exe',
+          root .. '/Builds/Ninja/*App_artefacts*/Release/*.exe',
+          root .. '/Builds/Ninja/*artefacts*/Debug/*.exe',
+          root .. '/Builds/Ninja/*artefacts*/Release/*.exe',
         }
+        
+        local found = nil
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
           if #matches > 0 then
-            return matches[1]
+            found = matches[1]
+            break
           end
         end
-        error('Standalone executable not found. Build project first.')
+        
+        if not found then
+          vim.notify('Failed to find standalone app in: ' .. root, vim.log.levels.ERROR)
+          error('Standalone executable not found. Build project first.')
+        end
+        
+        vim.notify('Launching: ' .. found, vim.log.levels.INFO)
+        return found
       end,
       cwd = '${workspaceFolder}',
       stopOnEntry = false,
@@ -388,6 +460,77 @@ function M.getConfigNameForFormat(format)
     AAX = 'Attach to DAW (AAX)',
   }
   return mapping[format]
+end
+
+-- ============================================================================
+-- STANDALONE CONFIG MANAGEMENT
+-- ============================================================================
+
+function M.loadStandaloneConfig(callback)
+  local configFile = getStandaloneConfigFilePath()
+  
+  if vim.fn.filereadable(configFile) ~= 1 then
+    M.showStandaloneSchemeDialog(callback)
+    return nil
+  end
+  
+  
+  local ok, config = pcall(dofile, configFile)
+  if not ok then
+    vim.notify('Standalone config corrupted. Reconfiguring...')
+    vim.fn.delete(configFile)
+    M.showStandaloneSchemeDialog(callback)
+    return nil
+  end
+  
+  if not config or not config.buildScheme or config.buildScheme == '' then
+    vim.notify('Standalone config missing buildScheme. Reconfiguring...')
+    M.showStandaloneSchemeDialog(callback)
+    return nil
+  end
+  
+  return config
+end
+
+function M.saveStandaloneConfig(buildScheme)
+  local configFile = getStandaloneConfigFilePath()
+  local content = string.format(
+    '-- Standalone Build Configuration\n' ..
+    'return {\n' ..
+    '  buildScheme = "%s",\n' ..
+    '}',
+    buildScheme
+  )
+  
+  local ok = pcall(vim.fn.writefile, vim.split(content, '\n'), configFile)
+  if not ok then
+    vim.notify('Failed to write standalone config')
+    return false
+  end
+  
+  return true
+end
+
+function M.showStandaloneSchemeDialog(callback)
+  local schemes = { 'Debug', 'Release' }
+  
+  vim.ui.select(schemes, { prompt = 'Select build scheme:' }, function(buildScheme)
+    if not buildScheme then
+      vim.notify('Standalone config cancelled')
+      return
+    end
+    
+    local ok = M.saveStandaloneConfig(buildScheme)
+    if not ok then
+      return
+    end
+    
+    vim.notify('Standalone config saved: ' .. buildScheme)
+    
+    if callback then
+      callback({ buildScheme = buildScheme })
+    end
+  end)
 end
 
 return M

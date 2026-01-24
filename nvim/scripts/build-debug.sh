@@ -31,10 +31,17 @@ if [ "$NEEDS_CONFIG" -eq 1 ]; then
 fi
 
 # Find target name for this format
-TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_${FORMAT}: phony" | cut -d: -f1 | head -1)
+# Note: JUCE uses "_App" for standalone, not "_Standalone"
+if [ "$FORMAT" = "Standalone" ]; then
+    TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_App: phony" | cut -d: -f1 | head -1)
+else
+    TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_${FORMAT}: phony" | cut -d: -f1 | head -1)
+fi
 
 if [ -z "$TARGET" ]; then
     echo "ERROR: No target found for format $FORMAT"
+    echo "Available targets:"
+    ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep "phony" | grep -v "cmake" | head -10
     exit 1
 fi
 
@@ -85,6 +92,9 @@ case "$FORMAT" in
             cp -R "$plugin" "$dest"
             echo "✓ AAX: $name"
         done
+        ;;
+    Standalone)
+        echo "✓ Standalone app built (no copy needed)"
         ;;
 esac
 

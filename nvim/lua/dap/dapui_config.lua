@@ -47,10 +47,13 @@ function M.setup()
   end
   dap.listeners.before.launch.dapui_config = function()
     dapui.open()
-    -- Setup debug layout when launching
-    local config = dapConfig.loadDawConfig()
-    if config and config.daw then
-      vim.fn.system(string.format('hs -c "require(\'debug-layout\').setupDebugLayout(\'%s\')"', config.daw))
+    -- Setup debug layout when launching (plugin projects only)
+    local projectType = dapConfig.detectProjectType()
+    if projectType == 'plugin' then
+      local config = dapConfig.loadDawConfig()
+      if config and config.daw then
+        vim.fn.system(string.format('hs -c "require(\'debug-layout\').setupDebugLayout(\'%s\')"', config.daw))
+      end
     end
   end
   dap.listeners.before.event_terminated.dapui_config = function()

@@ -4,9 +4,9 @@ return {
   keys = {
     { '<leader>dc', desc = 'DAP: Continue' },
     { '<leader>db', desc = 'DAP: Toggle breakpoint' },
-    { '<leader><C-r>', desc = 'Build + Launch + Attach' },
+    { '<leader><C-r>', desc = 'Build + Launch + Attach (auto-detect)' },
     { '<leader><C-k>', desc = 'Clean + Reconfigure build' },
-    { '<F5>', desc = 'DAP: Start/Continue' },
+    { '<F5>', desc = 'Configure project' },
   },
   cmd = { 'DapContinue', 'DapToggleBreakpoint' },
   deps = 'dap',
