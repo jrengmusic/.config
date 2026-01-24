@@ -335,7 +335,7 @@ function M.setup()
           error('Standalone executable not found. Build project first.')
         end
         
-        vim.notify('Launching: ' .. found, vim.log.levels.INFO)
+
         return found
       end,
       cwd = '${workspaceFolder}',

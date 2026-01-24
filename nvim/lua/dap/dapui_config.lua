@@ -57,36 +57,30 @@ function M.setup()
       end
     end
   end
+  
   dap.listeners.before.launch.dapui_config = function()
     dapui.open()
     -- Setup debug layout when launching (plugin projects only)
     local projectType = dapConfig.detectProjectType()
-    print("=== DAP DEBUG: Project type:", projectType)
     
     if projectType == 'plugin' then
       local config = dapConfig.loadDawConfig()
-      print("=== DAP DEBUG: Config:", vim.inspect(config))
       
       if config and config.daw then
         local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
         local cmd = string.format('%s -c "require(\'debug-layout\').setupDebugLayout(\'%s\')"', hs_cmd, config.daw)
-        print("=== DAP DEBUG: Running command:", cmd)
-        
-        local result = vim.fn.system(cmd)
-        print("=== DAP DEBUG: Command result:", result)
-      else
-        print("=== DAP DEBUG: No config.daw found")
+        vim.fn.system(cmd)
       end
-    else
-      print("=== DAP DEBUG: Not a plugin project")
     end
   end
+  
   dap.listeners.before.event_terminated.dapui_config = function()
     dapui.close()
     -- Restore layout when terminated
     local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
     vim.fn.system(string.format('%s -c "require(\'debug-layout\').restoreNormalLayout()"', hs_cmd))
   end
+  
   dap.listeners.before.event_exited.dapui_config = function()
     dapui.close()
     -- Restore layout when exited
@@ -125,7 +119,7 @@ function M.setup()
     local appName = program:match('/([^/]+)%.app/') or program:match('/([^/]+)$')
     
     if appName then
-      -- Call Hammerspoon to float this app and bring to front
+      -- Call Hammerspoon to float this app
       local cmd = string.format('/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs -c "require(\'debug-layout\').floatStandaloneApp(\'%s\')"', appName)
       vim.defer_fn(function()
         vim.fn.system(cmd)

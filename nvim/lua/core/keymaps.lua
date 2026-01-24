@@ -283,7 +283,7 @@ function M.setupDap()
        local function runStandaloneBuild(cfg)
          local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. cfg.buildScheme .. ' Standalone'
          runBuildInTerminal(cmd, function()
-           vim.notify('Build successful! Launching Standalone...', vim.log.levels.INFO)
+            vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })
            
            -- Launch and attach using "Launch Standalone" DAP config
            vim.defer_fn(function()
@@ -313,7 +313,7 @@ function M.setupDap()
        local function runBuild(cfg)
          local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. cfg.buildScheme .. ' ' .. cfg.format
          runBuildInTerminal(cmd, function()
-           vim.notify('Build successful! Launching DAW...', vim.log.levels.INFO)
+            vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
            vim.fn.jobstart({ cfg.dawPath })
            
             -- Run correct DAP config based on format
