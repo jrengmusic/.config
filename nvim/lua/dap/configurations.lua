@@ -9,39 +9,58 @@ local M = {}
 -- Detect if project is plugin or standalone by checking CMakeLists.txt
 function M.detectProjectType()
   local root = vim.fn.getcwd()
+  
+  -- First check: existing config file
+  local dawConfig = root .. '/.nvim-dap-config'
+  if vim.fn.filereadable(dawConfig) == 1 then
+    local ok, config = pcall(dofile, dawConfig)
+    if ok and config then
+      if config.format then
+        return 'plugin'  -- Has format field (VST3/AU/etc) = plugin
+      elseif config.buildScheme then
+        return 'standalone'  -- Only has buildScheme = standalone
+      end
+    end
+  end
+  
+  -- Second check: CMakeLists.txt content
   local cmakeFile = root .. '/CMakeLists.txt'
-  
-  if vim.fn.filereadable(cmakeFile) ~= 1 then
-    vim.notify('No CMakeLists.txt found', vim.log.levels.WARN)
-    return nil -- Cannot detect
+  if vim.fn.filereadable(cmakeFile) == 1 then
+    local content = table.concat(vim.fn.readfile(cmakeFile), '\n')
+    
+    -- Check for JUCE plugin markers
+    if content:match('juce_add_plugin') or content:match('PLUGIN_') or content:match('VST3') or content:match('AudioUnit') then
+      return 'plugin'
+    end
+    
+    -- Check for JUCE standalone app markers
+    if content:match('juce_add_console_app') or content:match('juce_add_gui_app') then
+      return 'standalone'
+    end
   end
   
-  local content = table.concat(vim.fn.readfile(cmakeFile), '\n')
+  -- Third check: build directory structure (check multiple build systems)
+  local buildDirs = {
+    root .. '/Builds/Ninja',
+    root .. '/Builds/Xcode', 
+    root .. '/build',
+    root .. '/cmake-build-debug'
+  }
   
-  -- Check for JUCE plugin markers
-  if content:match('juce_add_plugin') then
-    vim.notify('Detected: JUCE Plugin project', vim.log.levels.INFO)
-    return 'plugin'
-  end
-  
-  -- Check for JUCE standalone app markers
-  if content:match('juce_add_console_app') or content:match('juce_add_gui_app') then
-    vim.notify('Detected: JUCE Standalone App project', vim.log.levels.INFO)
-    return 'standalone'
-  end
-  
-  -- Fallback: check build directory for what exists
-  local buildDir = root .. '/Builds/Ninja'
-  if vim.fn.isdirectory(buildDir .. '/Debug/Standalone') == 1 or 
-     vim.fn.isdirectory(buildDir .. '/Release/Standalone') == 1 then
-    return 'standalone'
-  end
-  
-  if vim.fn.isdirectory(buildDir .. '/Debug/VST3') == 1 or 
-     vim.fn.isdirectory(buildDir .. '/Debug/AU') == 1 or
-     vim.fn.isdirectory(buildDir .. '/Release/VST3') == 1 or
-     vim.fn.isdirectory(buildDir .. '/Release/AU') == 1 then
-    return 'plugin'
+  for _, buildDir in ipairs(buildDirs) do
+    -- Check for standalone artefacts
+    if vim.fn.isdirectory(buildDir .. '/Debug/Standalone') == 1 or 
+       vim.fn.glob(buildDir .. '/*App_artefacts/Debug'):len() > 0 then
+      return 'standalone'
+    end
+    
+    -- Check for plugin artefacts
+    if vim.fn.isdirectory(buildDir .. '/Debug/VST3') == 1 or 
+       vim.fn.isdirectory(buildDir .. '/Debug/AU') == 1 or
+       vim.fn.glob(buildDir .. '/*_artefacts/Debug/*.vst3'):len() > 0 or
+       vim.fn.glob(buildDir .. '/*_artefacts/Debug/*.component'):len() > 0 then
+      return 'plugin'
+    end
   end
   
   return nil -- Cannot detect

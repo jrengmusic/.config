@@ -52,24 +52,28 @@ function M.setup()
     if projectType == 'plugin' then
       local config = dapConfig.loadDawConfig()
       if config and config.daw then
-        vim.fn.system(string.format('hs -c "require(\'debug-layout\').setupDebugLayout(\'%s\')"', config.daw))
+        local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
+        vim.fn.system(string.format('%s -c "require(\'debug-layout\').setupDebugLayout(\'%s\')"', hs_cmd, config.daw))
       end
     end
   end
   dap.listeners.before.event_terminated.dapui_config = function()
     dapui.close()
     -- Restore layout when terminated
-    vim.fn.system('hs -c "require(\'debug-layout\').restoreNormalLayout()"')
+    local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
+    vim.fn.system(string.format('%s -c "require(\'debug-layout\').restoreNormalLayout()"', hs_cmd))
   end
   dap.listeners.before.event_exited.dapui_config = function()
     dapui.close()
     -- Restore layout when exited
-    vim.fn.system('hs -c "require(\'debug-layout\').restoreNormalLayout()"')
+    local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
+    vim.fn.system(string.format('%s -c "require(\'debug-layout\').restoreNormalLayout()"', hs_cmd))
   end
 
   -- Focus nvim pane when breakpoint hit
   dap.listeners.after.event_stopped.focus_nvim = function()
-    vim.fn.system('hs -c "require(\'debug-layout\').focusNvimPane()"')
+    local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
+    vim.fn.system(string.format('%s -c "require(\'debug-layout\').focusNvimPane()"', hs_cmd))
   end
 
   -- Float standalone app windows (don't tile them in PaperWM)
