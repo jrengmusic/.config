@@ -84,5 +84,5 @@ end
 -- Close console on launch (prevents it from auto-opening)
 local consoleWin = hs.console.hswindow()
 if consoleWin then
-  consoleWin:close()
+	consoleWin:close()
 end
