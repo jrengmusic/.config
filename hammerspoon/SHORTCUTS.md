@@ -16,6 +16,7 @@ Enter modal mode with `Ctrl+Space`. Press `Escape` to exit.
 | `=` | Increase width |
 | `-` | Decrease width |
 | `Return` | Center window |
+| `Space` | Toggle floating |
 | `Escape` | Exit modal mode |
 
 ### Default Hotkeys (when modal is disabled)

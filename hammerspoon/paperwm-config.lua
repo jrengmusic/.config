@@ -118,5 +118,6 @@ local function splitEqual()
 end
 
 modal:bind({}, "0", nil, splitEqual)
+modal:bind({}, "space", nil, actions.toggle_floating)
 
 PaperWM:start()

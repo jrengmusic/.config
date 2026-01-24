@@ -14,6 +14,8 @@
 !tmux/**
 !hammerspoon/
 !hammerspoon/**
+!zsh/
+!zsh/**
 
 # Keep .gitignore itself
 !.gitignore

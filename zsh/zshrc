@@ -1,0 +1,139 @@
+# [ -f ~/.zprofile ] && source ~/.zprofile
+
+alias vim="nvim"
+alias :q="exit"
+
+autoload -Uz compinit && compinit
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
+#shortcuts
+alias kuassa='cd ~/Documents/Poems/kuassa'
+alias lib='cd ~/Documents/Poems/kuassa/___lib___'
+alias inf='cd ~/Documents/Poems/inf'
+alias dev='cd ~/Documents/Poems/dev'
+alias modules='cd ~/Documents/Poems/inf/___modules___/'
+
+alias ls='/opt/local/bin/eza'
+alias keju='~/Documents/Poems/inf/___user-modules___/automation/Keju_x64'
+
+# fzf configuration
+# Dot directories to always include
+DOT_INCLUDE=(".config" ".local" ".carol")
+
+# Individual dotfiles to include (in home directory)
+DOT_FILES=(".zshrc" ".zprofile" ".zshenv" ".gitconfig")
+
+# Directories/files to exclude
+EXCLUDE_PATTERNS=(
+  "*.noindex*"
+  "*/.DS_Store"
+  "*/node_modules/*"
+  "*/.git/*"
+  "*/.cache/*"
+  "*/build/*"
+  "*/dist/*"
+  "*/.vscode/*"
+  "*/Library/*"
+)
+
+# Build the find pattern for dot directories
+DOT_PATTERN=""
+for dir in "${DOT_INCLUDE[@]}"; do
+  DOT_PATTERN="$DOT_PATTERN -o -path \"*/$dir/*\""
+done
+
+# Add individual dotfiles
+for file in "${DOT_FILES[@]}"; do
+  DOT_PATTERN="$DOT_PATTERN -o -name \"$file\""
+done
+
+# Build exclusion pattern
+EXCLUDE=""
+for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+  EXCLUDE="$EXCLUDE -not -path \"$pattern\""
+done
+
+# Exclude hidden files EXCEPT specific dot directories/files, and exclude garbage
+export FZF_CTRL_T_COMMAND="find . -type f $EXCLUDE \( -not -path \"*/\.*\" $DOT_PATTERN \)"
+
+source /opt/local/share/fzf/shell/key-bindings.zsh
+source /opt/local/share/fzf/shell/completion.zsh
+
+# Custom fzf options
+export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:500 {}' \
+  --bind 'ctrl-v:execute(nvim {})' \
+  --bind 'ctrl-o:execute(open {})' \
+  --bind 'ctrl-y:execute-silent(echo {} | pbcopy)+abort'"
+
+# Ctrl+F for file search
+bindkey '^F' fzf-file-widget
+#
+# zsh-syntax-highlighting
+source /opt/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# Customize zsh-syntax-highlighting colors to match nvim gfx theme
+ZSH_HIGHLIGHT_STYLES[unknown-token]="fg=#f74a4a,bold"          # error red
+ZSH_HIGHLIGHT_STYLES[reserved-word]="fg=#4080ff,bold"          # keyword blue
+ZSH_HIGHLIGHT_STYLES[alias]="fg=#80ffff"                       # func cyan
+ZSH_HIGHLIGHT_STYLES[suffix-alias]="fg=#80ffff"                # func cyan
+ZSH_HIGHLIGHT_STYLES[global-alias]="fg=#80ffff"                # func cyan
+ZSH_HIGHLIGHT_STYLES[builtin]="fg=#4080ff,bold"                # keyword blue
+ZSH_HIGHLIGHT_STYLES[function]="fg=#80ffff"                    # func cyan
+ZSH_HIGHLIGHT_STYLES[command]="fg=#80ffff"                     # func cyan
+ZSH_HIGHLIGHT_STYLES[precommand]="fg=#00c0ff"                  # declaration cyan
+ZSH_HIGHLIGHT_STYLES[commandseparator]="fg=#808080"            # delimiter gray
+ZSH_HIGHLIGHT_STYLES[hashed-command]="fg=#80ffff"              # func cyan
+ZSH_HIGHLIGHT_STYLES[autodirectory]="fg=#00c6ff"               # variable cyan
+ZSH_HIGHLIGHT_STYLES[path]="fg=#c0c0c0"                        # fg default
+ZSH_HIGHLIGHT_STYLES[path_pathseparator]="fg=#808080"         # delimiter gray
+ZSH_HIGHLIGHT_STYLES[path_prefix]="fg=#c0c0c0"                 # fg default
+ZSH_HIGHLIGHT_STYLES[path_prefix_pathseparator]="fg=#808080"  # delimiter gray
+ZSH_HIGHLIGHT_STYLES[globbing]="fg=#ffa0ff"                    # type magenta
+ZSH_HIGHLIGHT_STYLES[history-expansion]="fg=#9aff00"           # preprocessor green
+ZSH_HIGHLIGHT_STYLES[single-hyphen-option]="fg=#00c6ff"        # variable cyan
+ZSH_HIGHLIGHT_STYLES[double-hyphen-option]="fg=#00c6ff"        # variable cyan
+ZSH_HIGHLIGHT_STYLES[back-quoted-argument]="fg=#ffc0c0"        # string pink
+ZSH_HIGHLIGHT_STYLES[single-quoted-argument]="fg=#ffc0c0"      # string pink
+ZSH_HIGHLIGHT_STYLES[double-quoted-argument]="fg=#ffc0c0"      # string pink
+ZSH_HIGHLIGHT_STYLES[dollar-quoted-argument]="fg=#ffc0c0"      # string pink
+ZSH_HIGHLIGHT_STYLES[rc-quote]="fg=#ffadb0"                    # character pink
+ZSH_HIGHLIGHT_STYLES[dollar-double-quoted-argument]="fg=#00c6ff" # variable cyan
+ZSH_HIGHLIGHT_STYLES[back-double-quoted-argument]="fg=#ffadb0" # character pink
+ZSH_HIGHLIGHT_STYLES[back-dollar-quoted-argument]="fg=#ffadb0" # character pink
+ZSH_HIGHLIGHT_STYLES[assign]="fg=#00c6ff"                      # variable cyan
+ZSH_HIGHLIGHT_STYLES[redirection]="fg=#4080ff"                 # keyword blue
+ZSH_HIGHLIGHT_STYLES[comment]="fg=#80a0ff,italic"              # comment blue
+ZSH_HIGHLIGHT_STYLES[named-fd]="fg=#00c6ff"                    # variable cyan
+ZSH_HIGHLIGHT_STYLES[numeric-fd]="fg=#00ff00"                  # number green
+ZSH_HIGHLIGHT_STYLES[arg0]="fg=#80ffff"                        # func cyan
+ZSH_HIGHLIGHT_STYLES[bracket-error]="fg=#f74a4a,bold"          # error red
+ZSH_HIGHLIGHT_STYLES[bracket-level-1]="fg=#808080"             # delimiter gray
+ZSH_HIGHLIGHT_STYLES[bracket-level-2]="fg=#808080"             # delimiter gray
+ZSH_HIGHLIGHT_STYLES[bracket-level-3]="fg=#808080"             # delimiter gray
+ZSH_HIGHLIGHT_STYLES[bracket-level-4]="fg=#808080"             # delimiter gray
+ZSH_HIGHLIGHT_STYLES[bracket-level-5]="fg=#808080"             # delimiter gray
+ZSH_HIGHLIGHT_STYLES[cursor-matchingbracket]="fg=#ffffff,bg=#4080ff,bold" # matching paren
+export PATH="$HOME/Library/cmake-4.2.0-macos-universal/CMake.app/Contents/bin:$PATH"
+
+# bun completions
+[ -s "~/.bun/_bun" ] && source "~/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# opencode
+export PATH=~/.opencode/bin:$PATH
+
+# This initializes zoxide and sets up the 'cd' alias automatically
+eval "$(zoxide init zsh --cmd cd)"
+alias zi='__zoxide_zi'
+
+# CAROL Framework
+export PATH="$HOME/.carol/bin:$PATH"
+
+# Oh my posh
+if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
+  eval "$(oh-my-posh init zsh --config ~/.config/omp/gfx.json)"
+fi
+

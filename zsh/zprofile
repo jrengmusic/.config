@@ -1,0 +1,13 @@
+export PATH="$HOME/.local/bin:$PATH"
+export MANPATH="/opt/local/share/man:$MANPATH"
+
+# MacPorts Installer addition on 2025-11-24_at_17:23:23: adding an appropriate PATH variable for use with MacPorts.
+export PATH="/opt/local/bin:/opt/local/sbin:$PATH"
+# Finished adapting your PATH environment variable for use with MacPorts.
+
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+
