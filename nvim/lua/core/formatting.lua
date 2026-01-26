@@ -32,7 +32,10 @@ function M.formatBuffer()
     local exitCode = vim.v.shell_error
 
     if exitCode == 0 and formatted ~= '' then
-      vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.fn.split(formatted, '\n'))
+      -- Check if buffer is modifiable before trying to format
+      if vim.bo.modifiable then
+        vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.fn.split(formatted, '\n'))
+      end
     elseif exitCode ~= 0 then
       vim.notify('clang-format failed (exit ' .. exitCode .. '): ' .. formatted, vim.log.levels.ERROR)
     end

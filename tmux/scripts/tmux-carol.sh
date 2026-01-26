@@ -32,9 +32,9 @@ tmux list-panes -s -F '#{pane_id}' | while read pane_id; do tmux send-keys -t "$
 
 # Wait for shells to load
 sleep 2
-tmux select-pane -t 1 -T ANALYST
-tmux select-pane -t 2 -T INSPECTOR
-tmux select-pane -t 3 -T SCAFFOLDER
-tmux select-pane -t 4 -T CARETAKER
+tmux select-pane -t 1 -T COUNSELOR
+tmux select-pane -t 2 -T AUDITOR
+tmux select-pane -t 3 -T ENGINEER
+tmux select-pane -t 4 -T MASCHINIST
 tmux select-pane -t 5 -T SURGEON
 tmux select-pane -t 6 -T JOURNALIST

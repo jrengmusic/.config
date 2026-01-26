@@ -1,29 +1,30 @@
 -- Clangd LSP configuration
 local M = {}
 
-function M.setup(capabilities)
-  local servers = {
+  function M.setup(capabilities)
+    local servers = {
     clangd = {
       cmd = {
         vim.fn.stdpath('data') .. '/mason/bin/clangd',
         '--header-insertion=iwyu',
         '--clang-tidy',
         '--completion-style=detailed',
+        '--header-insertion-decorators',
       },
     },
-    lua_ls = {
-      settings = {
-        Lua = {
-          completion = { callSnippet = 'Replace' },
+      lua_ls = {
+        settings = {
+          Lua = {
+            completion = { callSnippet = 'Replace' },
+          },
         },
       },
-    },
-    gopls = {},
-    zls = {},
-    ts_ls = {},
-    pyright = {},
-    cmake = {},
-  }
+      gopls = {},
+      zls = {},
+      ts_ls = {},
+      pyright = {},
+      cmake = {},
+    }
 
   local ensureInstalled = vim.tbl_keys(servers or {})
   vim.list_extend(ensureInstalled, { 'stylua', 'clangd', 'gopls', 'zls', 'prettier' })

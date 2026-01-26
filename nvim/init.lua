@@ -39,6 +39,7 @@ require('lazy').setup({
   plug { repo = 'stevearc/conform.nvim', module = 'plugins.formatting' },
   plug { repo = 'mfussenegger/nvim-dap', module = 'plugins.dap' },
   plug { repo = 'folke/snacks.nvim', module = 'plugins.picker' },
+  plug { repo = 'L3MON4D3/LuaSnip', module = 'plugins.snippets' },
 }, require('core.lazy_config').opts)
 
 -- ============================================================================
