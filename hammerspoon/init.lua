@@ -26,7 +26,7 @@ require("caffeine")
 require("fnkeys")
 require("reload")
 require("poems")
-require("paperwm-config")
+require("paper-wm")
 require("debug-layout")
 
 -- Create modal hotkey for shutdown commands (and app watcher below)

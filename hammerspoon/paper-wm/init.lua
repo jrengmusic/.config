@@ -19,6 +19,10 @@ end
 
 PaperWM:bindHotkeys(PaperWM.default_hotkeys)
 
+-- Menubar icon for modal state
+local statusBar = hs.menubar.new()
+statusBar:setIcon("paper-wm/inactive.png")
+
 local modal = hs.hotkey.modal.new({ "ctrl" }, "space")
 
 local actions = PaperWM.actions.actions()
@@ -43,14 +47,17 @@ modal:bind({}, "return", nil, actions.center_window)
 modal:bind({}, "tab", nil, actions.full_width)
 modal:bind({}, "=", nil, actions.increase_width)
 modal:bind({}, "-", nil, actions.decrease_width)
+
 modal:bind({}, "escape", function()
-	hs.alert.show("NORMAL")
+	statusBar:setIcon("paper-wm/inactive.png")
 	modal:exit()
 end)
 
 function modal:entered()
-	hs.alert.show("WINDOW")
+	statusBar:setIcon("paper-wm/active.png")
 end
+
+
 
 -- Custom: Split focused + adjacent window 50/50 (others pushed off-screen)
 local function splitEqual()
