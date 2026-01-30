@@ -307,11 +307,16 @@ M.setup = function()
   hi('GitSignsChange', { fg = colors.warning })
   hi('GitSignsDelete', { fg = colors.error })
 
-  -- Telescope
-  hi('TelescopeBorder', { fg = '#4a4a4a' })
-  hi('TelescopePromptBorder', { fg = colors.func })
-  hi('TelescopeSelection', { bg = colors.current_line })
-  hi('TelescopeMatching', { fg = colors.number, gui = 'bold' })
+   -- Telescope
+   hi('TelescopeBorder', { fg = '#4a4a4a' })
+   hi('TelescopePromptBorder', { fg = colors.func })
+   hi('TelescopeSelection', { bg = colors.current_line })
+   hi('TelescopeMatching', { fg = colors.number, gui = 'bold' })
+
+   -- Terminal error highlighting
+   hi('TerminalCaret', { fg = '#FFA500', bold = true })  -- Orange for ^^^^^^^
+   hi('TerminalLineNumber', { fg = '#00FF00', bold = true })  -- Green for line numbers
+   hi('TerminalFilename', { fg = '#00FFFF', bold = false })  -- Cyan for filenames
 end
 
 -- Auto-load the theme
