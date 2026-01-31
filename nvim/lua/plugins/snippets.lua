@@ -55,7 +55,7 @@ return {
 
       -- Separator
       luasnip.snippet('sep', {
-        luasnip.text_node('//=============================================================================='),
+        luasnip.text_node({'', '//=============================================================================='}),
       }),
 
       -- JUCE leak detector with separator
@@ -202,12 +202,12 @@ return {
       }),
 
       -- Namespace with proper format
-      luasnip.snippet('ns', {
+      luasnip.snippet('nam', {
         luasnip.text_node('namespace '),
         luasnip.insert_node(1, 'name'),
         luasnip.text_node({'', ''}),
         luasnip.text_node('{'),
-        luasnip.text_node({'/*____________________________________________________________________________*/'}),
+        luasnip.text_node({'/*____________________________________________________________________________*/', ''}),
         luasnip.text_node({'\t'}),
         luasnip.insert_node(2, '// namespace content'),
         luasnip.text_node({'', '/**____________________________END OF NAMESPACE______________________________*/'}),

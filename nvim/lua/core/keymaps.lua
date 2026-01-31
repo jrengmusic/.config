@@ -360,7 +360,69 @@ function M.setupDap()
       -- Show clean build output in terminal split
       vim.cmd('botright 20split | terminal ' .. script .. ' ' .. root)
       vim.cmd('startinsert')
-    end, { desc = 'Clean + Reconfigure build' })
+     end, { desc = 'Clean + Reconfigure build' })
+end
+
+-- Surround keymaps (called after mini.surround loads)
+function M.setupSurround()
+  local surround = require('mini.surround')
+  local opts = { noremap = true, silent = true }
+
+  local function map_surround(suffix, char)
+    -- Normal mode: surround current word
+    vim.keymap.set('n', '<leader>s' .. suffix, function()
+      vim.cmd('normal viw')
+      surround.add({ char })
+    end, opts)
+    -- Visual mode: surround selection
+    vim.keymap.set('v', '<leader>s' .. suffix, function()
+      surround.add({ char })
+    end, opts)
+  end
+
+  map_surround('(', '(')
+  map_surround('[', '[')
+  map_surround('{', '{')
+  map_surround('"', '"')
+  map_surround("'", "'")
+  map_surround('`', '`')
+  map_surround('<', '<')
+end
+
+-- Mini.pairs keymaps
+function M.setupMiniPairs()
+  -- Tab to jump out of brackets/quotes
+  vim.keymap.set('i', '<Tab>', function()
+    local col = vim.api.nvim_win_get_cursor(0)[2]
+    local char = vim.api.nvim_get_current_line():sub(col + 1, col + 1)
+
+    if char:match('[%)%]%}%"\'`]') then
+      return '<Right>'
+    else
+      return '<Tab>'
+    end
+  end, { expr = true, noremap = true })
+
+  -- Semicolon to jump out of () or {} and add ;
+  vim.keymap.set('i', ';', function()
+    local col = vim.api.nvim_win_get_cursor(0)[2]
+    local char = vim.api.nvim_get_current_line():sub(col + 1, col + 1)
+
+    if char == ')' or char == '}' then
+      return '<Esc>a;'
+    else
+      return ';'
+    end
+  end, { expr = true, noremap = true })
+end
+
+-- Flash keymaps
+function M.setupFlash()
+  vim.keymap.set({ 'n', 'x', 'o' }, 's', function() require('flash').jump() end, { desc = 'Flash' })
+  vim.keymap.set({ 'n', 'x', 'o' }, 'S', function() require('flash').treesitter() end, { desc = 'Flash Treesitter' })
+  vim.keymap.set('o', 'r', function() require('flash').remote() end, { desc = 'Remote Flash' })
+  vim.keymap.set({ 'o', 'x' }, 'R', function() require('flash').treesitter_search() end, { desc = 'Treesitter Search' })
+  vim.keymap.set('c', '<c-s>', function() require('flash').toggle() end, { desc = 'Toggle Flash Search' })
 end
 
 return M

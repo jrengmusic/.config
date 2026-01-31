@@ -166,6 +166,10 @@ M.setup = function()
   hi('DiagnosticUnderlineWarn', { sp = colors.warning, gui = 'undercurl' })
   hi('DiagnosticUnderlineInfo', { sp = colors.info, gui = 'undercurl' })
   hi('DiagnosticUnderlineHint', { sp = colors.hint, gui = 'undercurl' })
+  hi('DiagnosticSignError', { fg = colors.error })
+  hi('DiagnosticSignWarn', { fg = colors.warning })
+  hi('DiagnosticSignInfo', { fg = colors.info })
+  hi('DiagnosticSignHint', { fg = colors.hint })
 
    -- Syntax highlighting
    hi('Comment', { fg = colors.comment, gui = 'none' })

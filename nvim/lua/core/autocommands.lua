@@ -72,6 +72,33 @@ function M.setup()
         
         -- Column number in yellow
         vim.fn.matchadd('DiagnosticWarn', ':\\d\\+:\\zs\\d\\+')
+
+        -- C++ syntax highlighting for code snippets in errors
+        -- Preprocessor directives
+        vim.api.nvim_set_hl(0, 'TerminalPreproc', { fg = '#9aff00', bold = true })
+        vim.fn.matchadd('TerminalPreproc', '^\\s*#include\\>')
+        vim.fn.matchadd('TerminalPreproc', '^\\s*#define\\>')
+        vim.fn.matchadd('TerminalPreproc', '^\\s*#if\\>')
+        vim.fn.matchadd('TerminalPreproc', '^\\s*#else\\>')
+        vim.fn.matchadd('TerminalPreproc', '^\\s*#endif\\>')
+        vim.fn.matchadd('TerminalPreproc', '^\\s*#ifdef\\>')
+        vim.fn.matchadd('TerminalPreproc', '^\\s*#ifndef\\>')
+
+        -- String literals
+        vim.api.nvim_set_hl(0, 'TerminalString', { fg = '#ffc0c0' })
+        vim.fn.matchadd('TerminalString', '"[^"]*"')
+        vim.fn.matchadd('TerminalString', "'[^']*'")
+
+        -- Keywords
+        vim.api.nvim_set_hl(0, 'TerminalKeyword', { fg = '#1919ff', bold = true })
+        local keywords = {'if', 'else', 'for', 'while', 'return', 'void', 'int', 'float', 'double', 'bool', 'char', 'unsigned', 'const', 'static', 'class', 'struct', 'public', 'private', 'protected', 'virtual', 'inline', 'constexpr', 'auto', 'decltype', 'template', 'typename'}
+        for _, kw in ipairs(keywords) do
+          vim.fn.matchadd('TerminalKeyword', '\\<' .. kw .. '\\>')
+        end
+
+        -- Function names (followed by opening paren)
+        vim.api.nvim_set_hl(0, 'TerminalFunction', { fg = '#80ffff' })
+        vim.fn.matchadd('TerminalFunction', '\\<\\w\\+\\>(')
       end)
     end,
     desc = 'Highlight error indicators in terminal',
