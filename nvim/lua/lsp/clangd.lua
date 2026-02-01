@@ -10,6 +10,7 @@ local M = {}
         '--clang-tidy',
         '--completion-style=detailed',
         '--header-insertion-decorators',
+        '--query-driver=/usr/bin/c++,/usr/bin/clang++',
       },
     },
       lua_ls = {

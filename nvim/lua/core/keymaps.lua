@@ -8,7 +8,12 @@ function M.setup()
   vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highlights' })
   vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic quickfix list' })
   vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
-  vim.keymap.set('n', '<leader><Tab>', function() require('lsp.header-source').toggleHeaderSplit() end, { desc = 'Split with definition/type' })
+  -- Split commands (<leader>s group)
+  vim.keymap.set('n', '<leader>ss', function() require('lsp.header-source').toggleHeaderSplit() end, { desc = 'Split header/source' })
+  vim.keymap.set('n', '<leader>s\\', '<C-w>v', { desc = 'Split vertical' })
+  vim.keymap.set('n', '<leader>s-', '<C-w>s', { desc = 'Split horizontal' })
+  vim.keymap.set('n', '<leader>s=', '<C-w>=', { desc = 'Equal split sizes' })
+  vim.keymap.set('n', '<leader><Tab>', '<C-w>o', { desc = 'Close other splits' })
 
   -- Window navigation
   vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Focus left window' })
@@ -244,6 +249,15 @@ function M.setupDap()
      
      -- Shared terminal handler for build process
      local function runBuildInTerminal(cmd, onSuccess)
+       -- Reuse existing build terminal if open
+       for _, win in ipairs(vim.api.nvim_list_wins()) do
+         local buf = vim.api.nvim_win_get_buf(win)
+         if vim.bo[buf].buftype == 'terminal' then
+           vim.api.nvim_win_close(win, true)
+           break
+         end
+       end
+       
        vim.cmd('botright 15split | terminal ' .. cmd)
        
        local term_buf = vim.api.nvim_get_current_buf()
@@ -363,30 +377,11 @@ function M.setupDap()
      end, { desc = 'Clean + Reconfigure build' })
 end
 
--- Surround keymaps (called after mini.surround loads)
+-- Surround: use mini.surround defaults
+-- sa{motion}{char} = add surround (e.g., saiw" surrounds word with ")
+-- sd{char}         = delete surround
+-- sr{old}{new}     = replace surround
 function M.setupSurround()
-  local surround = require('mini.surround')
-  local opts = { noremap = true, silent = true }
-
-  local function map_surround(suffix, char)
-    -- Normal mode: surround current word
-    vim.keymap.set('n', '<leader>s' .. suffix, function()
-      vim.cmd('normal viw')
-      surround.add({ char })
-    end, opts)
-    -- Visual mode: surround selection
-    vim.keymap.set('v', '<leader>s' .. suffix, function()
-      surround.add({ char })
-    end, opts)
-  end
-
-  map_surround('(', '(')
-  map_surround('[', '[')
-  map_surround('{', '{')
-  map_surround('"', '"')
-  map_surround("'", "'")
-  map_surround('`', '`')
-  map_surround('<', '<')
 end
 
 -- Mini.pairs keymaps
@@ -409,7 +404,7 @@ function M.setupMiniPairs()
     local char = vim.api.nvim_get_current_line():sub(col + 1, col + 1)
 
     if char == ')' or char == '}' then
-      return '<Esc>a;'
+      return '<Right>;'
     else
       return ';'
     end

@@ -296,6 +296,8 @@ M.setup = function()
   hi('@define', { fg = colors.preprocessor })
   hi('@lsp.type.dependent', { fg = colors.preprocessor })
 
+
+
   -- C++ primitive types as keywords (void, int, float, etc.)
   hi('@type.builtin', { fg = colors.keyword, gui = 'bold' })
   hi('@lsp.type.type', { fg = colors.keyword, gui = 'bold' })

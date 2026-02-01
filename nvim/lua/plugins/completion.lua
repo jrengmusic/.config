@@ -20,7 +20,14 @@ return {
           elseif cmp.visible() then
             cmp.select_next_item()
           else
-            fallback()
+            -- Jump out of brackets/quotes
+            local col = vim.api.nvim_win_get_cursor(0)[2]
+            local char = vim.api.nvim_get_current_line():sub(col + 1, col + 1)
+            if char:match('[%)%]%}%"\'%>`]') then
+              vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Right>', true, false, true), 'n', false)
+            else
+              fallback()
+            end
           end
         end, { 'i', 's' }),
         ['<S-Tab>'] = cmp.mapping(function(fallback)
