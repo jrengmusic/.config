@@ -70,7 +70,7 @@ function M.setup()
   -- ============================================================================
   vim.keymap.set('n', '<leader>ff', function() require('core.cmake-picker').files() end, { desc = 'Find files (cmake)' })
   vim.keymap.set('n', '<leader>fx', function() require('core.cmake-picker').open_explorer() end, { desc = 'Project explorer (cmake)' })
-  vim.keymap.set('n', '<leader>fg', function() Snacks.picker.grep() end, { desc = 'Find by grep' })
+  vim.keymap.set('n', '<leader>fg', function() require('core.cmake-picker').grep() end, { desc = 'Find by grep (cmake)' })
   vim.keymap.set('n', '<leader>fb', function() Snacks.picker.buffers() end, { desc = 'Find buffers' })
   vim.keymap.set('n', '<leader>fh', function() Snacks.picker.help() end, { desc = 'Find help' })
   vim.keymap.set('n', '<leader>\\', function() Snacks.picker.explorer() end, { desc = 'File explorer' })

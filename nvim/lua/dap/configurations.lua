@@ -346,6 +346,7 @@ function M.setup()
       name = 'Attach to DAW (VST3)',
       type = 'codelldb',
       request = 'attach',
+      console = 'integratedTerminal',
       pid = getDawPid,
       program = function()
         local root = vim.fn.getcwd()

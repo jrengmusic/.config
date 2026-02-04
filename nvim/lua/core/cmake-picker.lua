@@ -404,4 +404,94 @@ function M.regenerate()
   end
 end
 
+function M.grep()
+  local Snacks = require('snacks')
+  local compile_db = find_compile_db()
+
+  if compile_db == nil then
+    Snacks.picker.grep()
+    return
+  end
+
+  local data = parse_compile_db(compile_db)
+  if data == nil then
+    Snacks.picker.grep()
+    return
+  end
+
+  -- SSOT: Use EXACT same logic as M.files() for directory discovery
+  local seen_dirs = {}
+  local dirs = {}
+  local cwd = vim.fn.getcwd()
+  local seen_modules = {}
+  local source_root = cwd .. '/Source'
+
+  -- First pass: collect directories from compile_commands.json
+  for _, entry in ipairs(data) do
+    local file = entry.file
+    if file ~= nil then
+      local skip = file:find('/Builds/') ~= nil
+      if not skip then
+        local group, submodule = classify_file(file)
+
+        if group == 'Sources' then
+          local dir = vim.fn.fnamemodify(file, ':h')
+          if seen_dirs[dir] == nil then
+            seen_dirs[dir] = true
+            table.insert(dirs, dir)
+          end
+        elseif group == 'JUCE Modules' and submodule ~= nil then
+          local idx = file:find('/' .. submodule .. '/')
+          if idx ~= nil then
+            local module_root = file:sub(1, idx + #submodule)
+            if seen_modules[submodule] == nil then
+              seen_modules[submodule] = module_root
+              -- Add module root directory
+              if seen_dirs[module_root] == nil then
+                seen_dirs[module_root] = true
+                table.insert(dirs, module_root)
+              end
+            end
+          end
+          -- Also add the file's directory
+          local dir = vim.fn.fnamemodify(file, ':h')
+          if seen_dirs[dir] == nil then
+            seen_dirs[dir] = true
+            table.insert(dirs, dir)
+          end
+        end
+      end
+    end
+  end
+
+  -- Second pass: scan ALL directories from discovered modules
+  for submodule, module_root in pairs(seen_modules) do
+    local module_files = scan_module_dir(module_root)
+    for _, f in ipairs(module_files) do
+      local dir = vim.fn.fnamemodify(f.path, ':h')
+      if seen_dirs[dir] == nil then
+        seen_dirs[dir] = true
+        table.insert(dirs, dir)
+      end
+    end
+  end
+
+  -- Third pass: scan ALL Source directories
+  local source_files = scan_source_dir()
+  for _, file in ipairs(source_files) do
+    local dir = vim.fn.fnamemodify(file, ':h')
+    if seen_dirs[dir] == nil then
+      seen_dirs[dir] = true
+      table.insert(dirs, dir)
+    end
+  end
+
+  if #dirs == 0 then
+    Snacks.picker.grep()
+    return
+  end
+
+  Snacks.picker.grep({ dirs = dirs })
+end
+
 return M
