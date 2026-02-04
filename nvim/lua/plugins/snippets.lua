@@ -56,7 +56,7 @@ return {
       }, {
         callbacks = {
           [-1] = {
-            [require('luasnip.util.events').post_expand] = function()
+            post_expand = function()
               vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
             end,
           },
