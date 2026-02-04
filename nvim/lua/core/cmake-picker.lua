@@ -333,12 +333,36 @@ function M.files()
     end
   end
 
+  -- Fourth pass: add CMakeLists.txt from project root
+  local cmake_file = cwd .. '/CMakeLists.txt'
+  if vim.fn.filereadable(cmake_file) == 1 and seen[cmake_file] == nil then
+    seen[cmake_file] = true
+    table.insert(items, {
+      idx = #items + 1,
+      score = #items + 1,
+      text = 'CMakeLists.txt',
+      file = cmake_file,
+      module = 'CMake',
+      display = 'CMakeLists.txt',
+    })
+  end
+
   table.sort(items, function(a, b)
     if a.module == b.module then
       return a.display < b.display
     end
-    if a.module == 'Source' then return true end
-    if b.module == 'Source' then return false end
+    -- Order: exact matches first, then prefixes, then others
+    local MODULE_ORDER = { 'CMake', 'Source', 'kuassa_', 'bo_', 'juce_' }
+    local function priority(mod)
+      for i, pattern in ipairs(MODULE_ORDER) do
+        if mod == pattern or mod:match('^' .. pattern) then
+          return i
+        end
+      end
+      return #MODULE_ORDER + 1
+    end
+    local pa, pb = priority(a.module), priority(b.module)
+    if pa ~= pb then return pa < pb end
     return a.module < b.module
   end)
 
