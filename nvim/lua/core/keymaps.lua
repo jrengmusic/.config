@@ -7,9 +7,12 @@ function M.setup()
   -- ============================================================================
   vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highlights' })
   vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic quickfix list' })
+  vim.keymap.set('n', 'ZA', '<cmd>wqa!<CR>', { desc = 'Save all and quit' })
+  vim.keymap.set('n', '<leader>tt', function() require('core.tui').tit() end, { desc = 'Open TIT (git TUI)' })
+  vim.keymap.set('n', '<leader>tc', function() require('core.tui').cake() end, { desc = 'Open Cake TUI' })
   vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
   -- Split commands (<leader>s group)
-  vim.keymap.set('n', '<leader>ss', function() require('lsp.header-source').toggleHeaderSplit() end, { desc = 'Split header/source' })
+  vim.keymap.set('n', '<leader>ss', function() require('lsp.header-source').syncSplit() end, { desc = 'Sync header/source split' })
   vim.keymap.set('n', '<leader>s\\', '<C-w>v', { desc = 'Split vertical' })
   vim.keymap.set('n', '<leader>s-', '<C-w>s', { desc = 'Split horizontal' })
   vim.keymap.set('n', '<leader>s=', '<C-w>=', { desc = 'Equal split sizes' })
@@ -64,7 +67,8 @@ vim.keymap.set('n', '<leader>x', '<C-w>q', { desc = 'Close window' })
   -- ============================================================================
   -- PICKER (snacks.nvim)
   -- ============================================================================
-  vim.keymap.set('n', '<leader>ff', function() Snacks.picker.files() end, { desc = 'Find files' })
+  vim.keymap.set('n', '<leader>ff', function() require('core.cmake-picker').files() end, { desc = 'Find files (cmake)' })
+  vim.keymap.set('n', '<leader>fx', function() require('core.cmake-picker').open_explorer() end, { desc = 'Project explorer (cmake)' })
   vim.keymap.set('n', '<leader>fg', function() Snacks.picker.grep() end, { desc = 'Find by grep' })
   vim.keymap.set('n', '<leader>fb', function() Snacks.picker.buffers() end, { desc = 'Find buffers' })
   vim.keymap.set('n', '<leader>fh', function() Snacks.picker.help() end, { desc = 'Find help' })
@@ -360,6 +364,84 @@ function M.setupDap()
        vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
      end
    end, { desc = 'Build + Launch + Attach' })
+
+   -- Build only (no launch, no attach)
+   vim.keymap.set('n', '<leader><C-b>', function()
+     vim.cmd('silent! wa')
+     
+     local root = vim.fn.getcwd()
+     local script = vim.fn.stdpath('config') .. '/scripts/build-debug.sh'
+     
+     if vim.fn.filereadable(script) ~= 1 then
+       vim.notify('build-debug.sh not found in nvim config', vim.log.levels.ERROR)
+       return
+     end
+     
+     local projectType = dapConfig.detectProjectType()
+     
+     local function runBuildOnly(scheme, format)
+       local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. scheme .. ' ' .. format
+       
+       for _, win in ipairs(vim.api.nvim_list_wins()) do
+         local buf = vim.api.nvim_win_get_buf(win)
+         if vim.bo[buf].buftype == 'terminal' then
+           vim.api.nvim_win_close(win, true)
+           break
+         end
+       end
+       
+       vim.cmd('botright 15split | terminal ' .. cmd)
+       
+       local term_buf = vim.api.nvim_get_current_buf()
+       local term_win = vim.api.nvim_get_current_win()
+       
+       vim.api.nvim_create_autocmd({'TermRequest', 'TextChangedT', 'CursorMovedI'}, {
+         buffer = term_buf,
+         callback = function()
+           if vim.api.nvim_win_is_valid(term_win) then
+             local line_count = vim.api.nvim_buf_line_count(term_buf)
+             vim.api.nvim_win_set_cursor(term_win, {line_count, 0})
+           end
+         end,
+       })
+       
+       vim.cmd('startinsert')
+       vim.api.nvim_create_autocmd('TermClose', {
+         buffer = term_buf,
+         once = true,
+         callback = function()
+           local exit_code = vim.v.event.status
+           if exit_code == 0 then
+             if vim.api.nvim_win_is_valid(term_win) then
+               vim.api.nvim_win_close(term_win, true)
+             end
+             vim.cmd('LspRestart')
+             vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
+           else
+             vim.notify('Build failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+           end
+         end,
+       })
+     end
+     
+     if projectType == 'standalone' then
+       local config = dapConfig.loadStandaloneConfig(function(cfg)
+         if cfg then runBuildOnly(cfg.buildScheme, 'Standalone') end
+       end)
+       if config then
+         runBuildOnly(config.buildScheme, 'Standalone')
+       end
+     elseif projectType == 'plugin' then
+       local config = dapConfig.loadDawConfig(function(cfg)
+         if cfg then runBuildOnly(cfg.buildScheme, cfg.format) end
+       end)
+       if config then
+         runBuildOnly(config.buildScheme, config.format)
+       end
+     else
+       vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
+     end
+   end, { desc = 'Build only (no launch)' })
 
    -- Clean build
    vim.keymap.set('n', '<leader><C-k>', function()

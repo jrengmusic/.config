@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 session_name="$1"
 old_session="$2"
+current_path="$3"
 full_name="CAROL-${session_name}"
 
 tmux rename-session -t "$old_session" "$full_name"
 
 # Create 3 columns with center pane larger (25% - 50% - 25%)
 # First split: create left (25%) and remaining (75%)
-tmux split-window -h -p 75
+tmux split-window -h -p 75 -c "$current_path"
 # Second split: split remaining into center (66% of 75% = 50%) and right (33% of 75% = 25%)
-tmux split-window -h -p 33
+tmux split-window -h -p 33 -c "$current_path"
 
 # Wait for shells to load
 sleep 0.1

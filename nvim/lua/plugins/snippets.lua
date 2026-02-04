@@ -27,7 +27,7 @@ return {
     end, 200)
     
     -- Add custom snippets after friendly ones are loaded
-    luasnip.add_snippets('cpp', {
+    local cpp_snippets = {
       -- Class definition with separator and leak detector
       luasnip.snippet('cls', {
         luasnip.text_node('//=============================================================================='),
@@ -229,7 +229,11 @@ return {
       luasnip.snippet('test', {
         luasnip.text_node('TEST SNIPPET WORKING!'),
       }),
-    })
+    }
+
+    luasnip.add_snippets('cpp', cpp_snippets)
+    luasnip.add_snippets('objcpp', cpp_snippets)
+    luasnip.add_snippets('objc', cpp_snippets)
     
     vim.keymap.set('i', '<C-l>', function() luasnip.jump(1) end, { silent = true })
     vim.keymap.set('i', '<C-h>', function() luasnip.jump(-1) end, { silent = true })
@@ -242,5 +246,9 @@ return {
     vim.keymap.set('n', '<leader>fs', function()
       require('snacks').picker.snippets()
     end, { desc = 'Snippet picker' })
+
+    vim.keymap.set('i', '<C-s>', function()
+      require('snacks').picker.snippets()
+    end, { desc = 'Snippet picker (insert mode)' })
   end,
 }

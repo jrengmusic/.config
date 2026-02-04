@@ -9,6 +9,7 @@
 | `<Esc><Esc>` | n | Force format buffer |
 | `<Esc><Esc>` | t | Exit terminal mode |
 | `<leader>q` | n | Open diagnostic quickfix list |
+| `ZA` | n | Save all and quit |
 | `<leader>x` | n | Close current window |
 | `<leader>[` | n | Jump back (jumplist) |
 | `<leader>]` | n | Jump forward (jumplist) |
@@ -17,7 +18,7 @@
 
 | Key | Action |
 |-----|--------|
-| `<leader>ss` | Toggle header/source split (C++) |
+| `<leader>ss` | Sync header/source split (C++) |
 | `<leader>s\` | Split vertical |
 | `<leader>s-` | Split horizontal |
 | `<leader>s=` | Equal split sizes |
@@ -36,7 +37,8 @@
 
 | Key | Action |
 |-----|--------|
-| `<leader>ff` | Find files |
+| `<leader>ff` | Find files (cmake-aware) |
+| `<leader>fx` | Project explorer (cmake modules) |
 | `<leader>fg` | Find by grep |
 | `<leader>fb` | Find buffers |
 | `<leader>fh` | Find help |
@@ -84,6 +86,7 @@
 | `<F11>` | Step into |
 | `<F12>` | Step out |
 | `<leader><C-r>` | Build + Launch + Attach |
+| `<leader><C-b>` | Build only (+ LSP restart) |
 | `<leader><C-k>` | Clean + Reconfigure build |
 | `<leader>db` | Toggle breakpoint |
 | `<leader>dB` | Conditional breakpoint |
@@ -151,6 +154,7 @@ Uses default mini.surround keys. **NOT** `<leader>s`.
 
 ## Snippets
 
-| Key | Action |
-|-----|--------|
-| `<leader>fs` | Find/insert snippets |
+| Key | Mode | Action |
+|-----|------|--------|
+| `<leader>fs` | n | Find/insert snippets |
+| `<C-s>` | i | Find/insert snippets |

@@ -2,6 +2,13 @@
 local M = {}
 
 function M.setup()
+  -- Filetype overrides
+  vim.filetype.add({
+    extension = {
+      mm = 'objcpp',
+    },
+  })
+
   -- Highlight on yank
   vim.api.nvim_create_autocmd('TextYankPost', {
     desc = 'Highlight when yanking text',
@@ -34,7 +41,7 @@ function M.setup()
 
   -- Format C/C++ on save
   vim.api.nvim_create_autocmd('BufWritePre', {
-    pattern = { '*.cpp', '*.c', '*.h', '*.hpp', '*.objc', '*.objcpp' },
+    pattern = { '*.cpp', '*.c', '*.h', '*.hpp', '*.objc', '*.objcpp', '*.mm' },
     callback = function()
       require('core.formatting').formatBuffer()
     end,

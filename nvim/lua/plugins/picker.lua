@@ -8,7 +8,87 @@ return {
     Snacks.setup({
       picker = {
         enabled = true,
+        actions = {
+          explorer_add_resolve = function(picker, item)
+            local current_dir = picker:dir()
+            local project_root = vim.fn.getcwd()
+            local project_name = vim.fn.fnamemodify(project_root, ':t')
+            local escaped_project_name = project_name:gsub('%-', '%%-')
+            local is_symlink_tree = current_dir:find('%.' .. escaped_project_name) ~= nil
+            
+            vim.ui.input({ prompt = 'Add file/dir (end with / for dir): ' }, function(name)
+              if name == nil or name == '' then return end
+              
+              local is_dir = name:sub(-1) == '/'
+              
+              if is_symlink_tree then
+                -- Step 1: Create file/dir in symlinked view first (for instant visibility)
+                local symlink_path = current_dir .. '/' .. (is_dir and name:sub(1, -2) or name)
+                
+                if is_dir then
+                  vim.fn.mkdir(symlink_path, 'p')
+                else
+                  vim.fn.mkdir(vim.fn.fnamemodify(symlink_path, ':h'), 'p')
+                  vim.fn.writefile({}, symlink_path)
+                end
+                
+                -- Step 2: Find real target directory from existing symlinks
+                local sample_files = vim.fn.readdir(current_dir)
+                local real_dir = nil
+                
+                for _, file in ipairs(sample_files) do
+                  local full_path = current_dir .. '/' .. file
+                  local link_target = vim.uv.fs_readlink(full_path)
+                  if link_target and file ~= (is_dir and name:sub(1, -2) or name) then
+                    real_dir = vim.fn.fnamemodify(link_target, ':h')
+                    break
+                  end
+                end
+                
+                -- Step 3: Move to real location and create proper symlink
+                if real_dir then
+                  local real_path = real_dir .. '/' .. (is_dir and name:sub(1, -2) or name)
+                  
+                  if is_dir then
+                    vim.fn.mkdir(real_path, 'p')
+                    vim.fn.delete(symlink_path, 'rf')  -- Remove temp directory
+                  else
+                    vim.fn.mkdir(vim.fn.fnamemodify(real_path, ':h'), 'p')
+                    vim.fn.rename(symlink_path, real_path)  -- Move file
+                  end
+                  
+                  -- Create proper symlink
+                  vim.fn.system({ 'ln', '-sf', real_path, symlink_path })
+                  vim.notify('Created: ' .. real_path, vim.log.levels.INFO)
+                else
+                  vim.notify('Could not find real directory - created in symlink tree', vim.log.levels.WARN)
+                end
+              else
+                -- Normal directory, create directly
+                local target_path = current_dir .. '/' .. name
+                if is_dir then
+                  vim.fn.mkdir(target_path:sub(1, -2), 'p')
+                else
+                  vim.fn.mkdir(vim.fn.fnamemodify(target_path, ':h'), 'p')
+                  vim.fn.writefile({}, target_path)
+                end
+                vim.notify('Created: ' .. target_path, vim.log.levels.INFO)
+              end
+              
+              picker:find()
+            end)
+          end,
+        },
         sources = {
+          explorer = {
+            win = {
+              list = {
+                keys = {
+                  ['a'] = 'explorer_add_resolve',
+                },
+              },
+            },
+          },
           snippets = {
             supports_live = false,
             preview = 'preview',

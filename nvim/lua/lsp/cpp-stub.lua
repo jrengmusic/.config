@@ -2,28 +2,67 @@
 -- Parses declaration under cursor and generates definition stub in .cpp file
 local M = {}
 
-local function parseDeclaration(line)
-  local pattern = '^%s*(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
-  local returnType, funcName, params = line:match(pattern)
-  
-  if not returnType or not funcName then
-    local virtualPattern = '^%s*virtual%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
-    returnType, funcName, params = line:match(virtualPattern)
-    if returnType then
-      returnType = returnType:gsub('^virtual%s+', '')
-    end
-  end
-  
-  if not returnType or not funcName then
-    local staticPattern = '^%s*static%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
-    returnType, funcName, params = line:match(staticPattern)
-    if returnType then
-      returnType = returnType:gsub('^static%s+', '')
-    end
-  end
-  
-  if not returnType or not funcName then
+local function isMacro(line)
+  return line:match('^%s*[A-Z_]+%s*%(') ~= nil
+end
+
+local function parseDeclaration(line, className)
+  if isMacro(line) then
     return nil
+  end
+  
+  local funcName, params
+  local returnType = nil
+  local isConstructor = false
+  local isDestructor = false
+  
+  if className then
+    local ctorPattern = '^%s*' .. vim.pesc(className) .. '%s*%((.*)%)%s*[;{:]?'
+    params = line:match(ctorPattern)
+    if params then
+      funcName = className
+      returnType = ''
+      isConstructor = true
+    end
+    
+    if not isConstructor then
+      local dtorPattern = '^%s*~' .. vim.pesc(className) .. '%s*%((.*)%)%s*[;{]?'
+      params = line:match(dtorPattern)
+      if params then
+        funcName = '~' .. className
+        returnType = ''
+        isDestructor = true
+      end
+    end
+  end
+  
+  if not isConstructor and not isDestructor then
+    local pattern = '^%s*(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
+    returnType, funcName, params = line:match(pattern)
+    
+    if not returnType or not funcName then
+      local virtualPattern = '^%s*virtual%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
+      returnType, funcName, params = line:match(virtualPattern)
+      if returnType then
+        returnType = returnType:gsub('^virtual%s+', '')
+      end
+    end
+    
+    if not returnType or not funcName then
+      local staticPattern = '^%s*static%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
+      returnType, funcName, params = line:match(staticPattern)
+      if returnType then
+        returnType = returnType:gsub('^static%s+', '')
+      end
+    end
+    
+    if not returnType or not funcName then
+      return nil
+    end
+    
+    if returnType == '' then
+      return nil
+    end
   end
   
   params = params or ''
@@ -37,10 +76,12 @@ local function parseDeclaration(line)
   local isConst = line:match('%)%s*const') ~= nil
   
   return {
-    returnType = returnType:gsub('^%s+', ''):gsub('%s+$', ''),
+    returnType = returnType and returnType:gsub('^%s+', ''):gsub('%s+$', '') or '',
     funcName = funcName,
     params = params:gsub('^%s+', ''):gsub('%s+$', ''),
     isConst = isConst,
+    isConstructor = isConstructor,
+    isDestructor = isDestructor,
   }
 end
 
@@ -196,18 +237,18 @@ function M.toggleCommentPair()
     return
   end
   
-  local cursorPos = vim.api.nvim_win_get_cursor(0)
-  local currentLine = vim.api.nvim_buf_get_lines(bufnr, cursorPos[1] - 1, cursorPos[1], false)[1]
-  
-  local decl = parseDeclaration(currentLine)
-  if not decl then
-    vim.notify('Could not parse function declaration', vim.log.levels.ERROR)
-    return
-  end
-  
   local className = findClassName(bufnr)
   if not className then
     vim.notify('Could not find class name', vim.log.levels.ERROR)
+    return
+  end
+  
+  local cursorPos = vim.api.nvim_win_get_cursor(0)
+  local currentLine = vim.api.nvim_buf_get_lines(bufnr, cursorPos[1] - 1, cursorPos[1], false)[1]
+  
+  local decl = parseDeclaration(currentLine, className)
+  if not decl then
+    vim.notify('Could not parse function declaration', vim.log.levels.ERROR)
     return
   end
   
@@ -307,7 +348,7 @@ local function collectClassDeclarations(bufnr)
         inClass = false
         className = nil
       elseif className and braceDepth > 0 then
-        local decl = parseDeclaration(line)
+        local decl = parseDeclaration(line, className)
         if decl then
           table.insert(declarations, {
             className = className,
@@ -330,6 +371,28 @@ local function hasDefinition(cppLines, className, funcName)
     end
   end
   return false
+end
+
+local function formatStub(decl, className)
+  local constSuffix = decl.isConst and ' const' or ''
+  
+  if decl.isConstructor or decl.isDestructor then
+    return string.format(
+      '%s::%s(%s)\n{\n    \n}',
+      className,
+      decl.funcName,
+      decl.params
+    )
+  else
+    return string.format(
+      '%s %s::%s(%s)%s\n{\n    \n}',
+      decl.returnType,
+      className,
+      decl.funcName,
+      decl.params,
+      constSuffix
+    )
+  end
 end
 
 function M.generateAllStubs()
@@ -371,15 +434,7 @@ function M.generateAllStubs()
       local generated = 0
       for _, entry in ipairs(declarations) do
         if not hasDefinition(cppLines, entry.className, entry.decl.funcName) then
-          local constSuffix = entry.decl.isConst and ' const' or ''
-          local stub = string.format(
-            '%s %s::%s(%s)%s\n{\n}\n',
-            entry.decl.returnType,
-            entry.className,
-            entry.decl.funcName,
-            entry.decl.params,
-            constSuffix
-          )
+          local stub = formatStub(entry.decl, entry.className) .. '\n'
           
           cppLines = vim.api.nvim_buf_get_lines(cppBuf, 0, -1, false)
           local insertLine = findLastClassMethod(cppLines, entry.className)
@@ -420,31 +475,22 @@ function M.generateStub()
     return
   end
   
-  local cursorPos = vim.api.nvim_win_get_cursor(0)
-  local currentLine = vim.api.nvim_buf_get_lines(bufnr, cursorPos[1] - 1, cursorPos[1], false)[1]
-  
-  local decl = parseDeclaration(currentLine)
-  if not decl then
-    vim.notify('Could not parse function declaration', vim.log.levels.ERROR)
-    return
-  end
-  
   local className = findClassName(bufnr)
   if not className then
     vim.notify('Could not find class name', vim.log.levels.ERROR)
     return
   end
   
-  local constSuffix = decl.isConst and ' const' or ''
-  local stub = string.format(
-    '%s %s::%s(%s)%s\n{\n    \n}',
-    decl.returnType,
-    className,
-    decl.funcName,
-    decl.params,
-    constSuffix
-  )
+  local cursorPos = vim.api.nvim_win_get_cursor(0)
+  local currentLine = vim.api.nvim_buf_get_lines(bufnr, cursorPos[1] - 1, cursorPos[1], false)[1]
   
+  local decl = parseDeclaration(currentLine, className)
+  if not decl then
+    vim.notify('Could not parse function declaration', vim.log.levels.ERROR)
+    return
+  end
+  
+  local stub = formatStub(decl, className)
   local funcName = decl.funcName
   
   switchToSource(function()

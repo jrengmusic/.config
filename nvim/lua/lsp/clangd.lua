@@ -6,7 +6,7 @@ local M = {}
     clangd = {
       cmd = {
         vim.fn.stdpath('data') .. '/mason/bin/clangd',
-        '--header-insertion=iwyu',
+        '--header-insertion=never',
         '--clang-tidy',
         '--completion-style=detailed',
         '--header-insertion-decorators',
@@ -48,6 +48,8 @@ function M.setupAttachHandlers()
     group = vim.api.nvim_create_augroup('lsp-attach', { clear = true }),
     callback = function(event)
       local client = vim.lsp.get_client_by_id(event.data.client_id)
+
+
 
       -- Register clangd-specific commands (keymaps now in core/keymaps.lua)
       if client and client.name == 'clangd' then

@@ -3,6 +3,8 @@ return {
   build = ':TSUpdate',
   main = 'nvim-treesitter.configs',
   setup = function()
+    vim.treesitter.language.register('cpp', 'objcpp')
+
     require('nvim-treesitter.configs').setup({
       ensure_installed = {
         'bash', 'c', 'cpp', 'diff', 'html', 'lua', 'luadoc',

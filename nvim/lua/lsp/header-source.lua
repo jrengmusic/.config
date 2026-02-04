@@ -7,7 +7,7 @@ local M = {}
 -- ============================================================================
 
 local function isCpp(file)
-  return file:match('%.cpp$') or file:match('%.cc$')
+  return file:match('%.cpp$') or file:match('%.cc$') or file:match('%.mm$')
 end
 
 local function isHeader(file)
@@ -17,7 +17,13 @@ end
 local function getCppCorrespondingFile(current)
   if current:match('%.cpp$') then
     return current:gsub('%.cpp$', '.h')
+  elseif current:match('%.mm$') then
+    return current:gsub('%.mm$', '.h')
   elseif current:match('%.h$') then
+    local mmFile = current:gsub('%.h$', '.mm')
+    if vim.fn.filereadable(mmFile) == 1 then
+      return mmFile
+    end
     return current:gsub('%.h$', '.cpp')
   elseif current:match('%.hpp$') then
     return current:gsub('%.hpp$', '.cpp')
@@ -94,17 +100,10 @@ local function findRelatedFile(currentFile, callback)
   })
 end
 
-function M.toggleSplit()
+function M.syncSplit()
   local current = vim.fn.expand('%:p')
-  local winCount = #vim.api.nvim_tabpage_list_wins(0)
 
-  if winCount >= 2 then
-    -- Already split: collapse
-    closeSplit()
-    return
-  end
-
-  -- Not split: find related file and open split
+  -- Always sync: open split or update existing
   findRelatedFile(current, function(related)
     if related then
       -- Determine order: for C++, cpp on left; otherwise current on left
@@ -242,7 +241,7 @@ function M.ensureCppHeaderLayout(targetFile, stayOnTarget)
 end
 
 function M.toggleHeaderSplit()
-  M.toggleSplit()
+  M.syncSplit()
 end
 
 function M.gotoDefinitionWithLayout()

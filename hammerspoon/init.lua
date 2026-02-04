@@ -19,6 +19,7 @@ local function alert(msg)
 end
 
 --------------------------------------------------------------------------------------
+require("caps-esc")
 require("caffeine")
 
 -- Tiling disabled - using Amethyst for window management

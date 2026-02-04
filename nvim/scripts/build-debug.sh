@@ -19,7 +19,7 @@ else
     fi
 fi
 
-if [ "$NEEDS_CONFIG" -eq 1 ]; then
+if [ "$NEEDS_CONFIG" -eq 1 ] || [ ! -f "$BUILD_DIR/build.ninja" ]; then
     echo "Configuring CMake ($SCHEME)..."
     mkdir -p "$ROOT/Builds"
     # Build only native architecture for fast iteration (not universal binary)
