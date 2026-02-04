@@ -220,15 +220,17 @@ function M.setupDap()
         once = true,
         callback = function()
           local exit_code = vim.v.event.status
-          if exit_code == 0 then
-            if vim.api.nvim_win_is_valid(term_win) then
-              vim.api.nvim_win_close(term_win, true)
-            end
-            vim.cmd('LspRestart')
-            vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
-          else
-            vim.notify('Build failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+          if vim.api.nvim_win_is_valid(term_win) and exit_code == 0 then
+            vim.api.nvim_win_close(term_win, true)
           end
+          vim.defer_fn(function()
+            vim.cmd('LspRestart')
+            if exit_code == 0 then
+              vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
+            else
+              vim.notify('Build failed (exit ' .. exit_code .. '), LSP restarted', vim.log.levels.WARN)
+            end
+          end, 500)
         end,
       })
     end
