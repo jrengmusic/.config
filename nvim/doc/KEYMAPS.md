@@ -77,6 +77,15 @@
 | `<leader>cv` | Generate all missing C++ stubs |
 | `<leader>c/` | Toggle comment in header + cpp |
 
+## Build (`<leader>b` group)
+
+| Key | Action |
+|-----|--------|
+| `<leader>br` | Build + Launch + Attach |
+| `<leader>bb` | Build only (+ LSP restart) |
+| `<leader>bc` | Clean build (clean + build) |
+| `<leader>bk` | Clean + Reconfigure build |
+
 ## Debug (`<leader>d` group)
 
 | Key | Action |
@@ -85,9 +94,6 @@
 | `<F10>` | Step over |
 | `<F11>` | Step into |
 | `<F12>` | Step out |
-| `<leader><C-r>` | Build + Launch + Attach |
-| `<leader><C-b>` | Build only (+ LSP restart) |
-| `<leader><C-k>` | Clean + Reconfigure build |
 | `<leader>db` | Toggle breakpoint |
 | `<leader>dB` | Conditional breakpoint |
 | `<leader>dl` | Log point |

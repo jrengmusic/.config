@@ -249,10 +249,14 @@ function M.files()
     return
   end
 
+  -- SSOT: Use EXACT same logic as generate_symlink_tree()
   local seen = {}
   local items = {}
   local cwd = vim.fn.getcwd()
+  local seen_modules = {}
+  local source_root = cwd .. '/Source'
 
+  -- First pass: collect from compile_commands.json (same as explorer)
   for i, entry in ipairs(data) do
     local file = entry.file
     if file ~= nil and seen[file] == nil then
@@ -260,31 +264,70 @@ function M.files()
       if not skip then
         seen[file] = true
         local group, submodule = classify_file(file)
-        local module = submodule or group
-        local display = file:gsub('^' .. vim.pesc(cwd) .. '/', '')
+
+        if group == 'Sources' then
+          local display = file:gsub('^' .. vim.pesc(cwd) .. '/', '')
+          table.insert(items, {
+            idx = i,
+            score = i,
+            text = 'Source/' .. display,
+            file = file,
+            module = 'Source',
+            display = display,
+          })
+        elseif group == 'JUCE Modules' and submodule ~= nil then
+          local idx = file:find('/' .. submodule .. '/')
+          if idx ~= nil then
+            local module_root = file:sub(1, idx + #submodule)
+            if seen_modules[submodule] == nil then
+              seen_modules[submodule] = module_root
+            end
+          end
+          local display = file:gsub('^' .. vim.pesc(cwd) .. '/', '')
+          table.insert(items, {
+            idx = i,
+            score = i,
+            text = submodule .. '/' .. display,
+            file = file,
+            module = submodule,
+            display = display,
+          })
+        end
+      end
+    end
+  end
+
+  -- Second pass: scan ALL files from discovered modules (same as explorer)
+  for submodule, module_root in pairs(seen_modules) do
+    local module_files = scan_module_dir(module_root)
+    for _, f in ipairs(module_files) do
+      if seen[f.path] == nil then
+        seen[f.path] = true
+        local display = f.path:gsub('^' .. vim.pesc(cwd) .. '/', '')
         table.insert(items, {
-          idx = i,
-          score = i,
-          text = module .. '/' .. display,
-          file = file,
-          module = module,
+          idx = #items + 1,
+          score = #items + 1,
+          text = submodule .. '/' .. display,
+          file = f.path,
+          module = submodule,
           display = display,
         })
       end
     end
   end
 
+  -- Third pass: scan ALL Source files (same as explorer)
   local source_files = scan_source_dir()
-  for i, file in ipairs(source_files) do
+  for _, file in ipairs(source_files) do
     if seen[file] == nil then
       seen[file] = true
       local display = file:gsub('^' .. vim.pesc(cwd) .. '/', '')
       table.insert(items, {
         idx = #items + 1,
         score = #items + 1,
-        text = 'Sources/' .. display,
+        text = 'Source/' .. display,
         file = file,
-        module = 'Sources',
+        module = 'Source',
         display = display,
       })
     end
@@ -294,8 +337,8 @@ function M.files()
     if a.module == b.module then
       return a.display < b.display
     end
-    if a.module == 'Sources' then return true end
-    if b.module == 'Sources' then return false end
+    if a.module == 'Source' then return true end
+    if b.module == 'Source' then return false end
     return a.module < b.module
   end)
 

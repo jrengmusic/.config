@@ -11,6 +11,7 @@ function M.setup()
   vim.keymap.set('n', '<leader>tt', function() require('core.tui').tit() end, { desc = 'Open TIT (git TUI)' })
   vim.keymap.set('n', '<leader>tc', function() require('core.tui').cake() end, { desc = 'Open Cake TUI' })
   vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
+  
   -- Split commands (<leader>s group)
   vim.keymap.set('n', '<leader>ss', function() require('lsp.header-source').syncSplit() end, { desc = 'Sync header/source split' })
   vim.keymap.set('n', '<leader>s\\', '<C-w>v', { desc = 'Split vertical' })
@@ -23,7 +24,7 @@ function M.setup()
   vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Focus right window' })
   vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Focus lower window' })
   vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Focus upper window' })
-vim.keymap.set('n', '<leader>x', '<C-w>q', { desc = 'Close window' })
+  vim.keymap.set('n', '<leader>x', '<C-w>q', { desc = 'Close window' })
 
   -- Jump list navigation
   vim.keymap.set('n', '<leader>[', '<C-o>', { desc = 'Jump back' })
@@ -120,8 +121,10 @@ vim.keymap.set('n', '<leader>x', '<C-w>q', { desc = 'Close window' })
   --   <leader>dL → Run last
   --   <leader>du → Toggle UI
   --   <leader>de → Evaluate expression
-   --   <leader><C-r> → Build + Launch + Attach (auto-detects plugin/standalone)
-  --   <leader><C-k> → Clean build
+  --   <leader>br → Build + Launch + Attach (auto-detects plugin/standalone)
+  --   <leader>bb → Build only (no launch)
+  --   <leader>bc → Clean build
+  --   <leader>bk → Clean
   --   <F5> → Configure project (auto-detects plugin/standalone)
 end
 
@@ -170,29 +173,123 @@ function M.setupDap()
     vim.keymap.set('n', keys, func, { desc = 'DAP: ' .. desc })
   end
 
+  -- Build functions (extracted for reuse)
+  local function runBuildOnly()
+    vim.cmd('silent! wa')
+    
+    local root = vim.fn.getcwd()
+    local script = vim.fn.stdpath('config') .. '/scripts/build-debug.sh'
+    
+    if vim.fn.filereadable(script) ~= 1 then
+      vim.notify('build-debug.sh not found in nvim config', vim.log.levels.ERROR)
+      return
+    end
+    
+    local dapConfig = require('dap.configurations')
+    local projectType = dapConfig.detectProjectType()
+    
+    local function runBuild(scheme, format)
+      local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. scheme .. ' ' .. format
+      
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        if vim.bo[buf].buftype == 'terminal' then
+          vim.api.nvim_win_close(win, true)
+          break
+        end
+      end
+      
+      vim.cmd('botright 15split | terminal ' .. cmd)
+      
+      local term_buf = vim.api.nvim_get_current_buf()
+      local term_win = vim.api.nvim_get_current_win()
+      
+      vim.api.nvim_create_autocmd({'TermRequest', 'TextChangedT', 'CursorMovedI'}, {
+        buffer = term_buf,
+        callback = function()
+          if vim.api.nvim_win_is_valid(term_win) then
+            local line_count = vim.api.nvim_buf_line_count(term_buf)
+            vim.api.nvim_win_set_cursor(term_win, {line_count, 0})
+          end
+        end,
+      })
+      
+      vim.cmd('startinsert')
+      vim.api.nvim_create_autocmd('TermClose', {
+        buffer = term_buf,
+        once = true,
+        callback = function()
+          local exit_code = vim.v.event.status
+          if exit_code == 0 then
+            if vim.api.nvim_win_is_valid(term_win) then
+              vim.api.nvim_win_close(term_win, true)
+            end
+            vim.cmd('LspRestart')
+            vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
+          else
+            vim.notify('Build failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+          end
+        end,
+      })
+    end
+    
+    if projectType == 'standalone' then
+      local config = dapConfig.loadStandaloneConfig(function(cfg)
+        if cfg then runBuild(cfg.buildScheme, 'Standalone') end
+      end)
+      if config then
+        runBuild(config.buildScheme, 'Standalone')
+      end
+    elseif projectType == 'plugin' then
+      local config = dapConfig.loadDawConfig(function(cfg)
+        if cfg then runBuild(cfg.buildScheme, cfg.format) end
+      end)
+      if config then
+        runBuild(config.buildScheme, config.format)
+      end
+    else
+      vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
+    end
+  end
+
+  local function runCleanOnly()
+    local root = vim.fn.getcwd()
+    local script = vim.fn.stdpath('config') .. '/scripts/clean-build.sh'
+    
+    if vim.fn.filereadable(script) ~= 1 then
+      vim.notify('clean-build.sh not found in nvim config')
+      return
+    end
+
+    -- Show clean build output in terminal split
+    vim.cmd('botright 20split | terminal ' .. script .. ' ' .. root)
+    vim.cmd('startinsert')
+  end
+
   -- Function keys
-   -- F5: Always show config dialog (auto-detects plugin vs standalone)
-   vim.keymap.set('n', '<F5>', function()
-     local projectType = dapConfig.detectProjectType()
-     
-     if projectType == 'standalone' then
-       -- Standalone: only ask for build scheme
-       dapConfig.showStandaloneSchemeDialog(function(config)
-         if config then
-           vim.notify('Standalone config saved. Press <leader><C-r> to build.')
-         end
-       end)
-     elseif projectType == 'plugin' then
-       -- Plugin: ask for format + DAW + build scheme
-       dapConfig.showDawFormatDialog(function(config)
-         if config then
-           vim.notify('Plugin config saved. Press <leader><C-r> to build.')
-         end
-       end)
-     else
-       vim.notify('Cannot detect project type (plugin or standalone). Check CMakeLists.txt.')
-     end
-   end, { desc = 'DAP: Configure project' })
+  -- F5: Always show config dialog (auto-detects plugin vs standalone)
+  vim.keymap.set('n', '<F5>', function()
+    local projectType = dapConfig.detectProjectType()
+    
+    if projectType == 'standalone' then
+      -- Standalone: only ask for build scheme
+      dapConfig.showStandaloneSchemeDialog(function(config)
+        if config then
+          vim.notify('Standalone config saved. Press <leader><C-r> to build.')
+        end
+      end)
+    elseif projectType == 'plugin' then
+      -- Plugin: ask for format + DAW + build scheme
+      dapConfig.showDawFormatDialog(function(config)
+        if config then
+          vim.notify('Plugin config saved. Press <leader><C-r> to build.')
+        end
+      end)
+    else
+      vim.notify('Cannot detect project type (plugin or standalone). Check CMakeLists.txt.')
+    end
+  end, { desc = 'DAP: Configure project' })
+  
   map('<F10>', dap.step_over, 'Step over')
   map('<F11>', dap.step_into, 'Step into')
   map('<F12>', dap.step_out, 'Step out')
@@ -210,253 +307,204 @@ function M.setupDap()
   map('<leader>du', dapui.toggle, 'Toggle UI')
   map('<leader>de', dapui.eval, 'Evaluate expression')
 
-   -- Terminate + close DAW/App (auto-detects project type)
-   vim.keymap.set('n', '<leader>dt', function()
-     dap.terminate()
-     
-     local projectType = dapConfig.detectProjectType()
-     
-     if projectType == 'plugin' then
-       -- For plugins: also kill the DAW process
-       local config = dapConfig.loadDawConfig(function(cfg)
-         if cfg and cfg.daw then
-           vim.fn.jobstart({ 'killall', cfg.daw })
-         end
-       end)
-       -- If config already exists, kill DAW immediately
-       if config and config.daw then
-         vim.fn.jobstart({ 'killall', config.daw })
-       end
-     elseif projectType == 'standalone' then
-       -- For standalone: just terminate (no DAW to kill)
-       vim.notify('Standalone app terminated')
-     end
-   end, { desc = 'DAP: Terminate + close DAW/App' })
+  -- Terminate + close DAW/App (auto-detects project type)
+  vim.keymap.set('n', '<leader>dt', function()
+    dap.terminate()
+    
+    local projectType = dapConfig.detectProjectType()
+    
+    if projectType == 'plugin' then
+      -- For plugins: also kill the DAW process
+      local config = dapConfig.loadDawConfig(function(cfg)
+        if cfg and cfg.daw then
+          vim.fn.jobstart({ 'killall', cfg.daw })
+        end
+      end)
+      -- If config already exists, kill DAW immediately
+      if config and config.daw then
+        vim.fn.jobstart({ 'killall', config.daw })
+      end
+    elseif projectType == 'standalone' then
+      -- For standalone: just terminate (no DAW to kill)
+      vim.notify('Standalone app terminated')
+    end
+  end, { desc = 'DAP: Terminate + close DAW/App' })
 
   -- Visual mode eval
   vim.keymap.set('v', '<leader>de', dapui.eval, { desc = 'DAP: Evaluate selection' })
 
-   -- Build + Debug automation (auto-detects plugin vs standalone)
-   vim.keymap.set('n', '<leader><C-r>', function()
-     -- Auto-save all buffers before building
-     vim.cmd('silent! wa')
-     
-     local root = vim.fn.getcwd()
-     local script = vim.fn.stdpath('config') .. '/scripts/build-debug.sh'
-     
-     if vim.fn.filereadable(script) ~= 1 then
-       vim.notify('build-debug.sh not found in nvim config', vim.log.levels.ERROR)
-       return
-     end
+  -- Build group keymaps
+  vim.keymap.set('n', '<leader>br', function()
+    -- Auto-save all buffers before building
+    vim.cmd('silent! wa')
+    
+    local root = vim.fn.getcwd()
+    local script = vim.fn.stdpath('config') .. '/scripts/build-debug.sh'
+    
+    if vim.fn.filereadable(script) ~= 1 then
+      vim.notify('build-debug.sh not found in nvim config', vim.log.levels.ERROR)
+      return
+    end
 
-     local projectType = dapConfig.detectProjectType()
-     
-     -- Shared terminal handler for build process
-     local function runBuildInTerminal(cmd, onSuccess)
-       -- Reuse existing build terminal if open
-       for _, win in ipairs(vim.api.nvim_list_wins()) do
-         local buf = vim.api.nvim_win_get_buf(win)
-         if vim.bo[buf].buftype == 'terminal' then
-           vim.api.nvim_win_close(win, true)
-           break
-         end
-       end
-       
-       vim.cmd('botright 15split | terminal ' .. cmd)
-       
-       local term_buf = vim.api.nvim_get_current_buf()
-       local term_win = vim.api.nvim_get_current_win()
-       
-       -- Auto-scroll terminal output
-       vim.api.nvim_create_autocmd({'TermRequest', 'TextChangedT', 'CursorMovedI'}, {
-         buffer = term_buf,
-         callback = function()
-           if vim.api.nvim_win_is_valid(term_win) then
-             local line_count = vim.api.nvim_buf_line_count(term_buf)
-             vim.api.nvim_win_set_cursor(term_win, {line_count, 0})
-           end
-         end,
-       })
-       
-       vim.cmd('startinsert')
-       vim.api.nvim_create_autocmd('TermClose', {
-         buffer = term_buf,
-         once = true,
-         callback = function()
-           local exit_code = vim.v.event.status
-           if exit_code == 0 then
-             -- Close terminal window on success
-             if vim.api.nvim_win_is_valid(term_win) then
-               vim.api.nvim_win_close(term_win, true)
-             end
-             onSuccess()
-           else
-             vim.notify('Build failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
-           end
-         end,
-       })
-     end
-     
-     if projectType == 'standalone' then
-       -- ==== STANDALONE FLOW ====
-       local function runStandaloneBuild(cfg)
-         local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. cfg.buildScheme .. ' Standalone'
-         runBuildInTerminal(cmd, function()
-            vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })
-           
-           -- Launch and attach using "Launch Standalone" DAP config
-           vim.defer_fn(function()
-             for _, dapCfg in ipairs(dap.configurations.cpp) do
-               if dapCfg.name == 'Launch Standalone' then
-                 dap.run(dapCfg)
-                 return
-               end
-             end
-             vim.notify('DAP config not found: Launch Standalone', vim.log.levels.ERROR)
-           end, 1000)
-         end)
-       end
-       
-       -- Load standalone config (shows dialog if missing/invalid)
-       local config = dapConfig.loadStandaloneConfig(function(cfg)
-         if cfg then runStandaloneBuild(cfg) end
-       end)
-       
-       -- If config already valid, run immediately
-       if config then
-         runStandaloneBuild(config)
-       end
-       
-     elseif projectType == 'plugin' then
-       -- ==== PLUGIN FLOW ====
-       local function runBuild(cfg)
-         local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. cfg.buildScheme .. ' ' .. cfg.format
-         runBuildInTerminal(cmd, function()
-            vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
-           vim.fn.jobstart({ cfg.dawPath })
-           
-            -- Run correct DAP config based on format
-            local configName = dapConfig.getConfigNameForFormat(cfg.format)
-            vim.defer_fn(function()
-              for _, dapCfg in ipairs(dap.configurations.cpp) do
-                if dapCfg.name == configName then
-                  dap.run(dapCfg)
-                  return
-                end
-              end
-              vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
-            end, 2000)
-         end)
-       end
-
-       -- Load plugin config (shows dialog if missing/invalid)
-       local config = dapConfig.loadDawConfig(function(cfg)
-         if cfg then runBuild(cfg) end
-       end)
-       
-       -- If config already valid, run immediately
-       if config then
-         runBuild(config)
-       end
-       
-     else
-       -- ==== CANNOT DETECT ====
-       vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
-     end
-   end, { desc = 'Build + Launch + Attach' })
-
-   -- Build only (no launch, no attach)
-   vim.keymap.set('n', '<leader><C-b>', function()
-     vim.cmd('silent! wa')
-     
-     local root = vim.fn.getcwd()
-     local script = vim.fn.stdpath('config') .. '/scripts/build-debug.sh'
-     
-     if vim.fn.filereadable(script) ~= 1 then
-       vim.notify('build-debug.sh not found in nvim config', vim.log.levels.ERROR)
-       return
-     end
-     
-     local projectType = dapConfig.detectProjectType()
-     
-     local function runBuildOnly(scheme, format)
-       local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. scheme .. ' ' .. format
-       
-       for _, win in ipairs(vim.api.nvim_list_wins()) do
-         local buf = vim.api.nvim_win_get_buf(win)
-         if vim.bo[buf].buftype == 'terminal' then
-           vim.api.nvim_win_close(win, true)
-           break
-         end
-       end
-       
-       vim.cmd('botright 15split | terminal ' .. cmd)
-       
-       local term_buf = vim.api.nvim_get_current_buf()
-       local term_win = vim.api.nvim_get_current_win()
-       
-       vim.api.nvim_create_autocmd({'TermRequest', 'TextChangedT', 'CursorMovedI'}, {
-         buffer = term_buf,
-         callback = function()
-           if vim.api.nvim_win_is_valid(term_win) then
-             local line_count = vim.api.nvim_buf_line_count(term_buf)
-             vim.api.nvim_win_set_cursor(term_win, {line_count, 0})
-           end
-         end,
-       })
-       
-       vim.cmd('startinsert')
-       vim.api.nvim_create_autocmd('TermClose', {
-         buffer = term_buf,
-         once = true,
-         callback = function()
-           local exit_code = vim.v.event.status
-           if exit_code == 0 then
-             if vim.api.nvim_win_is_valid(term_win) then
-               vim.api.nvim_win_close(term_win, true)
-             end
-             vim.cmd('LspRestart')
-             vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
-           else
-             vim.notify('Build failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
-           end
-         end,
-       })
-     end
-     
-     if projectType == 'standalone' then
-       local config = dapConfig.loadStandaloneConfig(function(cfg)
-         if cfg then runBuildOnly(cfg.buildScheme, 'Standalone') end
-       end)
-       if config then
-         runBuildOnly(config.buildScheme, 'Standalone')
-       end
-     elseif projectType == 'plugin' then
-       local config = dapConfig.loadDawConfig(function(cfg)
-         if cfg then runBuildOnly(cfg.buildScheme, cfg.format) end
-       end)
-       if config then
-         runBuildOnly(config.buildScheme, config.format)
-       end
-     else
-       vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
-     end
-   end, { desc = 'Build only (no launch)' })
-
-   -- Clean build
-   vim.keymap.set('n', '<leader><C-k>', function()
-      local root = vim.fn.getcwd()
-      local script = vim.fn.stdpath('config') .. '/scripts/clean-build.sh'
+    local projectType = dapConfig.detectProjectType()
+    
+    -- Shared terminal handler for build process
+    local function runBuildInTerminal(cmd, onSuccess)
+      -- Reuse existing build terminal if open
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        if vim.bo[buf].buftype == 'terminal' then
+          vim.api.nvim_win_close(win, true)
+          break
+        end
+      end
       
-      if vim.fn.filereadable(script) ~= 1 then
-        vim.notify('clean-build.sh not found in nvim config')
-        return
+      vim.cmd('botright 15split | terminal ' .. cmd)
+      
+      local term_buf = vim.api.nvim_get_current_buf()
+      local term_win = vim.api.nvim_get_current_win()
+      
+      -- Auto-scroll terminal output
+      vim.api.nvim_create_autocmd({'TermRequest', 'TextChangedT', 'CursorMovedI'}, {
+        buffer = term_buf,
+        callback = function()
+          if vim.api.nvim_win_is_valid(term_win) then
+            local line_count = vim.api.nvim_buf_line_count(term_buf)
+            vim.api.nvim_win_set_cursor(term_win, {line_count, 0})
+          end
+        end,
+      })
+      
+      vim.cmd('startinsert')
+      vim.api.nvim_create_autocmd('TermClose', {
+        buffer = term_buf,
+        once = true,
+        callback = function()
+          local exit_code = vim.v.event.status
+          if exit_code == 0 then
+            -- Close terminal window on success
+            if vim.api.nvim_win_is_valid(term_win) then
+              vim.api.nvim_win_close(term_win, true)
+            end
+            onSuccess()
+          else
+            vim.notify('Build failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+          end
+        end,
+      })
+    end
+    
+    if projectType == 'standalone' then
+      -- ==== STANDALONE FLOW ====
+      local function runStandaloneBuild(cfg)
+        local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. cfg.buildScheme .. ' Standalone'
+        runBuildInTerminal(cmd, function()
+          vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })
+          
+          -- Launch and attach using "Launch Standalone" DAP config
+          vim.defer_fn(function()
+            for _, dapCfg in ipairs(dap.configurations.cpp) do
+              if dapCfg.name == 'Launch Standalone' then
+                dap.run(dapCfg)
+                return
+              end
+            end
+            vim.notify('DAP config not found: Launch Standalone', vim.log.levels.ERROR)
+          end, 1000)
+        end)
+      end
+      
+      -- Load standalone config (shows dialog if missing/invalid)
+      local config = dapConfig.loadStandaloneConfig(function(cfg)
+        if cfg then runStandaloneBuild(cfg) end
+      end)
+      
+      -- If config already valid, run immediately
+      if config then
+        runStandaloneBuild(config)
+      end
+      
+    elseif projectType == 'plugin' then
+      -- ==== PLUGIN FLOW ====
+      local function runBuild(cfg)
+        local cmd = script .. ' ' .. vim.fn.shellescape(root) .. ' ' .. cfg.buildScheme .. ' ' .. cfg.format
+        runBuildInTerminal(cmd, function()
+          vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
+          vim.fn.jobstart({ cfg.dawPath })
+          
+          -- Run correct DAP config based on format
+          local configName = dapConfig.getConfigNameForFormat(cfg.format)
+          vim.defer_fn(function()
+            for _, dapCfg in ipairs(dap.configurations.cpp) do
+              if dapCfg.name == configName then
+                dap.run(dapCfg)
+                return
+              end
+            end
+            vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+          end, 2000)
+        end)
       end
 
-      -- Show clean build output in terminal split
-      vim.cmd('botright 20split | terminal ' .. script .. ' ' .. root)
-      vim.cmd('startinsert')
-     end, { desc = 'Clean + Reconfigure build' })
+      -- Load plugin config (shows dialog if missing/invalid)
+      local config = dapConfig.loadDawConfig(function(cfg)
+        if cfg then runBuild(cfg) end
+      end)
+      
+      -- If config already valid, run immediately
+      if config then
+        runBuild(config)
+      end
+      
+    else
+      -- ==== CANNOT DETECT ====
+      vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
+    end
+  end, { desc = 'DAP: Build and run' })
+
+  vim.keymap.set('n', '<leader>bb', runBuildOnly, { desc = 'DAP: Build only' })
+
+  vim.keymap.set('n', '<leader>bc', function()
+    -- Clean + build: first run clean, then build on success
+    local root = vim.fn.getcwd()
+    local cleanScript = vim.fn.stdpath('config') .. '/scripts/clean-build.sh'
+    
+    if vim.fn.filereadable(cleanScript) ~= 1 then
+      vim.notify('clean-build.sh not found in nvim config', vim.log.levels.ERROR)
+      return
+    end
+
+    -- Close existing terminal
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.bo[buf].buftype == 'terminal' then
+        vim.api.nvim_win_close(win, true)
+        break
+      end
+    end
+
+    -- Run clean, then build on success
+    vim.cmd('botright 20split | terminal ' .. cleanScript .. ' ' .. root)
+    local term_buf = vim.api.nvim_get_current_buf()
+    
+    vim.cmd('startinsert')
+    vim.api.nvim_create_autocmd('TermClose', {
+      buffer = term_buf,
+      once = true,
+      callback = function()
+        local exit_code = vim.v.event.status
+        if exit_code == 0 then
+          vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
+          -- Call build function directly
+          runBuildOnly()
+        else
+          vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+        end
+      end,
+    })
+  end, { desc = 'DAP: Clean build' })
+
+  vim.keymap.set('n', '<leader>bk', runCleanOnly, { desc = 'DAP: Clean' })
 end
 
 -- Surround: use mini.surround defaults

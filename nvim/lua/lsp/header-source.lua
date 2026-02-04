@@ -14,23 +14,45 @@ local function isHeader(file)
   return file:match('%.h$') or file:match('%.hpp$')
 end
 
-local function getCppCorrespondingFile(current)
-  if current:match('%.cpp$') then
-    return current:gsub('%.cpp$', '.h')
-  elseif current:match('%.mm$') then
-    return current:gsub('%.mm$', '.h')
-  elseif current:match('%.h$') then
-    local mmFile = current:gsub('%.h$', '.mm')
-    if vim.fn.filereadable(mmFile) == 1 then
-      return mmFile
+local function getAllCorrespondingFiles(current)
+  local files = {}
+  local basename = current:match('(.+)%.[^%.]+$') -- remove extension
+  
+  if not basename then return files end
+  
+  -- Check all possible extensions
+  local extensions = { '.cpp', '.mm', '.h', '.hpp' }
+  for _, ext in ipairs(extensions) do
+    local candidate = basename .. ext
+    if vim.fn.filereadable(candidate) == 1 and candidate ~= current then
+      table.insert(files, candidate)
     end
-    return current:gsub('%.h$', '.cpp')
-  elseif current:match('%.hpp$') then
-    return current:gsub('%.hpp$', '.cpp')
-  elseif current:match('%.cc$') then
-    return current:gsub('%.cc$', '.h')
   end
-  return nil
+  
+  return files
+end
+
+local function getNextInCycle(currentFile, candidateFiles, currentOtherFile)
+  if #candidateFiles == 0 then return nil end
+  if #candidateFiles == 1 then return candidateFiles[1] end
+  
+  -- Find current index
+  local currentIdx = nil
+  for i, file in ipairs(candidateFiles) do
+    if file == currentOtherFile then
+      currentIdx = i
+      break
+    end
+  end
+  
+  if currentIdx then
+    -- Cycle to next
+    local nextIdx = (currentIdx % #candidateFiles) + 1
+    return candidateFiles[nextIdx]
+  else
+    -- Not found, return first
+    return candidateFiles[1]
+  end
 end
 
 -- ============================================================================
@@ -38,9 +60,7 @@ end
 -- ============================================================================
 
 local function applySplitRatio()
-  local totalWidth = vim.o.columns
-  vim.cmd('wincmd h')
-  vim.cmd('vertical resize ' .. math.floor(totalWidth * 0.6))
+  vim.cmd('wincmd =')  -- 50/50 split
 end
 
 local function openSplit(leftFile, rightFile)
@@ -48,10 +68,12 @@ local function openSplit(leftFile, rightFile)
 
   if winCount == 1 then
     -- Create split: left=leftFile, right=rightFile
-    vim.cmd('buffer ' .. vim.fn.bufadd(leftFile))
     vim.cmd('vsplit')
+    -- Right window is now active, load rightFile there
     vim.cmd('buffer ' .. vim.fn.bufadd(rightFile))
+    -- Switch to left window and load leftFile
     vim.cmd('wincmd h')
+    vim.cmd('buffer ' .. vim.fn.bufadd(leftFile))
   else
     -- Update existing split: left=leftFile, right=rightFile
     vim.cmd('wincmd h')
@@ -73,14 +95,14 @@ end
 -- ============================================================================
 
 -- Try to find a related file for ANY language
--- For C++: uses cpp ↔ h pairing
+-- For C++: uses new cycling logic
 -- For others: uses LSP type_definition as fallback
 local function findRelatedFile(currentFile, callback)
-  -- First: Try C++ cpp ↔ h pairing
+  -- First: Try C++ file pairing
   if isCpp(currentFile) or isHeader(currentFile) then
-    local paired = getCppCorrespondingFile(currentFile)
-    if paired and vim.fn.filereadable(paired) == 1 then
-      callback(paired)
+    local allFiles = getAllCorrespondingFiles(currentFile)
+    if #allFiles > 0 then
+      callback(allFiles[1]) -- return first match
       return
     end
   end
@@ -102,22 +124,101 @@ end
 
 function M.syncSplit()
   local current = vim.fn.expand('%:p')
-
-  -- Always sync: open split or update existing
-  findRelatedFile(current, function(related)
-    if related then
-      -- Determine order: for C++, cpp on left; otherwise current on left
-      local leftFile, rightFile
-      if (isCpp(current) or isHeader(current)) then
-        leftFile = isCpp(current) and current or related
-        rightFile = isCpp(current) and related or current
-      else
-        leftFile = current
-        rightFile = related
+  local winCount = #vim.api.nvim_tabpage_list_wins(0)
+  
+  if not (isCpp(current) or isHeader(current)) then
+    vim.notify('syncSplit only works with C++/header files', vim.log.levels.WARN)
+    return
+  end
+  
+  local allFiles = getAllCorrespondingFiles(current)
+  if #allFiles == 0 then
+    vim.notify('No corresponding files found', vim.log.levels.WARN)
+    return
+  end
+  
+  -- ALWAYS split first when only 1 window
+  if winCount == 1 then
+    vim.cmd('vsplit')
+    vim.cmd('wincmd =')  -- 50/50 split immediately
+  end
+  
+  -- Check if we already have a split with corresponding file
+  local currentOtherFile = nil
+  if winCount >= 2 then
+    local wins = vim.api.nvim_tabpage_list_wins(0)
+    local currentWin = vim.api.nvim_get_current_win()
+    for _, win in ipairs(wins) do
+      if win ~= currentWin then
+        local buf = vim.api.nvim_win_get_buf(win)
+        local otherFile = vim.api.nvim_buf_get_name(buf)
+        if otherFile ~= '' then
+          currentOtherFile = otherFile
+          break
+        end
       end
-      openSplit(leftFile, rightFile)
     end
-  end)
+  end
+  
+  local targetFile
+  
+  if isHeader(current) then
+    -- Header (right side): cycle through cpp/mm files on left
+    local leftCandidates = {}
+    for _, file in ipairs(allFiles) do
+      if isCpp(file) then
+        table.insert(leftCandidates, file)
+      end
+    end
+    targetFile = getNextInCycle(current, leftCandidates, currentOtherFile)
+  elseif current:match('%.mm$') then
+    -- .mm file (left side): cycle through cpp/h files on right  
+    local rightCandidates = {}
+    for _, file in ipairs(allFiles) do
+      if not file:match('%.mm$') then -- cpp or h
+        table.insert(rightCandidates, file)
+      end
+    end
+    targetFile = getNextInCycle(current, rightCandidates, currentOtherFile)
+  else
+    -- .cpp file (left side): find header for right side
+    for _, file in ipairs(allFiles) do
+      if isHeader(file) then
+        targetFile = file
+        break
+      end
+    end
+  end
+  
+  if not targetFile then
+    vim.notify('No target file found', vim.log.levels.WARN)
+    return
+  end
+  
+  -- Determine layout: h always right, cpp/mm always left
+  local leftFile, rightFile
+  if isHeader(current) then
+    leftFile = targetFile
+    rightFile = current
+  else
+    leftFile = current  
+    rightFile = targetFile
+  end
+  
+  -- Load files in the correct positions (split already exists)
+  vim.cmd('wincmd h')
+  vim.cmd('buffer ' .. vim.fn.bufadd(leftFile))
+  vim.cmd('wincmd l')
+  vim.cmd('buffer ' .. vim.fn.bufadd(rightFile))
+  
+  -- Stay in the window we started from
+  if isHeader(current) then
+    -- Started from header (right), stay right
+    -- Already in right window after the commands above
+  else
+    -- Started from cpp/mm (left), stay left  
+    vim.cmd('wincmd h')
+  end
 end
 
 -- ============================================================================
@@ -176,8 +277,9 @@ function M.smartDefinitionJump()
         -- Definition not visible in adjacent pane
         -- For C++: ensure pair is open first, then show definition
         if isCpp(current) or isHeader(current) then
-          local paired = getCppCorrespondingFile(current)
-          if paired and vim.fn.filereadable(paired) == 1 then
+          local allFiles = getAllCorrespondingFiles(current)
+          if #allFiles > 0 then
+            local paired = allFiles[1]
             -- Open pair in adjacent pane
             vim.api.nvim_set_current_win(adjacentWin)
             vim.cmd('buffer ' .. vim.fn.bufadd(paired))
@@ -227,11 +329,16 @@ end
 
 M.isCpp = isCpp
 M.isHeader = isHeader
-M.getCorrespondingFile = getCppCorrespondingFile
+-- Legacy function for backward compatibility 
+function M.getCorrespondingFile(current)
+  local allFiles = getAllCorrespondingFiles(current)
+  return allFiles[1] -- return first match for compatibility
+end
 
 function M.ensureCppHeaderLayout(targetFile, stayOnTarget)
-  local other = getCppCorrespondingFile(targetFile)
-  if other and vim.fn.filereadable(other) == 1 then
+  local allFiles = getAllCorrespondingFiles(targetFile)
+  if #allFiles > 0 then
+    local other = allFiles[1] -- use first match
     local leftFile = isCpp(targetFile) and targetFile or other
     local rightFile = isCpp(targetFile) and other or targetFile
     openSplit(leftFile, rightFile)
