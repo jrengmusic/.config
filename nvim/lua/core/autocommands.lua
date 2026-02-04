@@ -9,6 +9,15 @@ function M.setup()
     },
   })
 
+  -- Use // for C++ comments instead of /* */
+  vim.api.nvim_create_autocmd('FileType', {
+    pattern = { 'cpp', 'c', 'objc', 'objcpp' },
+    callback = function()
+      vim.opt_local.commentstring = '// %s'
+    end,
+    desc = 'Set C++ style line comments',
+  })
+
   -- Highlight on yank
   vim.api.nvim_create_autocmd('TextYankPost', {
     desc = 'Highlight when yanking text',

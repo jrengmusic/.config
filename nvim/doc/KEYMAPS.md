@@ -160,7 +160,35 @@ Uses default mini.surround keys. **NOT** `<leader>s`.
 
 ## Snippets
 
+### Snippet Commands
+
 | Key | Mode | Action |
 |-----|------|--------|
 | `<leader>fs` | n | Find/insert snippets |
 | `<C-s>` | i | Find/insert snippets |
+
+### Available Snippets
+
+| Trigger | Description |
+|---------|-------------|
+| `sep` | Separator comment `//==============` (returns to normal mode) |
+| `cls` | Class with leak detector |
+| `comp` | JUCE Component header declaration |
+| `leak` | JUCE leak detector macro with separator |
+| `juce` | Simple JUCE Component with inline implementations |
+| `fn` | Function definition with noexcept |
+| `loop` | Traditional for loop (int i {0}; i < N; ++i) |
+| `forr` | Range-based for loop (auto& item : container) |
+| `if` | If statement with braces |
+| `ife` | If-else statement |
+| `while` | While loop with braces |
+| `switch` | Switch statement with case/default |
+| `template` | Template function declaration |
+| `nam` | Namespace with decorative comments |
+| `sing` | Meyers Singleton complete class |
+| `unp` | `std::unique_ptr<type> name` |
+| `mku` | `std::make_unique<type>(args)` |
+| `mks` | `std::make_shared<type>(args)` |
+| `dbp` | Debug paint (magenta border) |
+| `mac` | `#if JUCE_MAC ... #endif` |
+| `win` | `#if JUCE_WINDOWS ... #endif` |

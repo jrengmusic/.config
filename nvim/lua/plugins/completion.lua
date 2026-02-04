@@ -42,8 +42,8 @@ return {
         ['<C-Space>'] = cmp.mapping.complete({}),
       }),
       sources = {
-        { name = 'nvim_lsp' },
-        { name = 'luasnip' },
+        { name = 'luasnip', priority = 100 },
+        { name = 'nvim_lsp', priority = 50 },
       },
     })
   end,

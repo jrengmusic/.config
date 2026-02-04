@@ -30,32 +30,62 @@ return {
     local cpp_snippets = {
       -- Class definition with separator and leak detector
       luasnip.snippet('cls', {
-        luasnip.text_node('//=============================================================================='),
-        luasnip.text_node({'', ''}),
-        luasnip.text_node('JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR ('),
-        luasnip.insert_node(2, 'ClassName'),
-        luasnip.text_node(')'),
-        luasnip.text_node({'', ''}),
         luasnip.text_node('class '),
-        luasnip.insert_node(3, 'ClassName'),
-        luasnip.text_node({'', ''}),
-        luasnip.text_node('{'),
-        luasnip.text_node({'public:', '\t'}),
-        luasnip.insert_node(4, '// public members'),
-        luasnip.text_node({'', '\t'}),
-        luasnip.insert_node(5, 'ClassName'),
+        luasnip.insert_node(1, 'ClassName'),
+        luasnip.text_node({'', '{'}),
+        luasnip.text_node({'', 'public:', ''}),
+        luasnip.text_node({'\t'}),
+        luasnip.insert_node(1, 'ClassName'),
         luasnip.text_node('() = default;'),
         luasnip.text_node({'', '\t~'}),
-        luasnip.insert_node(5, 'ClassName'),
+        luasnip.insert_node(1, 'ClassName'),
         luasnip.text_node('() = default;'),
-        luasnip.text_node({'', '', 'private:', '\t'}),
-        luasnip.insert_node(6, '// private members'),
+        luasnip.text_node({'', '', 'private:', ''}),
+        luasnip.text_node({'\t'}),
+        luasnip.insert_node(2, '// members'),
+        luasnip.text_node({'', '', '//==============================================================================', ''}),
+        luasnip.text_node({'\tJUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR ('}),
+        luasnip.insert_node(1, 'ClassName'),
+        luasnip.text_node(')'),
         luasnip.text_node({'', '};'}),
       }),
 
       -- Separator
       luasnip.snippet('sep', {
         luasnip.text_node({'', '//=============================================================================='}),
+      }, {
+        callbacks = {
+          [-1] = {
+            [require('luasnip.util.events').post_expand] = function()
+              vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
+            end,
+          },
+        },
+      }),
+
+      -- JUCE Component header declaration
+      luasnip.snippet('comp', {
+        luasnip.text_node('class '),
+        luasnip.insert_node(1, 'ComponentName'),
+        luasnip.text_node(' : public juce::Component'),
+        luasnip.text_node({'', '{'}),
+        luasnip.text_node({'', 'public:', ''}),
+        luasnip.text_node({'\t'}),
+        luasnip.insert_node(1, 'ComponentName'),
+        luasnip.text_node('() noexcept;'),
+        luasnip.text_node({'', '\t~'}),
+        luasnip.insert_node(1, 'ComponentName'),
+        luasnip.text_node('() override;'),
+        luasnip.text_node({'', '', '\tvoid paint (juce::Graphics&) override;', ''}),
+        luasnip.text_node({'\tvoid resized() override;', ''}),
+        luasnip.text_node({'private:', ''}),
+        luasnip.text_node({'\t'}),
+        luasnip.insert_node(2, '// members'),
+        luasnip.text_node({'', '', '//==============================================================================', ''}),
+        luasnip.text_node({'\tJUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR ('}),
+        luasnip.insert_node(1, 'ComponentName'),
+        luasnip.text_node(')'),
+        luasnip.text_node({'', '};'}),
       }),
 
       -- JUCE leak detector with separator
@@ -100,17 +130,17 @@ return {
         luasnip.text_node('for (int '),
         luasnip.insert_node(1, 'i'),
         luasnip.text_node(' { 0 }; '),
-        luasnip.insert_node(1, 'i'),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
         luasnip.text_node(' < '),
         luasnip.insert_node(2, 'N'),
         luasnip.text_node('; ++'),
-        luasnip.insert_node(1, 'i'),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
         luasnip.text_node(')'),
-        luasnip.text_node({'', ''}),
+        luasnip.text_node({ '', '' }),
         luasnip.text_node('{'),
-        luasnip.text_node({'\t'}),
+        luasnip.text_node({ '\t' }),
         luasnip.insert_node(3, '// loop body'),
-        luasnip.text_node({'', '}'}),
+        luasnip.text_node({ '', '}' }),
       }),
 
       -- Range-based for loop (auto, &)
@@ -144,14 +174,15 @@ return {
         luasnip.text_node('if ('),
         luasnip.insert_node(1, 'condition'),
         luasnip.text_node(')'),
-        luasnip.text_node({'', ''}),
+        luasnip.text_node({ '', '' }),
         luasnip.text_node('{'),
-        luasnip.text_node({'\t'}),
+        luasnip.text_node({ '\t' }),
         luasnip.insert_node(2, '// if body'),
-        luasnip.text_node({'', '}'}),
-        luasnip.text_node({'else', '\t{', '\t'}),
+        luasnip.text_node({ '', '}', '' }),
+        luasnip.text_node({ 'else', '' }),
+        luasnip.text_node({ '{', '\t' }),
         luasnip.insert_node(3, '// else body'),
-        luasnip.text_node({'\t}', '}'}),
+        luasnip.text_node({ '', '}' }),
       }),
 
       -- While loop
@@ -171,16 +202,17 @@ return {
         luasnip.text_node('switch ('),
         luasnip.insert_node(1, 'variable'),
         luasnip.text_node(')'),
-        luasnip.text_node({'', ''}),
-        luasnip.text_node('{'),
-        luasnip.text_node({'case ', '\t'}),
+        luasnip.text_node({ '', '' }),
+        luasnip.text_node({ '{', '' }),
+        luasnip.text_node({ '\tcase ' }),
         luasnip.insert_node(2, 'value'),
         luasnip.text_node(':'),
-        luasnip.text_node({'\t\t'}),
+        luasnip.text_node({ '', '\t\t' }),
         luasnip.insert_node(3, '// case body'),
-        luasnip.text_node({'\t\tbreak;', '', 'default:', '\t\t'}),
+        luasnip.text_node({ '', '\t\tbreak;', '', '\tdefault:', '' }),
+        luasnip.text_node({ '\t\t' }),
         luasnip.insert_node(4, '// default case'),
-        luasnip.text_node({'\t\tbreak;', '', '}'}),
+        luasnip.text_node({ '', '\t\tbreak;', '', '}' }),
       }),
 
       -- Template function (typename, descriptive names)
@@ -215,14 +247,100 @@ return {
         luasnip.insert_node(1, 'name'),
       }),
 
-      -- Include guard (uppercase, no spaces)
-      luasnip.snippet('guard', {
-        luasnip.text_node('#ifndef '),
-        luasnip.insert_node(1, 'FILENAME_H'),
-        luasnip.text_node({'', '#define '}),
-        luasnip.insert_node(1, 'FILENAME_H'),
-        luasnip.text_node({'', '', '// Header content', '', '#endif // '}),
-        luasnip.insert_node(1, 'FILENAME_H'),
+
+
+      -- std::unique_ptr
+      luasnip.snippet('unp', {
+        luasnip.text_node('std::unique_ptr<'),
+        luasnip.insert_node(1, 'type'),
+        luasnip.text_node('> '),
+        luasnip.insert_node(2, 'name'),
+      }),
+
+      -- std::make_unique
+      luasnip.snippet('mku', {
+        luasnip.text_node('std::make_unique<'),
+        luasnip.insert_node(1, 'type'),
+        luasnip.text_node('>('),
+        luasnip.insert_node(2, 'args'),
+        luasnip.text_node(')'),
+      }),
+
+      -- std::make_shared
+      luasnip.snippet('mks', {
+        luasnip.text_node('std::make_shared<'),
+        luasnip.insert_node(1, 'type'),
+        luasnip.text_node('>('),
+        luasnip.insert_node(2, 'args'),
+        luasnip.text_node(')'),
+      }),
+
+      -- Debug paint (magenta border)
+      luasnip.snippet('dbp', {
+        luasnip.text_node('void paint (juce::Graphics& g) override'),
+        luasnip.text_node({'', '{'}),
+        luasnip.text_node({'', '\tg.setColour (juce::Colours::magenta);'}),
+        luasnip.text_node({'', '\tg.drawRect (getLocalBounds(), 2.0f);'}),
+        luasnip.text_node({'', '}'}),
+      }),
+
+      -- Meyer singleton
+      luasnip.snippet('sing', {
+        luasnip.text_node('class '),
+        luasnip.insert_node(1, 'MeyersSingleton'),
+        luasnip.text_node({'', '{'}),
+        luasnip.text_node({'', 'public:', ''}),
+        luasnip.text_node({'', '\tstatic '}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('& instance()'),
+        luasnip.text_node({'', '\t{'}),
+        luasnip.text_node({'', '\t\tstatic '}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node(' single;'),
+        luasnip.text_node({'', '\t\treturn single;'}),
+        luasnip.text_node({'', '\t}', ''}),
+        luasnip.text_node({'', '//==============================================================================', ''}),
+        luasnip.text_node({'', 'private:', ''}),
+        luasnip.text_node({'', '\t'}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('() = default;'),
+        luasnip.text_node({'', '\t'}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('(const '),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('&) = delete;'),
+        luasnip.text_node({'', '\t'}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('('),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('&&) = delete;'),
+        luasnip.text_node({'', '\t'}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('& operator=('),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('&&) = delete;'),
+        luasnip.text_node({'', '\t'}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('& operator=(const '),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
+        luasnip.text_node('&) = delete;'),
+        luasnip.text_node({'', '};'}),
+      }),
+
+      -- JUCE macOS
+      luasnip.snippet('mac', {
+        luasnip.text_node('#if JUCE_MAC'),
+        luasnip.text_node({'', '\t'}),
+        luasnip.insert_node(1, 'something'),
+        luasnip.text_node({'', '#endif // JUCE_MAC'}),
+      }),
+
+      -- JUCE Windows
+      luasnip.snippet('win', {
+        luasnip.text_node('#if JUCE_WINDOWS'),
+        luasnip.text_node({'', '\t'}),
+        luasnip.insert_node(1, 'something'),
+        luasnip.text_node({'', '#endif // JUCE_WINDOWS'}),
       }),
 
       -- Test snippet

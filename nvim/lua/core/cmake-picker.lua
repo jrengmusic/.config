@@ -351,15 +351,15 @@ function M.files()
     if a.module == b.module then
       return a.display < b.display
     end
-    -- Order: exact matches first, then prefixes, then others
-    local MODULE_ORDER = { 'CMake', 'Source', 'kuassa_', 'bo_', 'juce_' }
+    -- Order: CMake > Source > User modules > JUCE modules > Others
+    local MODULE_PRIORITY = {
+      CMake = 1,
+      Source = 2,
+    }
     local function priority(mod)
-      for i, pattern in ipairs(MODULE_ORDER) do
-        if mod == pattern or mod:match('^' .. pattern) then
-          return i
-        end
-      end
-      return #MODULE_ORDER + 1
+      if MODULE_PRIORITY[mod] then return MODULE_PRIORITY[mod] end
+      if mod:match('^juce_') then return 4 end
+      return 3  -- User modules
     end
     local pa, pb = priority(a.module), priority(b.module)
     if pa ~= pb then return pa < pb end
