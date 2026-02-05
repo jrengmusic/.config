@@ -383,6 +383,39 @@ function M.files()
   })
 end
 
+local function find_symlink_for_file(real_file)
+  local cwd = vim.fn.getcwd()
+  local project_dir = get_project_dir()
+  local source_root = cwd .. '/Source'
+
+  local group, submodule = classify_file(real_file)
+  if group == 'Sources' then
+    local rel = real_file:gsub('^' .. vim.pesc(source_root) .. '/', '')
+    local subdir = vim.fn.fnamemodify(rel, ':h')
+    local basename = vim.fn.fnamemodify(real_file, ':t')
+    local symlink
+    if subdir ~= '.' and subdir ~= '' then
+      symlink = project_dir .. '/1 Source/' .. subdir .. '/' .. basename
+    else
+      symlink = project_dir .. '/1 Source/' .. basename
+    end
+    if vim.fn.filereadable(symlink) == 1 then
+      return symlink
+    end
+  elseif group == 'JUCE Modules' and submodule ~= nil then
+    local idx = real_file:find('/' .. submodule .. '/')
+    if idx ~= nil then
+      local module_root = real_file:sub(1, idx + #submodule)
+      local rel = real_file:sub(idx + #submodule + 2)
+      local symlink = project_dir .. '/2 JUCE Modules/' .. submodule .. '/' .. rel
+      if vim.fn.filereadable(symlink) == 1 then
+        return symlink
+      end
+    end
+  end
+  return nil
+end
+
 function M.open_explorer()
   local project_dir = get_project_dir()
 
@@ -393,7 +426,29 @@ function M.open_explorer()
     end
   end
 
-  require('snacks').picker.explorer({ cwd = project_dir })
+  local current_file = vim.fn.expand('%:p')
+  local symlink_path = find_symlink_for_file(current_file)
+
+  local Tree = require('snacks.explorer.tree')
+  Tree:refresh(project_dir)
+  if symlink_path ~= nil then
+    Tree:open(symlink_path)
+  end
+
+  local picker = require('snacks').picker.explorer({
+    cwd = project_dir,
+    on_close = function()
+      local Tree = require('snacks.explorer.tree')
+      Tree:close_all()
+    end,
+  })
+
+  if symlink_path ~= nil then
+    vim.schedule(function()
+      local Actions = require('snacks.explorer.actions')
+      Actions.update(picker, { target = symlink_path })
+    end)
+  end
 end
 
 function M.regenerate()

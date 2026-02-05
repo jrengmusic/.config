@@ -111,17 +111,70 @@
 
 Uses default mini.surround keys. **NOT** `<leader>s`.
 
+### Custom Surroundings
+
+| Char | Surrounds With |
+|------|----------------|
+| `m` | `std::move (...)` |
+| `(` | `(...)` (no spaces) |
+| `)` | `(...)` (no spaces) |
+
+### Text Object Motions
+
+| Motion | Captures |
+|--------|----------|
+| `iw` | word (`layout`) |
+| `iW` | WORD including dots (`layout.panel`) |
+| `_` | entire line (trimmed) |
+| `$` | to end of line |
+| `i}` | inside `{}` block |
+| `a}` | around `{}` block (includes braces) |
+| `iF` | inside function definition (treesitter) |
+| `aF` | around function definition (treesitter) |
+| `iC` | inside class definition (treesitter) |
+| `aC` | around class definition (treesitter) |
+| `iS` | inside scope/block (treesitter) |
+| `aS` | around scope/block (treesitter) |
+| `if` | inside function call `()` |
+| `af` | around function call `()` |
+
+### Select Scope/Function Examples
+
+```
+vi}     →  select inside {} braces
+va}     →  select {} including braces
+viF     →  select function body (treesitter)
+vaF     →  select entire function (treesitter)
+viC     →  select class body
+vaC     →  select entire class
+viS     →  select scope/block body
+vaS     →  select entire scope/block
+vaFsam  →  select function, wrap with std::move
+```
+
 ### Add Surround
 
 | Key | Action |
 |-----|--------|
 | `sa{motion}{char}` | Surround motion with char |
 | `saiw"` | Surround word with `"` |
-| `saiw)` | Surround word with `()` |
+| `saW(` | Surround WORD with `()` → `(layout.panel)` |
+| `saWm` | Surround WORD with std::move → `std::move (layout.panel)` |
+| `sa_m` | Surround line with std::move |
 | `sa$}` | Surround to EOL with `{}` |
-| `sat<div>` | Surround to EOL with `<div></div>` |
 
 **In visual mode:** select text, then `sa{char}`
+- `viWsam` → select WORD, wrap with `std::move (...)`
+- `Vsam` → select line, wrap with `std::move (...)`
+
+### Examples
+
+```
+variable        + saiwm  →  std::move (variable)
+layout.panel    + saWm   →  std::move (layout.panel)
+whole line here + sa_m   →  std::move (whole line here)
+someValue       + saW(   →  (someValue)
+```
 
 ### Delete Surround
 
@@ -130,6 +183,7 @@ Uses default mini.surround keys. **NOT** `<leader>s`.
 | `sd{char}` | Delete surrounding char |
 | `sd"` | Delete surrounding `"` |
 | `sd)` | Delete surrounding `()` |
+| `sdm` | Delete surrounding `std::move (...)` |
 
 ### Replace Surround
 
@@ -138,6 +192,7 @@ Uses default mini.surround keys. **NOT** `<leader>s`.
 | `sr{old}{new}` | Replace old surround with new |
 | `sr"'` | Replace `"` with `'` |
 | `sr)]` | Replace `()` with `[]` |
+| `srm(` | Replace `std::move (x)` with `(x)` |
 
 ## Insert Mode Helpers
 

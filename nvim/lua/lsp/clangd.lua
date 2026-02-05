@@ -9,7 +9,7 @@ local M = {}
         '--header-insertion=never',
         '--clang-tidy',
         '--completion-style=detailed',
-        '--header-insertion-decorators',
+        '--header-insertion-decorators=false',
         '--query-driver=/usr/bin/c++,/usr/bin/clang++',
       },
     },

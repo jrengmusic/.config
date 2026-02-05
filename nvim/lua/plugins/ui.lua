@@ -47,7 +47,15 @@ return {
     })
 
     require('mini.ai').setup({ n_lines = 500 })
-    require('mini.surround').setup()
+    require('mini.surround').setup({
+      custom_surroundings = {
+        -- No-space parentheses (default ( adds spaces)
+        ['('] = { output = { left = '(', right = ')' } },
+        [')'] = { output = { left = '(', right = ')' } },
+        -- std::move wrapper - use 'm' as trigger
+        ['m'] = { output = { left = 'std::move (', right = ')' } },
+      },
+    })
     require('core.keymaps').setupSurround()
     require('mini.pairs').setup({})
     require('core.keymaps').setupMiniPairs()
