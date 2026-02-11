@@ -43,7 +43,23 @@ return {
       }),
       sources = {
         { name = 'luasnip', priority = 100 },
-        { name = 'nvim_lsp', priority = 50 },
+        {
+          name = 'nvim_lsp',
+          priority = 50,
+          entry_filter = function(entry)
+            -- Block clangd's auto-include insertions
+            local item = entry:get_completion_item()
+            if item.additionalTextEdits then
+              for _, edit in ipairs(item.additionalTextEdits) do
+                if edit.newText:match('#include') then
+                  item.additionalTextEdits = nil
+                  break
+                end
+              end
+            end
+            return true
+          end,
+        },
       },
     })
   end,

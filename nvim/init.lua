@@ -41,6 +41,7 @@ require('lazy').setup({
   plug { repo = 'folke/snacks.nvim', module = 'plugins.picker' },
   plug { repo = 'L3MON4D3/LuaSnip', module = 'plugins.snippets' },
   plug { repo = 'folke/flash.nvim', module = 'plugins.flash' },
+  plug { repo = 'ThePrimeagen/99', module = 'plugins.99' },
 }, require('core.lazy_config').opts)
 
 -- ============================================================================

@@ -365,7 +365,7 @@ return {
       require('snacks').picker.snippets()
     end, { desc = 'Snippet picker' })
 
-    vim.keymap.set('i', '<C-s>', function()
+    vim.keymap.set('i', '<C-v>', function()
       require('snacks').picker.snippets()
     end, { desc = 'Snippet picker (insert mode)' })
   end,

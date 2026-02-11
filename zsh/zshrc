@@ -137,3 +137,4 @@ if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
   eval "$(oh-my-posh init zsh --config ~/.config/omp/gfx.json)"
 fi
 
+export MINIMAX_API_KEY="sk-cp-PihWk8rBmAoId9ZmELUyRelsaaFiOe7h5J9WqU0iYsIIzCEVoylbsXnoWax4fYSwVUj8VB1wpCzhsBHCTsE05sjiGdECPpDJJaM9_2ZNaOni8wx3KERNLrA"

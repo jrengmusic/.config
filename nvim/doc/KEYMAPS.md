@@ -9,7 +9,8 @@
 | `<Esc><Esc>` | n | Force format buffer |
 | `<Esc><Esc>` | t | Exit terminal mode |
 | `<leader>q` | n | Open diagnostic quickfix list |
-| `ZA` | n | Save all and quit |
+| `<C-s>` | n | Save all and quit |
+| `<C-c>` | n | Quit all without saving |
 | `<leader>x` | n | Close current window |
 | `<leader>[` | n | Jump back (jumplist) |
 | `<leader>]` | n | Jump forward (jumplist) |
@@ -133,8 +134,10 @@ Uses default mini.surround keys. **NOT** `<leader>s`.
 | `aF` | around function definition (treesitter) |
 | `iC` | inside class definition (treesitter) |
 | `aC` | around class definition (treesitter) |
-| `iS` | inside scope/block (treesitter) |
-| `aS` | around scope/block (treesitter) |
+| `iL` | inside loop (treesitter) |
+| `aL` | around loop (treesitter) |
+| `iI` | inside if/conditional (treesitter) |
+| `aI` | around if/conditional (treesitter) |
 | `if` | inside function call `()` |
 | `af` | around function call `()` |
 
@@ -147,8 +150,10 @@ viF     →  select function body (treesitter)
 vaF     →  select entire function (treesitter)
 viC     →  select class body
 vaC     →  select entire class
-viS     →  select scope/block body
-vaS     →  select entire scope/block
+viL     →  select loop body
+vaL     →  select entire loop
+viI     →  select if/conditional body
+vaI     →  select entire if/conditional
 vaFsam  →  select function, wrap with std::move
 ```
 
@@ -213,6 +218,14 @@ someValue       + saW(   →  (someValue)
 | `R` | o/x | Treesitter search |
 | `<C-s>` | c | Toggle flash in search |
 
+## AI Agent (99)
+
+| Key | Mode | Action |
+|-----|------|--------|
+| `<leader>9f` | n | Fill function body with AI |
+| `<leader>9v` | v | AI on visual selection |
+| `<leader>9s` | n | Stop all AI requests |
+
 ## Snippets
 
 ### Snippet Commands
@@ -220,7 +233,7 @@ someValue       + saW(   →  (someValue)
 | Key | Mode | Action |
 |-----|------|--------|
 | `<leader>fs` | n | Find/insert snippets |
-| `<C-s>` | i | Find/insert snippets |
+| `<C-v>` | i | Find/insert snippets |
 
 ### Available Snippets
 

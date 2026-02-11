@@ -165,6 +165,34 @@ return {
         preset = {
           header = dashboard.header,
         },
+        formats = {
+          header = function(item)
+            local lines = vim.split(item.header, '\n')
+            -- Top: dark red, Bottom: slightly lighter red with more orange
+            local gradient_colors = {
+              '#cd3131', -- top: dark red
+              '#d23838', --
+              '#d74040', --
+              '#dc4848', --
+              '#e15050', --
+              '#e75858', --
+              '#ec6060', --
+              '#f16868', -- bottom: lighter red with more orange tint
+            }
+            -- Set up gradient highlights
+            for i, color in ipairs(gradient_colors) do
+              vim.api.nvim_set_hl(0, 'JrengGradient' .. i, { fg = color })
+            end
+            -- Return formatted text with gradient
+            local result = {}
+            for i, line in ipairs(lines) do
+              if line ~= '' then
+                table.insert(result, { line .. '\n', hl = 'JrengGradient' .. i, align = 'center' })
+              end
+            end
+            return result
+          end,
+        },
         sections = dashboard.sections,
       },
       -- Explicitly disable unused features to suppress healthcheck warnings

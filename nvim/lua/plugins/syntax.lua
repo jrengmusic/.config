@@ -32,7 +32,9 @@ return {
     vim.keymap.set({ 'x', 'o' }, 'iF', function() select('@function.inner', 'textobjects') end, { desc = 'inside function' })
     vim.keymap.set({ 'x', 'o' }, 'aC', function() select('@class.outer', 'textobjects') end, { desc = 'around class' })
     vim.keymap.set({ 'x', 'o' }, 'iC', function() select('@class.inner', 'textobjects') end, { desc = 'inside class' })
-    vim.keymap.set({ 'x', 'o' }, 'aS', function() select('@block.outer', 'textobjects') end, { desc = 'around scope/block' })
-    vim.keymap.set({ 'x', 'o' }, 'iS', function() select('@block.inner', 'textobjects') end, { desc = 'inside scope/block' })
+    vim.keymap.set({ 'x', 'o' }, 'aL', function() select('@loop.outer', 'textobjects') end, { desc = 'around loop' })
+    vim.keymap.set({ 'x', 'o' }, 'iL', function() select('@loop.inner', 'textobjects') end, { desc = 'inside loop' })
+    vim.keymap.set({ 'x', 'o' }, 'aI', function() select('@conditional.outer', 'textobjects') end, { desc = 'around if/conditional' })
+    vim.keymap.set({ 'x', 'o' }, 'iI', function() select('@conditional.inner', 'textobjects') end, { desc = 'inside if/conditional' })
   end,
 }

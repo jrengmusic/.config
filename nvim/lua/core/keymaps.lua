@@ -7,10 +7,19 @@ function M.setup()
   -- ============================================================================
   vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highlights' })
   vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic quickfix list' })
-  vim.keymap.set('n', 'ZA', '<cmd>wqa!<CR>', { desc = 'Save all and quit' })
+  vim.keymap.set('n', '<C-s>', '<cmd>wqa!<CR>', { desc = 'Save all and quit' })
+  vim.keymap.set('n', '<C-c>', '<cmd>qa!<CR>', { desc = 'Quit all without saving' })
   vim.keymap.set('n', '<leader>tt', function() require('core.tui').tit() end, { desc = 'Open TIT (git TUI)' })
   vim.keymap.set('n', '<leader>tc', function() require('core.tui').cake() end, { desc = 'Open Cake TUI' })
   vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
+  vim.keymap.set('n', '<leader>tx', function()
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.bo[buf].buftype == 'terminal' then
+        vim.api.nvim_win_close(win, true)
+      end
+    end
+  end, { desc = 'Close all terminal windows' })
   
   -- Split commands (<leader>s group)
   vim.keymap.set('n', '<leader>ss', function() require('lsp.header-source').syncSplit() end, { desc = 'Sync header/source split' })
@@ -29,6 +38,10 @@ function M.setup()
   -- Jump list navigation
   vim.keymap.set('n', '<leader>[', '<C-o>', { desc = 'Jump back' })
   vim.keymap.set('n', '<leader>]', '<C-i>', { desc = 'Jump forward' })
+
+  -- Paste on new line (bypasses format-on-escape issue)
+  vim.keymap.set('n', '<leader>p', ':pu<CR>', { desc = 'Paste below on new line' })
+  vim.keymap.set('n', '<leader>P', ':pu!<CR>', { desc = 'Paste above on new line' })
 
   -- ============================================================================
   -- FORMATTING
