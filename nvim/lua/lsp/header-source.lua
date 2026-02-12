@@ -124,44 +124,80 @@ end
 
 function M.syncSplit()
   local current = vim.fn.expand('%:p')
-  local winCount = #vim.api.nvim_tabpage_list_wins(0)
-  
+
   if not (isCpp(current) or isHeader(current)) then
     vim.notify('syncSplit only works with C++/header files', vim.log.levels.WARN)
     return
   end
-  
+
   local allFiles = getAllCorrespondingFiles(current)
   if #allFiles == 0 then
     vim.notify('No corresponding files found', vim.log.levels.WARN)
     return
   end
-  
-  -- ALWAYS split first when only 1 window
-  if winCount == 1 then
-    vim.cmd('vsplit')
-    vim.cmd('wincmd =')  -- 50/50 split immediately
+
+  -- Count only non-terminal windows
+  local normalWins = {}
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.bo[buf].buftype ~= 'terminal' then
+      table.insert(normalWins, win)
+    end
   end
-  
-  -- Check if we already have a split with corresponding file
+  local winCount = #normalWins
+
+  -- Count only windows with actual files (for toggle logic)
+  local fileWinCount = 0
+  for _, win in ipairs(normalWins) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    local bufName = vim.api.nvim_buf_get_name(buf)
+    if bufName ~= '' and vim.fn.filereadable(bufName) == 1 then
+      fileWinCount = fileWinCount + 1
+    end
+  end
+
+  -- Check if we already have a split with corresponding file (ignore terminals and empty buffers)
   local currentOtherFile = nil
+  local currentWin = vim.api.nvim_get_current_win()
   if winCount >= 2 then
-    local wins = vim.api.nvim_tabpage_list_wins(0)
-    local currentWin = vim.api.nvim_get_current_win()
-    for _, win in ipairs(wins) do
+    for _, win in ipairs(normalWins) do
       if win ~= currentWin then
         local buf = vim.api.nvim_win_get_buf(win)
         local otherFile = vim.api.nvim_buf_get_name(buf)
-        if otherFile ~= '' then
+        -- Only consider actual files (not empty buffers)
+        if otherFile ~= '' and vim.fn.filereadable(otherFile) == 1 then
           currentOtherFile = otherFile
           break
         end
       end
     end
   end
-  
+
+  -- If multiple windows but no valid files, treat as single window
+  if fileWinCount >= 2 and currentOtherFile == nil then
+    fileWinCount = 1
+  end
+
+  -- Check if current split already has the paired file
+  local isPaired = false
+  if currentOtherFile then
+    for _, file in ipairs(allFiles) do
+      if vim.fn.fnamemodify(file, ':p') == vim.fn.fnamemodify(currentOtherFile, ':p') then
+        isPaired = true
+        break
+      end
+    end
+  end
+
+  -- TOGGLE behavior: only toggle when exactly 2 file windows with paired files
+  if fileWinCount == 2 and isPaired then
+    vim.cmd('only')
+    return
+  end
+
+  -- Determine target file BEFORE creating/updating split
   local targetFile
-  
+
   if isHeader(current) then
     -- Header (right side): cycle through cpp/mm files on left
     local leftCandidates = {}
@@ -172,7 +208,7 @@ function M.syncSplit()
     end
     targetFile = getNextInCycle(current, leftCandidates, currentOtherFile)
   elseif current:match('%.mm$') then
-    -- .mm file (left side): cycle through cpp/h files on right  
+    -- .mm file (left side): cycle through cpp/h files on right
     local rightCandidates = {}
     for _, file in ipairs(allFiles) do
       if not file:match('%.mm$') then -- cpp or h
@@ -189,35 +225,74 @@ function M.syncSplit()
       end
     end
   end
-  
+
   if not targetFile then
     vim.notify('No target file found', vim.log.levels.WARN)
     return
   end
-  
+
   -- Determine layout: h always right, cpp/mm always left
   local leftFile, rightFile
   if isHeader(current) then
     leftFile = targetFile
     rightFile = current
   else
-    leftFile = current  
+    leftFile = current
     rightFile = targetFile
   end
-  
-  -- Load files in the correct positions (split already exists)
-  vim.cmd('wincmd h')
+
+  -- Create split if only 1 file window, then load files immediately
+  if fileWinCount == 1 then
+    -- Verify target file exists
+    if vim.fn.filereadable(targetFile) ~= 1 then
+      vim.notify('Target file not found: ' .. targetFile, vim.log.levels.ERROR)
+      return
+    end
+
+    -- Strategy: Always create split with cpp left, header right
+    -- Then return to the window we started from
+
+    if isHeader(current) then
+      -- Current is header (will go right), target is cpp (goes left)
+      vim.cmd('vsplit ' .. vim.fn.fnameescape(targetFile))
+      vim.cmd('wincmd H')  -- Move current window to far left
+      vim.cmd('wincmd l')  -- Move to right (header) where we started
+    else
+      -- Current is cpp (will stay left), target is header (goes right)
+      vim.cmd('vsplit ' .. vim.fn.fnameescape(targetFile))
+      vim.cmd('wincmd h')  -- Move to left (cpp) where we started
+    end
+
+    vim.cmd('wincmd =')  -- Equalize sizes
+    return
+  end
+
+  -- Update existing split (2+ windows)
+  -- Find leftmost and rightmost non-terminal windows
+  local leftWin, rightWin
+  for _, win in ipairs(normalWins) do
+    local pos = vim.api.nvim_win_get_position(win)
+    if not leftWin or pos[2] < vim.api.nvim_win_get_position(leftWin)[2] then
+      leftWin = win
+    end
+    if not rightWin or pos[2] > vim.api.nvim_win_get_position(rightWin)[2] then
+      rightWin = win
+    end
+  end
+
+  -- Load files in the correct positions
+  vim.api.nvim_set_current_win(leftWin)
   vim.cmd('buffer ' .. vim.fn.bufadd(leftFile))
-  vim.cmd('wincmd l')
-  vim.cmd('buffer ' .. vim.fn.bufadd(rightFile))
-  
+  if rightWin and rightWin ~= leftWin then
+    vim.api.nvim_set_current_win(rightWin)
+    vim.cmd('buffer ' .. vim.fn.bufadd(rightFile))
+  end
+
   -- Stay in the window we started from
   if isHeader(current) then
-    -- Started from header (right), stay right
-    -- Already in right window after the commands above
+    vim.api.nvim_set_current_win(rightWin)
   else
-    -- Started from cpp/mm (left), stay left  
-    vim.cmd('wincmd h')
+    vim.api.nvim_set_current_win(leftWin)
   end
 end
 

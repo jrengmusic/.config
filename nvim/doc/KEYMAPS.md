@@ -8,12 +8,33 @@
 | `<Esc>` | i/v | Exit + auto-format buffer |
 | `<Esc><Esc>` | n | Force format buffer |
 | `<Esc><Esc>` | t | Exit terminal mode |
-| `<leader>q` | n | Open diagnostic quickfix list |
+| `<leader>q` | n | Toggle diagnostic list (top split) |
 | `<C-s>` | n | Save all and quit |
-| `<C-c>` | n | Quit all without saving |
+| `<C-c>` | n | Quit with save/discard prompt |
 | `<leader>x` | n | Close current window |
 | `<leader>[` | n | Jump back (jumplist) |
 | `<leader>]` | n | Jump forward (jumplist) |
+
+## Diagnostics
+
+### Inline Diagnostics (Always Active)
+- **Virtual text** - Error messages at end of lines (`● error message`)
+- **Signs** - Gutter icons: `✘` (error), `▲` (warning), `⚑` (hint), `»` (info)
+- **Underlines** - Wavy lines under problematic code
+- **Floating window** - Hover on error (cursor hold) shows full diagnostic
+
+### Diagnostic List (`<leader>q`)
+Opens at top (horizontal split, 15 lines):
+
+| Key | Action |
+|-----|--------|
+| `<leader>q` | Toggle diagnostic list |
+| `<Enter>` | Jump to diagnostic |
+| `q` | Close diagnostic list |
+| `p` | Preview diagnostic |
+| `j`/`k` | Navigate diagnostics |
+
+**Auto-close:** List closes automatically when all errors are fixed.
 
 ## Splits (`<leader>s` group)
 
@@ -74,9 +95,15 @@
 | Key | Action |
 |-----|--------|
 | `gh` | Switch header ↔ source (in-place) |
+| `<leader>ss` | Sync header/source split (toggle) |
 | `<leader>cc` | Generate C++ definition stub |
 | `<leader>cv` | Generate all missing C++ stubs |
 | `<leader>c/` | Toggle comment in header + cpp |
+
+**Stub Notes:**
+- Strips linkage keywords (`static`, `extern`, `inline`, `virtual`, etc.)
+- Skips `inline` functions (should be defined in header)
+- Auto-places stubs after last class method
 
 ## Build (`<leader>b` group)
 

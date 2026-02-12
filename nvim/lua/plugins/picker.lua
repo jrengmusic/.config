@@ -85,6 +85,7 @@ return {
               list = {
                 keys = {
                   ['a'] = 'explorer_add_resolve',
+                  ['<C-c>'] = 'close',
                 },
               },
             },

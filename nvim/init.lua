@@ -12,6 +12,7 @@ vim.g.have_nerd_font = true
 -- ============================================================================
 
 require('core.options').setup()
+require('core.diagnostics').setup()
 require('core.formatting').setup()
 require('core.autocommands').setup()
 require('core.keymaps').setup()

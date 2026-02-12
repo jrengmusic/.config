@@ -6,11 +6,27 @@ local function isMacro(line)
   return line:match('^%s*[A-Z_]+%s*%(') ~= nil
 end
 
+local function stripLinkageKeywords(returnType)
+  if not returnType then return nil end
+  -- Remove linkage/storage class keywords that shouldn't appear in definitions
+  returnType = returnType:gsub('^%s*static%s+', '')
+  returnType = returnType:gsub('^%s*extern%s+', '')
+  returnType = returnType:gsub('^%s*inline%s+', '')
+  returnType = returnType:gsub('^%s*virtual%s+', '')
+  returnType = returnType:gsub('^%s*constexpr%s+', '')
+  returnType = returnType:gsub('^%s*consteval%s+', '')
+  returnType = returnType:gsub('^%s*explicit%s+', '')
+  return returnType
+end
+
 local function parseDeclaration(line, className)
   if isMacro(line) then
     return nil
   end
-  
+
+  -- Check if function is inline - should not generate stub
+  local isInline = line:match('^%s*inline%s+') ~= nil
+
   local funcName, params
   local returnType = nil
   local isConstructor = false
@@ -37,32 +53,40 @@ local function parseDeclaration(line, className)
   end
   
   if not isConstructor and not isDestructor then
+    -- Try to match function declaration with various keyword combinations
     local pattern = '^%s*(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
     returnType, funcName, params = line:match(pattern)
-    
+
     if not returnType or not funcName then
       local virtualPattern = '^%s*virtual%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
       returnType, funcName, params = line:match(virtualPattern)
-      if returnType then
-        returnType = returnType:gsub('^virtual%s+', '')
-      end
     end
-    
+
     if not returnType or not funcName then
       local staticPattern = '^%s*static%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
       returnType, funcName, params = line:match(staticPattern)
-      if returnType then
-        returnType = returnType:gsub('^static%s+', '')
-      end
     end
-    
+
+    if not returnType or not funcName then
+      local externPattern = '^%s*extern%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
+      returnType, funcName, params = line:match(externPattern)
+    end
+
+    if not returnType or not funcName then
+      local inlinePattern = '^%s*inline%s+(.-)%s+([%w_]+)%s*%((.*)%)%s*[;{=]?'
+      returnType, funcName, params = line:match(inlinePattern)
+    end
+
     if not returnType or not funcName then
       return nil
     end
-    
+
     if returnType == '' then
       return nil
     end
+
+    -- Strip all linkage keywords from return type
+    returnType = stripLinkageKeywords(returnType)
   end
   
   params = params or ''
@@ -74,7 +98,7 @@ local function parseDeclaration(line, className)
   params = params:gsub('%s*=%s*delete%s*$', '')
   
   local isConst = line:match('%)%s*const') ~= nil
-  
+
   return {
     returnType = returnType and returnType:gsub('^%s+', ''):gsub('%s+$', '') or '',
     funcName = funcName,
@@ -82,6 +106,7 @@ local function parseDeclaration(line, className)
     isConst = isConst,
     isConstructor = isConstructor,
     isDestructor = isDestructor,
+    isInline = isInline,
   }
 end
 
@@ -244,14 +269,14 @@ function M.toggleCommentPair()
   end
   
   local cursorPos = vim.api.nvim_win_get_cursor(0)
-  local currentLine = vim.api.nvim_buf_get_lines(bufnr, cursorPos[1] - 1, cursorPos[1], false)[1]
-  
-  local decl = parseDeclaration(currentLine, className)
+  local declaration = collectMultilineDeclaration(bufnr, cursorPos[1])
+
+  local decl = parseDeclaration(declaration, className)
   if not decl then
     vim.notify('Could not parse function declaration', vim.log.levels.ERROR)
     return
   end
-  
+
   local hStart, hEnd = findDeclarationRange(bufnr, cursorPos[1])
   toggleCommentRange(bufnr, hStart, hEnd)
   
@@ -325,11 +350,17 @@ local function collectClassDeclarations(bufnr)
   local className = nil
   local inClass = false
   local braceDepth = 0
-  
+  local skipUntilLine = 0
+
   for i, line in ipairs(lines) do
+    -- Skip lines that were already processed as part of multi-line declaration
+    if i <= skipUntilLine then
+      goto continue
+    end
+
     local classMatch = line:match('^%s*class%s+([%w_]+)')
     local structMatch = line:match('^%s*struct%s+([%w_]+)')
-    
+
     if classMatch then
       className = classMatch
       inClass = true
@@ -339,27 +370,40 @@ local function collectClassDeclarations(bufnr)
       inClass = true
       braceDepth = 0
     end
-    
+
     if inClass then
       for _ in line:gmatch('{') do braceDepth = braceDepth + 1 end
       for _ in line:gmatch('}') do braceDepth = braceDepth - 1 end
-      
+
       if braceDepth == 0 and line:match('}') then
         inClass = false
         className = nil
       elseif className and braceDepth > 0 then
-        local decl = parseDeclaration(line, className)
+        -- Use multi-line collection for parsing
+        local fullDecl = collectMultilineDeclaration(bufnr, i)
+        local decl = parseDeclaration(fullDecl, className)
         if decl then
           table.insert(declarations, {
             className = className,
             decl = decl,
             line = i,
           })
+
+          -- Calculate how many lines to skip
+          local lineCount = 1
+          for j = i, #lines do
+            if lines[j]:match(';') or lines[j]:match('{') then
+              skipUntilLine = j
+              break
+            end
+          end
         end
       end
     end
+
+    ::continue::
   end
-  
+
   return declarations
 end
 
@@ -432,8 +476,12 @@ function M.generateAllStubs()
       local cppLines = vim.api.nvim_buf_get_lines(cppBuf, 0, -1, false)
       
       local generated = 0
+      local skipped_inline = 0
       for _, entry in ipairs(declarations) do
-        if not hasDefinition(cppLines, entry.className, entry.decl.funcName) then
+        -- Skip inline functions
+        if entry.decl.isInline then
+          skipped_inline = skipped_inline + 1
+        elseif not hasDefinition(cppLines, entry.className, entry.decl.funcName) then
           local stub = formatStub(entry.decl, entry.className) .. '\n'
           
           cppLines = vim.api.nvim_buf_get_lines(cppBuf, 0, -1, false)
@@ -457,42 +505,95 @@ function M.generateAllStubs()
         end
       end
       
+      local msg = ''
       if generated > 0 then
-        vim.notify(string.format('Generated %d stub(s)', generated), vim.log.levels.INFO)
+        msg = string.format('Generated %d stub(s)', generated)
       else
-        vim.notify('All functions already have definitions', vim.log.levels.INFO)
+        msg = 'All functions already have definitions'
       end
+
+      if skipped_inline > 0 then
+        msg = msg .. string.format(' (skipped %d inline)', skipped_inline)
+      end
+
+      vim.notify(msg, vim.log.levels.INFO)
     end)
   end, bufnr)
+end
+
+local function collectMultilineDeclaration(bufnr, startLine)
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local collected = {}
+  local parenDepth = 0
+  local foundStart = false
+
+  for i = startLine, #lines do
+    local line = lines[i]
+
+    -- Count parentheses
+    for char in line:gmatch('.') do
+      if char == '(' then
+        parenDepth = parenDepth + 1
+        foundStart = true
+      elseif char == ')' then
+        parenDepth = parenDepth - 1
+      end
+    end
+
+    table.insert(collected, line)
+
+    -- Stop when we've closed all parentheses and found a semicolon or brace
+    if foundStart and parenDepth == 0 and (line:match(';') or line:match('{')) then
+      break
+    end
+
+    -- Safety limit: don't read more than 20 lines
+    if #collected >= 20 then
+      break
+    end
+  end
+
+  -- Join lines, preserving single spaces between them
+  local joined = table.concat(collected, ' ')
+  -- Clean up multiple spaces
+  joined = joined:gsub('%s+', ' ')
+
+  return joined
 end
 
 function M.generateStub()
   local bufnr = vim.api.nvim_get_current_buf()
   local filename = vim.api.nvim_buf_get_name(bufnr)
-  
+
   if not filename:match('%.h$') and not filename:match('%.hpp$') then
     vim.notify('Not in a header file', vim.log.levels.WARN)
     return
   end
-  
+
   local className = findClassName(bufnr)
   if not className then
     vim.notify('Could not find class name', vim.log.levels.ERROR)
     return
   end
-  
+
   local cursorPos = vim.api.nvim_win_get_cursor(0)
-  local currentLine = vim.api.nvim_buf_get_lines(bufnr, cursorPos[1] - 1, cursorPos[1], false)[1]
-  
-  local decl = parseDeclaration(currentLine, className)
+  local declaration = collectMultilineDeclaration(bufnr, cursorPos[1])
+
+  local decl = parseDeclaration(declaration, className)
   if not decl then
     vim.notify('Could not parse function declaration', vim.log.levels.ERROR)
     return
   end
-  
+
+  -- Skip inline functions - they should be defined in the header
+  if decl.isInline then
+    vim.notify('Inline functions should be defined in the header', vim.log.levels.WARN)
+    return
+  end
+
   local stub = formatStub(decl, className)
   local funcName = decl.funcName
-  
+
   switchToSource(function()
     insertStubAtEnd(stub, className, funcName)
   end)

@@ -45,6 +45,27 @@ local function get_project_dir()
   return cwd .. '/.' .. name
 end
 
+local function is_symlink_tree_stale()
+  local compile_db = find_compile_db()
+  if compile_db == nil then return false end
+
+  local project_dir = get_project_dir()
+  if vim.fn.isdirectory(project_dir) ~= 1 then return true end
+
+  local tree_mtime = vim.fn.getftime(project_dir)
+  local db_mtime = vim.fn.getftime(compile_db)
+
+  if db_mtime > tree_mtime then return true end
+
+  local source_dir = vim.fn.getcwd() .. '/Source'
+  if vim.fn.isdirectory(source_dir) == 1 then
+    local source_mtime = vim.fn.getftime(source_dir)
+    if source_mtime > tree_mtime then return true end
+  end
+
+  return false
+end
+
 local function is_source_ext(file)
   local ext = file:match('%.([^%.]+)$')
   if ext == nil then return false end
@@ -419,7 +440,7 @@ end
 function M.open_explorer()
   local project_dir = get_project_dir()
 
-  if vim.fn.isdirectory(project_dir) ~= 1 or vim.fn.empty(vim.fn.readdir(project_dir)) == 1 then
+  if is_symlink_tree_stale() then
     if not generate_symlink_tree() then
       vim.notify('No compile_commands.json - run cmake first', vim.log.levels.WARN)
       return
@@ -438,15 +459,19 @@ function M.open_explorer()
   local picker = require('snacks').picker.explorer({
     cwd = project_dir,
     on_close = function()
-      local Tree = require('snacks.explorer.tree')
-      Tree:close_all()
+      pcall(function()
+        local Tree = require('snacks.explorer.tree')
+        Tree:close_all()
+      end)
     end,
   })
 
   if symlink_path ~= nil then
     vim.schedule(function()
-      local Actions = require('snacks.explorer.actions')
-      Actions.update(picker, { target = symlink_path })
+      pcall(function()
+        local Actions = require('snacks.explorer.actions')
+        Actions.update(picker, { target = symlink_path })
+      end)
     end)
   end
 end
