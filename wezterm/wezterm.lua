@@ -3,10 +3,11 @@ local config = {
 	automatically_reload_config = true,
 	window_close_confirmation = "AlwaysPrompt",
 	window_decorations = "RESIZE",
+	macos_window_background_blur = 32,
 	font = wezterm.font("Input Mono Narrow"),
-	font_size = 13.0,
+	font_size = 15.0,
 	initial_rows = 80,
-	initial_cols = 100,
+	initial_cols = 3000,
 	-- Enable image rendering (for inline images, mermaid diagrams, etc.)
 	enable_kitty_graphics = true,
 	-- Better scrollback for long outputs
@@ -14,7 +15,7 @@ local config = {
 	background = {
 		{
 			source = {
-				Color = "#0A1216", -- Brighter blue
+				Color = "rgba(10, 18, 22, 0.444)",
 			},
 			width = "100%",
 			height = "100%",

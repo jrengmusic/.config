@@ -89,15 +89,12 @@ end
 local function classify_file(file)
   if file:find('/Source/') then
     return 'Sources', 'Source'
-  elseif file:find('/juce_[^/]+/') then
-    return 'JUCE Modules', 'juce_' .. file:match('/juce_([^/]+)/')
-  elseif file:find('/kuassa_[^/]+/') then
-    return 'JUCE Modules', file:match('/(kuassa_[^/]+)/')
-  elseif file:find('/JRENG_[^/]+/') then
-    return 'JUCE Modules', file:match('/(JRENG_[^/]+)/')
-  elseif file:find('/oblivion_[^/]+/') then
-    return 'JUCE Modules', file:match('/(oblivion_[^/]+)/')
   else
+    -- Auto-detect any module pattern: /module_name/
+    local module = file:match('/([^/]+_[^/]+)/')
+    if module then
+      return 'JUCE Modules', module
+    end
     return 'Other', nil
   end
 end
