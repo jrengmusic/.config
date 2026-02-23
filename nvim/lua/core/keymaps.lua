@@ -72,6 +72,12 @@ function M.setup()
     end
   end, { desc = 'Close all terminal windows' })
   
+  -- Replace (<leader>r group)
+  vim.keymap.set('n', '<leader>rw', ':%s/\\<<C-r><C-w>\\>/<C-r><C-w>/gI<Left><Left><Left>', { desc = 'Replace word (exact)' })
+  vim.keymap.set('v', '<leader>rw', '"hy:%s/\\<<C-r>h\\>/<C-r>h/gI<Left><Left><Left>', { desc = 'Replace selection (exact)' })
+  vim.keymap.set('n', '<leader>rc', ':%s/<C-r><C-w>/<C-r><C-w>/gI<Left><Left><Left>', { desc = 'Replace word (contains)' })
+  vim.keymap.set('v', '<leader>rc', '"hy:%s/<C-r>h/<C-r>h/gI<Left><Left><Left>', { desc = 'Replace selection (contains)' })
+
   -- Split commands (<leader>s group)
   vim.keymap.set('n', '<leader>ss', function() require('lsp.header-source').syncSplit() end, { desc = 'Sync header/source split' })
   vim.keymap.set('n', '<leader>s\\', '<C-w>v', { desc = 'Split vertical' })

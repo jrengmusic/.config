@@ -237,14 +237,12 @@ return {
       luasnip.snippet('nam', {
         luasnip.text_node('namespace '),
         luasnip.insert_node(1, 'name'),
-        luasnip.text_node({'', ''}),
-        luasnip.text_node('{'),
+        luasnip.text_node({'', '{'}),
         luasnip.text_node({'/*____________________________________________________________________________*/', ''}),
         luasnip.text_node({'\t'}),
         luasnip.insert_node(2, '// namespace content'),
-        luasnip.text_node({'', '/**____________________________END OF NAMESPACE______________________________*/'}),
-        luasnip.text_node('}  // namespace '),
-        luasnip.insert_node(1, 'name'),
+        luasnip.text_node({'', '/**______________________________END OF NAMESPACE______________________________*/', '}  // namespace '}),
+        luasnip.function_node(function(args) return args[1][1] end, { 1 }),
       }),
 
 
@@ -349,9 +347,23 @@ return {
       }),
     }
 
-    luasnip.add_snippets('cpp', cpp_snippets)
-    luasnip.add_snippets('objcpp', cpp_snippets)
-    luasnip.add_snippets('objc', cpp_snippets)
+    -- Override friendly-snippets namespace with custom nam
+    vim.defer_fn(function()
+      luasnip.add_snippets('cpp', cpp_snippets)
+      luasnip.add_snippets('objcpp', cpp_snippets)
+      luasnip.add_snippets('objc', cpp_snippets)
+      
+      -- Remove friendly-snippets namespace
+      local all_snippets = luasnip.get_snippets('cpp')
+      if all_snippets then
+        for i, snip in ipairs(all_snippets) do
+          if snip.trigger == 'namespace' then
+            table.remove(all_snippets, i)
+            break
+          end
+        end
+      end
+    end, 300)
     
     vim.keymap.set('i', '<C-l>', function() luasnip.jump(1) end, { silent = true })
     vim.keymap.set('i', '<C-h>', function() luasnip.jump(-1) end, { silent = true })

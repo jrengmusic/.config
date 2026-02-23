@@ -36,6 +36,14 @@ Opens at top (horizontal split, 15 lines):
 
 **Auto-close:** List closes automatically when all errors are fixed.
 
+## Replace (`<leader>r` group)
+
+| Key | Mode | Action |
+|-----|------|--------|
+| `<leader>rw` | n/v | Replace word/selection (exact match) |
+| `<leader>rc` | n/v | Replace word/selection (contains) |
+| `<leader>rn` | n | Rename symbol (LSP) |
+
 ## Splits (`<leader>s` group)
 
 | Key | Action |
@@ -86,7 +94,6 @@ Opens at top (horizontal split, 15 lines):
 | `K` | Hover documentation |
 | `<leader>ds` | Document symbols |
 | `<leader>ws` | Workspace symbols |
-| `<leader>rn` | Rename symbol |
 | `<leader>ca` | Code action |
 | `<leader>th` | Toggle inlay hints |
 
