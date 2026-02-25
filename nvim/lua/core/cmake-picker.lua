@@ -4,7 +4,7 @@ local M = {}
 
 local SOURCE_EXTENSIONS = {
   'cpp', 'cc', 'c', 'mm', 'm', 'h', 'hpp', 'hxx',
-  'xml', 'svg', 'json', 'txt', 'md', 'cmake',
+  'xml', 'svg', 'json', 'txt', 'md', 'cmake', 'html',
 }
 
 local EXCLUDE_EXTENSIONS = {
