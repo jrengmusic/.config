@@ -1,5 +1,14 @@
 # [ -f ~/.zprofile ] && source ~/.zprofile
 
+# Detect package share paths: Homebrew (ARM) vs MacPorts (Intel)
+if [[ -d /opt/homebrew ]]; then
+  _FZF_SHARE="/opt/homebrew/opt/fzf/shell"
+  _ZSH_HL="/opt/homebrew/share/zsh-syntax-highlighting"
+elif [[ -d /opt/local ]]; then
+  _FZF_SHARE="/opt/local/share/fzf/shell"
+  _ZSH_HL="/opt/local/share/zsh-syntax-highlighting"
+fi
+
 alias vim="nvim"
 alias :q="exit"
 
@@ -13,7 +22,7 @@ alias inf='cd ~/Documents/Poems/inf'
 alias dev='cd ~/Documents/Poems/dev'
 alias modules='cd ~/Documents/Poems/inf/___modules___/'
 
-alias ls='/opt/local/bin/eza -la'
+alias ls='eza -la'
 alias keju='~/Documents/Poems/inf/___user-modules___/automation/Keju_x64'
 
 # fzf configuration
@@ -56,8 +65,8 @@ done
 # Exclude hidden files EXCEPT specific dot directories/files, and exclude garbage
 export FZF_CTRL_T_COMMAND="find . -type f $EXCLUDE \( -not -path \"*/\.*\" $DOT_PATTERN \)"
 
-source /opt/local/share/fzf/shell/key-bindings.zsh
-source /opt/local/share/fzf/shell/completion.zsh
+source "$_FZF_SHARE/key-bindings.zsh"
+source "$_FZF_SHARE/completion.zsh"
 
 # Custom fzf options
 export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:500 {}' \
@@ -69,7 +78,7 @@ export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-ran
 bindkey '^F' fzf-file-widget
 #
 # zsh-syntax-highlighting
-source /opt/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source "$_ZSH_HL/zsh-syntax-highlighting.zsh"
 
 # Customize zsh-syntax-highlighting colors to match nvim gfx theme
 ZSH_HIGHLIGHT_STYLES[unknown-token]="fg=#f74a4a,bold"          # error red
