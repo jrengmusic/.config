@@ -9,7 +9,7 @@ local originalTerminalFrame = nil
 
 -- Detect terminal app
 local function getTerminalApp()
-  local terminalApps = { 'kitty', 'Alacritty', 'WezTerm', 'iTerm2', 'Terminal' }
+  local terminalApps = { 'kitty', 'Alacritty', 'WezTerm', 'iTerm2', 'Terminal', 'END' }
   for _, appName in ipairs(terminalApps) do
     local app = hs.application.find(appName)
     if app then
