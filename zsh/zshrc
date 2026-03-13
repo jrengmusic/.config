@@ -1,12 +1,22 @@
-# [ -f ~/.zprofile ] && source ~/.zprofile
+# OS detection
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  OPERATING_SYSTEM="windows"
+elif [[ "$(uname -m)" == "arm64" ]]; then
+  OPERATING_SYSTEM="macos-arm"
+else
+  OPERATING_SYSTEM="macos-intel"
+fi
 
-# Detect package share paths: Homebrew (ARM) vs MacPorts (Intel)
-if [[ -d /opt/homebrew ]]; then
+# Package paths
+if [[ $OPERATING_SYSTEM == "macos-arm" ]]; then
   _FZF_SHARE="/opt/homebrew/opt/fzf/shell"
   _ZSH_HL="/opt/homebrew/share/zsh-syntax-highlighting"
-elif [[ -d /opt/local ]]; then
+elif [[ $OPERATING_SYSTEM == "macos-intel" ]]; then
   _FZF_SHARE="/opt/local/share/fzf/shell"
   _ZSH_HL="/opt/local/share/zsh-syntax-highlighting"
+elif [[ $OPERATING_SYSTEM == "windows" ]]; then
+  _FZF_SHARE="/mingw64/share/fzf"
+  _ZSH_HL="/usr/share/zsh-syntax-highlighting"
 fi
 
 alias vim="nvim"
@@ -24,6 +34,11 @@ alias modules='cd ~/Documents/Poems/inf/___modules___/'
 
 alias ls='eza -la'
 alias keju='~/Documents/Poems/inf/___user-modules___/automation/Keju_x64'
+
+# Windows-only aliases
+if [[ $OPERATING_SYSTEM == "windows" ]]; then
+  alias amp='AMP_HOME=/c/Users/jreng/.amp AMP_RIPGREP_PATH=/c/Users/jreng/.amp/bin/rg.exe /c/Users/jreng/.amp/bin/bun.exe run --cwd /c/Users/jreng/.amp/package /c/Users/jreng/.amp/package/dist/main.js'
+fi
 
 # fzf configuration
 # Dot directories to always include
@@ -65,8 +80,8 @@ done
 # Exclude hidden files EXCEPT specific dot directories/files, and exclude garbage
 export FZF_CTRL_T_COMMAND="find . -type f $EXCLUDE \( -not -path \"*/\.*\" $DOT_PATTERN \)"
 
-source "$_FZF_SHARE/key-bindings.zsh"
-source "$_FZF_SHARE/completion.zsh"
+[ -f "$_FZF_SHARE/key-bindings.zsh" ] && source "$_FZF_SHARE/key-bindings.zsh"
+[ -f "$_FZF_SHARE/completion.zsh" ]   && source "$_FZF_SHARE/completion.zsh"
 
 # Custom fzf options
 export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:500 {}' \
@@ -76,9 +91,9 @@ export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-ran
 
 # Ctrl+F for file search
 bindkey '^F' fzf-file-widget
-#
+
 # zsh-syntax-highlighting
-source "$_ZSH_HL/zsh-syntax-highlighting.zsh"
+[ -f "$_ZSH_HL/zsh-syntax-highlighting.zsh" ] && source "$_ZSH_HL/zsh-syntax-highlighting.zsh"
 
 # Customize zsh-syntax-highlighting colors to match nvim gfx theme
 ZSH_HIGHLIGHT_STYLES[unknown-token]="fg=#f74a4a,bold"          # error red
@@ -122,7 +137,10 @@ ZSH_HIGHLIGHT_STYLES[bracket-level-3]="fg=#808080"             # delimiter gray
 ZSH_HIGHLIGHT_STYLES[bracket-level-4]="fg=#808080"             # delimiter gray
 ZSH_HIGHLIGHT_STYLES[bracket-level-5]="fg=#808080"             # delimiter gray
 ZSH_HIGHLIGHT_STYLES[cursor-matchingbracket]="fg=#ffffff,bg=#4080ff,bold" # matching paren
-export PATH="$HOME/Library/cmake-4.2.0-macos-universal/CMake.app/Contents/bin:$PATH"
+# cmake (macos-intel: official download, no pkg manager)
+if [[ $OPERATING_SYSTEM == "macos-intel" ]]; then
+  export PATH="$HOME/Library/cmake-4.2.0-macos-universal/CMake.app/Contents/bin:$PATH"
+fi
 
 # bun completions
 [ -s "~/.bun/_bun" ] && source "~/.bun/_bun"
@@ -138,8 +156,7 @@ export PATH=~/.opencode/bin:$PATH
 eval "$(zoxide init zsh --cmd cd)"
 alias zi='__zoxide_zi'
 
-# # Oh my posh
-if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
+# Oh my posh
+if [ "$TERM_PROGRAM" != "Apple_Terminal" ] && command -v oh-my-posh &>/dev/null; then
   eval "$(oh-my-posh init zsh --config ~/.config/omp/gfx.json)"
 fi
-

@@ -1,13 +1,25 @@
+# OS detection
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  OPERATING_SYSTEM="windows"
+elif [[ "$(uname -m)" == "arm64" ]]; then
+  OPERATING_SYSTEM="macos-arm"
+else
+  OPERATING_SYSTEM="macos-intel"
+fi
+
 export PATH="$HOME/.local/bin:$PATH"
 
-# Package manager detection: Homebrew (ARM) vs MacPorts (Intel)
-if [[ -x /opt/homebrew/bin/brew ]]; then
+# Package manager
+if [[ $OPERATING_SYSTEM == "macos-arm" ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv zsh)"
-elif [[ -d /opt/local ]]; then
+elif [[ $OPERATING_SYSTEM == "macos-intel" ]]; then
   export PATH="/opt/local/bin:/opt/local/sbin:$PATH"
   export MANPATH="/opt/local/share/man:$MANPATH"
 fi
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+# nvm (mac only)
+if [[ $OPERATING_SYSTEM != "windows" ]]; then
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+fi

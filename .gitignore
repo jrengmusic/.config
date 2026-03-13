@@ -2,14 +2,12 @@
 *
 
 # Whitelist directories
-!kitty/
-!kitty/**
+!end/
+!end/**
 !omp/
 !omp/**
 !nvim/
 !nvim/**
-!wezterm/
-!wezterm/**
 !tmux/
 !tmux/**
 !hammerspoon/
