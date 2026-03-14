@@ -243,11 +243,15 @@ function M.setupDap()
     vim.keymap.set('n', keys, func, { desc = 'DAP: ' .. desc })
   end
 
-  -- Pick the right build/clean script for the current OS.
-  -- Mac: .sh — Windows: .bat (runs natively in cmd.exe terminal)
+  -- Build requires MSVC on Windows (JUCE rejects MinGW), so .bat calls vcvarsall.
+  -- Clean has no compiler dependency, so .sh works everywhere via bash.
   local is_windows = vim.fn.has('win32') == 1
+  local function toMsys(p)
+    if is_windows then return p:gsub('\\', '/'):gsub('^(%a):', function(d) return '/' .. d:lower() end) end
+    return p
+  end
   local function buildScript() return vim.fn.stdpath('config') .. (is_windows and '\\scripts\\build-debug.bat' or '/scripts/build-debug.sh') end
-  local function cleanScript() return vim.fn.stdpath('config') .. (is_windows and '\\scripts\\clean-build.bat' or '/scripts/clean-build.sh') end
+  local function cleanScript() return toMsys(vim.fn.stdpath('config') .. '/scripts/clean-build.sh') end
 
   -- Build functions (extracted for reuse)
   local function runBuildOnly()
@@ -333,7 +337,7 @@ function M.setupDap()
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_set_current_buf(buf)
     if is_windows then
-      vim.fn.jobstart({script, root}, {term = true})
+      vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true})
     else
       vim.fn.termopen({script, root})
     end
@@ -509,7 +513,7 @@ function M.setupDap()
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_set_current_buf(buf)
     if is_windows then
-      vim.fn.jobstart({script, root}, {term = true, on_exit = function(_, exit_code)
+      vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = function(_, exit_code)
         if exit_code == 0 then
           vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
           runBuildOnly()
