@@ -178,14 +178,17 @@ end
 -- Show dialog to configure format, DAW, and build scheme
 -- User must provide all fields (validation happens in dialog)
 function M.showDawFormatDialog(callback)
-  local formats = { 'VST3', 'AU', 'VST', 'AAX' }
-  
+  local is_windows = vim.fn.has('win32') == 1
+
+  -- AU is macOS only
+  local formats = is_windows and { 'VST3', 'VST', 'AAX' } or { 'VST3', 'AU', 'VST', 'AAX' }
+
   vim.ui.select(formats, { prompt = 'Select plugin format:' }, function(format)
     if not format then
       vim.notify('DAP config cancelled')
       return
     end
-    
+
     -- Select build scheme
     local schemes = { 'Debug', 'Release' }
     vim.ui.select(schemes, { prompt = 'Select build scheme:' }, function(buildScheme)
@@ -193,26 +196,39 @@ function M.showDawFormatDialog(callback)
         vim.notify('DAP config cancelled')
         return
       end
-      
-      -- Browse for DAW .app bundle using picker with custom items
-      local apps_dir = '/Applications'
-      local handle = io.popen('find "' .. apps_dir .. '" -maxdepth 2 -name "*.app" -type d 2>/dev/null')
-      if not handle then
-        vim.notify('Failed to list applications')
-        return
-      end
-      
+
+      -- Find DAW executables (OS-specific)
       local apps = {}
-      for line in handle:lines() do
-        table.insert(apps, { text = line, file = line })
+      if is_windows then
+        -- Use vim.fn.glob — works natively in nvim without shell dependency
+        local patterns = {
+          'C:/Program Files/*/*.exe',
+          'C:/Program Files/*/*/*.exe',
+          'C:/Program Files (x86)/*/*.exe',
+          'C:/Program Files (x86)/*/*/*.exe',
+        }
+        for _, pattern in ipairs(patterns) do
+          local matches = vim.fn.glob(pattern, false, true)
+          for _, path in ipairs(matches) do
+            path = path:gsub('\\', '/')
+            table.insert(apps, { text = path, file = path })
+          end
+        end
+      else
+        local handle = io.popen('find "/Applications" -maxdepth 2 -name "*.app" -type d 2>/dev/null')
+        if handle then
+          for line in handle:lines() do
+            table.insert(apps, { text = line, file = line })
+          end
+          handle:close()
+        end
       end
-      handle:close()
-      
+
       if #apps == 0 then
-        vim.notify('No applications found in ' .. apps_dir)
+        vim.notify('No applications found')
         return
       end
-      
+
       Snacks.picker({
         items = apps,
         prompt = 'Select DAW Application: ',
@@ -223,39 +239,39 @@ function M.showDawFormatDialog(callback)
             picker:close()
             return
           end
-          
+
           local dawPath = item.file
-          
-          -- If user selected .app bundle, find executable inside Contents/MacOS/
-          if dawPath:match('%.app/?$') then
-            local appName = vim.fn.fnamemodify(dawPath, ':t:r')  -- Get app name without .app
+
+          -- macOS: unwrap .app bundle to executable
+          if not is_windows and dawPath:match('%.app/?$') then
+            local appName = vim.fn.fnamemodify(dawPath, ':t:r')
             dawPath = dawPath:gsub('/$', '') .. '/Contents/MacOS/' .. appName
           end
-          
-          -- Verify path exists - if not, show dialog again
+
+          -- Verify path exists
           if vim.fn.filereadable(dawPath) ~= 1 then
             vim.notify('DAW executable not found: ' .. dawPath .. '. Try again.')
             picker:close()
             vim.defer_fn(function() M.showDawFormatDialog(callback) end, 100)
             return
           end
-          
+
           -- Extract DAW name from path
           local daw = vim.fn.fnamemodify(dawPath, ':t')
-          
+
           -- Save config
           local ok = M.saveDawConfig(format, daw, dawPath, buildScheme)
           if not ok then
             picker:close()
             return
           end
-          
+
           vim.notify(string.format('DAP config saved: %s + %s (%s)', format, daw, buildScheme))
-          
+
           if callback then
             callback({ format = format, daw = daw, dawPath = dawPath, buildScheme = buildScheme })
           end
-          
+
           picker:close()
         end,
       })
@@ -281,18 +297,35 @@ local function getDawPid()
     return nil
   end
   
-  local handle = io.popen("pgrep -x '" .. config.daw .. "' 2>/dev/null | head -1")
+  local is_windows = vim.fn.has('win32') == 1
+  local handle
+  if is_windows then
+    -- Windows: use tasklist to find PID
+    local dawName = vim.fn.fnamemodify(config.daw, ':t:r') -- strip .exe if present
+    handle = io.popen('tasklist /FI "IMAGENAME eq ' .. dawName .. '.exe" /FO CSV /NH 2>nul')
+  else
+    handle = io.popen("pgrep -x '" .. config.daw .. "' 2>/dev/null | head -1")
+  end
+
   if not handle then
     error('Failed to search for DAW process: ' .. config.daw)
   end
-  
-  local pid = handle:read('*l')
+
+  local output = handle:read('*l')
   handle:close()
-  
-  if pid and tonumber(pid) then
-    return tonumber(pid)
+
+  if is_windows then
+    -- tasklist CSV format: "process.exe","PID","session","session#","mem"
+    local pid = output and output:match('"[^"]+","(%d+)"')
+    if pid and tonumber(pid) then
+      return tonumber(pid)
+    end
+  else
+    if output and tonumber(output) then
+      return tonumber(output)
+    end
   end
-  
+
   error('DAW not running: ' .. config.daw .. '. Launch it first.')
 end
 

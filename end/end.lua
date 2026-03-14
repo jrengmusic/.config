@@ -20,7 +20,7 @@
 --
 -- ============================================================================
 
-local is_windows = package.config:sub(1,1) == "\\"
+local is_windows = package.config:sub(1, 1) == "\\"
 
 END = {
 
@@ -166,7 +166,7 @@ END = {
 		blur_radius = 32.0,
 
 		-- Keep window above all other windows.
-		always_on_top = true,
+		always_on_top = false,
 
 		-- Show native window buttons (close / minimise / maximise).
 		buttons = false,

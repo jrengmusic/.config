@@ -17,3 +17,4 @@
 
 # Keep .gitignore itself
 !.gitignore
+end/state.xml

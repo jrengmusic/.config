@@ -17,6 +17,12 @@ elif [[ $OPERATING_SYSTEM == "macos-intel" ]]; then
   export MANPATH="/opt/local/share/man:$MANPATH"
 fi
 
+# Windows-specific paths
+if [[ $OPERATING_SYSTEM == "windows" ]]; then
+  export PATH="/c/Program Files/Go/bin:$PATH"
+  export PATH="/c/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin:$PATH"
+fi
+
 # nvm (mac only)
 if [[ $OPERATING_SYSTEM != "windows" ]]; then
   export NVM_DIR="$HOME/.nvm"

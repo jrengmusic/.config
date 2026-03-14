@@ -4,14 +4,23 @@ local M = {}
   function M.setup(capabilities)
     local servers = {
     clangd = {
-      cmd = {
-        vim.fn.stdpath('data') .. '/mason/bin/clangd',
-        '--header-insertion=never',
-        '--clang-tidy',
-        '--completion-style=detailed',
-        '--header-insertion-decorators=false',
-        '--query-driver=/usr/bin/c++,/usr/bin/clang++',
-      },
+      cmd = (function()
+        local is_windows = vim.fn.has('win32') == 1
+        local clangd_bin = is_windows
+          and 'clangd'  -- system clangd via winget LLVM (Mason's clangd is .cmd, won't work)
+          or (vim.fn.stdpath('data') .. '/mason/bin/clangd')
+        local query_driver = is_windows
+          and '--query-driver=/mingw64/bin/g++'
+          or '--query-driver=/usr/bin/c++,/usr/bin/clang++'
+        return {
+          clangd_bin,
+          '--header-insertion=never',
+          '--clang-tidy',
+          '--completion-style=detailed',
+          '--header-insertion-decorators=false',
+          query_driver,
+        }
+      end)(),
     },
       lua_ls = {
         settings = {
