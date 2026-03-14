@@ -23,10 +23,10 @@ All machines share the same config repo. OS-specific behavior is handled by:
 Install these before running the setup script:
 
 1. **MSYS2** — https://www.msys2.org/ (install to `C:\msys64`)
-2. **Visual Studio 2022+** — with "Desktop development with C++" workload
-3. **Neovim** — `winget install Neovim.Neovim`
-4. **Git** — `winget install Git.Git`
-5. **LLVM/clangd** — `winget install LLVM.LLVM` (Mason's clangd is `.cmd`, won't work)
+2. **Visual Studio 2022+** — with "Desktop development with C++" workload (provides vcvarsall.bat, MSVC linker, headers)
+3. **LLVM** — `winget install LLVM.LLVM` (provides clang-cl compiler + clangd LSP)
+4. **Neovim** — `winget install Neovim.Neovim`
+5. **Git** — `winget install Git.Git`
 6. **Go** — `winget install GoLang.Go`
 7. **Bun** — `winget install oven-sh.Bun`
 8. **Node/npm** — for opencode
@@ -154,15 +154,27 @@ nvim's `:terminal` on Windows uses `vim.o.shell` which defaults to `zsh.exe` (MS
 
 ### Build Pipeline
 
-JUCE explicitly rejects MinGW (`#error "MinGW is not supported"`), so builds must use MSVC:
+JUCE explicitly rejects MinGW (`#error "MinGW is not supported"`), so builds require MSVC environment.
+
+**Compiler**: `clang-cl` (from LLVM) — MSVC-compatible frontend that produces **DWARF** debug symbols, which codelldb/LLDB can read natively. This gives identical debugging experience to macOS.
+
+**Why not `cl.exe`?** MSVC produces PDB debug symbols. codelldb uses LLDB which has limited PDB support. By using clang-cl with `-gdwarf`, we get DWARF symbols on both platforms — same debugger, same behavior.
+
+**Why not MinGW GCC?** JUCE hardcodes `#error "MinGW is not supported"`.
 
 | Script | Platform | Purpose |
 |---|---|---|
 | `build-debug.sh` | macOS | Build with clang via cmake+ninja |
-| `build-debug.bat` | Windows | Set up MSVC env via vcvarsall.bat, then cmake+ninja |
+| `build-debug.bat` | Windows | vcvarsall.bat + clang-cl + cmake+ninja |
 | `clean-build.sh` | Both | Delete `Builds/Ninja/` (no compiler needed) |
 
-The `.bat` file calls `vcvarsall.bat x64` to put `cl.exe` on PATH before running cmake. This is the only way to get MSVC's compiler, linker, and headers available.
+The `.bat` file:
+1. Calls `vcvarsall.bat x64` — sets up MSVC linker, headers, and libraries
+2. Sets `CC`/`CXX` to `clang-cl` from `C:\Program Files\LLVM\bin\`
+3. Passes `-gdwarf /EHsc -fms-compatibility` flags
+4. Runs cmake + ninja
+
+**Known issue**: clang-cl 22.x has a regression with `auto x { expr }` brace initialization and JUCE's `Array` template `initializer_list` constructor (LLVM #136203/#138307). Workaround: use `auto x = expr` instead of `auto x { expr }` for JUCE container return values.
 
 ### LSP (clangd)
 
@@ -175,8 +187,14 @@ Mason's clangd on Windows is a `.cmd` wrapper that nvim can't execute directly. 
 
 ### DAP (codelldb)
 
+codelldb is used on both platforms. On macOS, clang produces DWARF symbols. On Windows, clang-cl produces DWARF symbols with `-gdwarf`. Same adapter, same debug format, same experience.
+
+**vsdbg (Microsoft's debugger) won't work** — it's licensed exclusively for VS Code and rejects nvim as a client.
+
 | | macOS | Windows |
 |---|---|---|
+| Adapter | codelldb (Mason) | codelldb (Mason) |
+| Debug symbols | DWARF (clang) | DWARF (clang-cl with `-gdwarf`) |
 | Process lookup | `pgrep -x 'DAW'` | `tasklist /FI "IMAGENAME eq DAW.exe"` |
 | Kill process | `killall DAW` | `taskkill /F /IM DAW` |
 | DAW launch delay | 2000ms | 3000ms |
@@ -247,7 +265,7 @@ Terminal behavior on build:
     │       └── syntax.lua              # Treesitter config
     └── scripts/
         ├── build-debug.sh              # macOS build (clang + cmake + ninja)
-        ├── build-debug.bat             # Windows build (MSVC + cmake + ninja)
+        ├── build-debug.bat             # Windows build (clang-cl + MSVC env + cmake + ninja)
         └── clean-build.sh             # Clean (cross-platform, no compiler)
 
 ~/.zshrc                                # Machine-local bootstrap (not in repo)
@@ -262,13 +280,19 @@ Terminal behavior on build:
 ## Troubleshooting
 
 ### "MinGW is not supported" error during build
-The build is using GCC instead of MSVC. Make sure `leader bb`/`bc`/`br` uses `build-debug.bat` (not `.sh`). The `.bat` file calls `vcvarsall.bat` to set up MSVC.
+The build is using GCC instead of clang-cl. Make sure `leader bb`/`bc`/`br` uses `build-debug.bat` (not `.sh`). The `.bat` sets up MSVC env then uses clang-cl as the compiler.
+
+### `auto x { expr }` brace-init errors with clang-cl
+clang 22.x has a regression (LLVM #136203) where `auto x { expr }` with JUCE's `Array` template `initializer_list` constructor is incorrectly preferred over copy/move constructors. Workaround: use `auto x = expr` instead. This does NOT affect macOS clang.
 
 ### clangd not starting
 Mason's clangd is a `.cmd` file that nvim can't run. Install system clangd: `winget install LLVM.LLVM`. The config in `clangd.lua` auto-selects system clangd on Windows.
 
 ### "DAW not running" error on `leader br`
 The DAW hasn't started within the 3-second delay. Either increase the delay in `keymaps.lua` or launch the DAW manually before running `leader br`.
+
+### vsdbg / cppvsdbg won't work
+Microsoft's vsdbg debugger is licensed exclusively for VS Code. It validates the client and rejects nvim. Use codelldb with DWARF symbols instead.
 
 ### Symlinks fail with "Permission denied"
 Ensure `MSYS=winsymlinks:nativestrict` is set as a Windows user environment variable. May also need Developer Mode enabled in Windows Settings > For developers.

@@ -216,10 +216,13 @@ fi
 step "9. Neovim Mason tools"
 
 echo "After launching nvim, run:"
-echo "  :MasonInstall clangd lua_ls pyright ts_ls zls stylua prettier codelldb"
+echo "  :MasonInstall lua_ls pyright ts_ls zls stylua prettier codelldb"
 echo ""
-echo "Note: Mason's clangd is a .cmd file on Windows and won't work."
-echo "Install system clangd via: winget install LLVM.LLVM"
+echo "Notes:"
+echo "  - Do NOT install clangd via Mason (it's a .cmd wrapper, won't work)"
+echo "  - System clangd from LLVM.LLVM is used automatically"
+echo "  - codelldb is the DAP adapter for both macOS and Windows"
+echo "  - On Windows, clang-cl produces DWARF symbols that codelldb reads"
 
 # ============================================================================
 # 10. Carol (carolcode wrapper)
@@ -272,14 +275,23 @@ cat << 'EOF'
 The following should be installed via winget or manually:
 
   winget install Neovim.Neovim
-  winget install LLVM.LLVM            # clangd (system, not Mason)
+  winget install LLVM.LLVM            # clang-cl (compiler) + clangd (LSP)
   winget install GoLang.Go
   winget install oven-sh.Bun
   winget install Git.Git
   winget install Microsoft.VisualStudio.2022.Community
     (with "Desktop development with C++" workload)
 
-Visual Studio is required for MSVC compiler (JUCE rejects MinGW).
+LLVM provides:
+  - clang-cl: MSVC-compatible compiler that produces DWARF debug symbols
+  - clangd: LSP server (Mason's clangd is .cmd on Windows, won't work)
+
+Visual Studio provides:
+  - vcvarsall.bat: sets up MSVC linker, headers, and libs
+  - JUCE rejects MinGW, so MSVC environment is required even with clang-cl
+
+The build pipeline uses: clang-cl (compiler) + MSVC (linker/headers) + Ninja
+Debug symbols are DWARF format, read by codelldb/LLDB (same as macOS).
 EOF
 
 # ============================================================================
