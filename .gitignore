@@ -15,6 +15,11 @@
 !zsh/
 !zsh/**
 
+# Repo-level docs and scripts
+!WINDOWS-SETUP.md
+!scripts/
+!scripts/**
+
 # Keep .gitignore itself
 !.gitignore
 end/state.xml
