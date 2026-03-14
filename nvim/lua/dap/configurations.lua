@@ -332,10 +332,13 @@ end
 function M.setup()
   local dap = require('dap')
 
+  -- codelldb on all platforms: clang (macOS) and clang-cl (Windows) both produce DWARF symbols
+  local adapter = 'codelldb'
+
   dap.configurations.cpp = {
     {
       name = 'Launch Standalone',
-      type = 'codelldb',
+      type = adapter,
       request = 'launch',
       program = function()
         local root = vim.fn.getcwd()
@@ -367,17 +370,17 @@ function M.setup()
           vim.notify('Failed to find standalone app in: ' .. root, vim.log.levels.ERROR)
           error('Standalone executable not found. Build project first.')
         end
-        
 
         return found
       end,
       cwd = '${workspaceFolder}',
       stopOnEntry = false,
       args = {},
+
     },
     {
       name = 'Attach to DAW (VST3)',
-      type = 'codelldb',
+      type = adapter,
       request = 'attach',
       console = 'integratedTerminal',
       pid = getDawPid,
@@ -404,7 +407,7 @@ function M.setup()
     },
     {
       name = 'Attach to DAW (AU)',
-      type = 'codelldb',
+      type = adapter,
       request = 'attach',
       pid = getDawPid,
       program = function()
@@ -427,7 +430,7 @@ function M.setup()
     },
     {
       name = 'Attach to DAW (VST)',
-      type = 'codelldb',
+      type = adapter,
       request = 'attach',
       pid = getDawPid,
       program = function()
@@ -453,7 +456,7 @@ function M.setup()
     },
     {
       name = 'Attach to DAW (AAX)',
-      type = 'codelldb',
+      type = adapter,
       request = 'attach',
       pid = getDawPid,
       program = function()
@@ -479,14 +482,14 @@ function M.setup()
     },
     {
       name = 'Attach to Process',
-      type = 'codelldb',
+      type = adapter,
       request = 'attach',
       pid = require('dap.utils').pick_process,
       cwd = '${workspaceFolder}',
     },
     {
       name = 'Launch Custom Executable',
-      type = 'codelldb',
+      type = adapter,
       request = 'launch',
       program = function()
         return vim.fn.input('Executable: ', vim.fn.getcwd() .. '/', 'file')
