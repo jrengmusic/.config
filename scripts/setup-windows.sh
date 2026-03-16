@@ -105,6 +105,7 @@ set_win_env() {
 set_win_env "MSYS" "winsymlinks:nativestrict"
 set_win_env "MSYSTEM" "MINGW64"
 set_win_env "MSYS2_PATH_TYPE" "inherit"
+set_win_env "XDG_CONFIG_HOME" "$WINDOWS_HOME\\.config"
 
 # ============================================================================
 # 4. Install MSYS2 packages
@@ -196,19 +197,12 @@ EOF
 fi
 
 # ============================================================================
-# 8. Neovim symlink
+# 8. Neovim config
 # ============================================================================
-step "8. Neovim config symlink"
+step "8. Neovim config"
 
-NVIM_CONFIG="$HOME/AppData/Local/nvim"
-if [[ -L "$NVIM_CONFIG" ]]; then
-    info "nvim symlink already exists: $(readlink "$NVIM_CONFIG")"
-elif [[ -d "$NVIM_CONFIG" ]]; then
-    warn "$NVIM_CONFIG exists as a directory. Back it up and re-run."
-else
-    ln -s "$HOME/.config/nvim" "$NVIM_CONFIG"
-    info "Created symlink: $NVIM_CONFIG → ~/.config/nvim"
-fi
+# With XDG_CONFIG_HOME set, nvim reads ~/.config/nvim directly — no symlink needed.
+info "XDG_CONFIG_HOME is set → nvim uses ~/.config/nvim directly"
 
 # ============================================================================
 # 9. Neovim — Mason LSP/DAP tools

@@ -26,19 +26,8 @@ if not exist "%VCVARSALL%" (
 echo Setting up MSVC x64 environment...
 call "%VCVARSALL%" x64
 
-:: Use clang for DWARF debug symbols (codelldb/LLDB compatible)
-:: clang++ uses standard clang frontend (same as macOS) but targets MSVC ABI
-set CLANGXX=C:\Program Files\LLVM\bin\clang++.exe
-set CLANGC=C:\Program Files\LLVM\bin\clang.exe
-if exist "%CLANGXX%" (
-    set CC=%CLANGC%
-    set CXX=%CLANGXX%
-    set CLANG_FLAGS=-gdwarf -fms-compatibility
-    echo Using clang with DWARF debug symbols
-) else (
-    set CLANG_FLAGS=
-    echo WARNING: clang-cl not found, using cl.exe (PDB only, limited DAP support)
-)
+:: Use VS-bundled ninja (avoids MSYS2 ld.exe conflict)
+set PATH=%VS_PATH%\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
 
 :: Check if reconfiguration is needed
 if not exist "%BUILD_DIR%\CMakeCache.txt" goto :configure
@@ -48,7 +37,7 @@ goto :build
 :configure
 echo Configuring CMake (%SCHEME%)...
 if not exist "%ROOT%\Builds" mkdir "%ROOT%\Builds"
-cmake -S "%ROOT%" -B "%BUILD_DIR%" -G Ninja -DCMAKE_BUILD_TYPE=%SCHEME% -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER="%CC%" -DCMAKE_CXX_COMPILER="%CXX%" -DCMAKE_C_FLAGS="%CLANG_FLAGS%" -DCMAKE_CXX_FLAGS="%CLANG_FLAGS%"
+cmake -S "%ROOT%" -B "%BUILD_DIR%" -G Ninja -DCMAKE_BUILD_TYPE=%SCHEME% -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 if errorlevel 1 ( echo CMake configure FAILED & exit /b 1 )
 
 :build

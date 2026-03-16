@@ -1,6 +1,19 @@
+--	████████████████████  ████████████    ████  ████    ████    ████
+--	████████████████████  ████████████    ████  ████    ████    ████
+--	████░░░░░░░░░░░░████  ████░░░░████    ████  ░░░░    ░░░░    ████
+--	████            ████  ████    ████    ████                  ████
+--	████████████████████  ████    ████    ████  ████████████████████
+--	████████████████████  ████    ████    ████  ████████████████████
+--	████░░░░░░░░░░░░░░░░  ████    ████    ████  ████░░░░░░░░░░░░████
+--	████                  ████    ████    ████  ████            ████
+--	████████████████████  ████    ████████████  ████████████████████
+--	████████████████████  ████    ████████████  ████████████████████
+--	░░░░░░░░░░░░░░░░░░░░  ░░░░    ░░░░░░░░░░░░  ░░░░░░░░░░░░░░░░░░░░
+-- 
+--	                Ephemeral Nexus Display  v%versionString%
 -- ============================================================================
--- END Terminal Emulator Configuration
--- https://github.com/jreng/end
+-- Configuration
+-- https://github.com/jrengmusic/end
 -- ============================================================================
 --
 -- This file is auto-generated with default values on first launch.
@@ -20,8 +33,6 @@
 --
 -- ============================================================================
 
-local is_windows = package.config:sub(1, 1) == "\\"
-
 END = {
 
 	-- ========================================================================
@@ -34,14 +45,14 @@ END = {
 		family = "Display Mono",
 
 		-- Font size in points before zoom is applied (1 - 200).
-		size = 10.0,
+		size = 11.0,
 
 		-- Enable OpenType ligature substitution (e.g. -> becomes arrow).
 		ligatures = true,
 
 		-- Embolden glyphs for heavier strokes.
 		-- Useful for thin fonts that are hard to read at small sizes.
-		embolden = true,
+		embolden = false,
 	},
 
 	-- ========================================================================
@@ -185,7 +196,7 @@ END = {
 		family = "Display Mono",
 
 		-- Tab bar font size in points.
-		size = 10.0,
+		size = 24.0,
 
 		-- Active tab text colour.
 		foreground = "#FF00C8D8",
@@ -224,7 +235,7 @@ END = {
 		family = "Display Mono",
 
 		-- Overlay font size in points.
-		size = 28.0,
+		size = 20.0,
 
 		-- Overlay text colour.
 		colour = "#4E8C93",
@@ -237,20 +248,32 @@ END = {
 	shell = {
 		-- Shell program name or absolute path.
 		-- Examples: "zsh", "bash", "fish", "/opt/homebrew/bin/fish"
-		program = is_windows and "zsh.exe" or "zsh",
-		args = "--login",
+		program = "C:\\msys64\\usr\\bin\\zsh.exe",
+
+		-- Arguments passed to the shell program (space-separated string).
+		-- Default: "-l" on Unix (login shell), "" on Windows.
+		-- Set to "" to launch the shell with no arguments.
+		args = "-l",
 	},
 
 	-- ========================================================================
-	-- SCROLLBACK
+	-- TERMINAL
 	-- ========================================================================
 
-	scrollback = {
-		-- Maximum number of scrollback lines retained (100 - 1000000).
-		num_lines = 10000,
+	terminal = {
+		-- Maximum number of scrollback lines retained in the ring buffer (100 - 1000000).
+		scrollback_lines = 10000,
 
-		-- Lines scrolled per mouse wheel tick (1 - 100).
-		step = 5,
+		-- Lines scrolled per mouse wheel tick and per Shift+PgUp/PgDn step (1 - 100).
+		scroll_step = 5,
+
+		-- Grid padding in logical pixels — space between the window edge and the
+		-- terminal grid on each side.  Four values in CSS order:
+		--   { top, right, bottom, left }
+		-- All four values must be present.  Valid range: 0 - 200.
+		-- Example: { 10, 10, 10, 10 } gives equal padding on all sides.
+		--          { 4, 10, 10, 10 } gives a tighter top edge.
+		padding = { 10, 10, 10, 10 },
 	},
 
 	-- ========================================================================
@@ -276,10 +299,10 @@ END = {
 
 	keys = {
 		-- Copy selection to clipboard.
-		copy = "shift+ctrl+c",
+		copy = "ctrl+c",
 
 		-- Paste from clipboard.
-		paste = "shift+ctrl+v",
+		paste = "ctrl+v",
 
 		-- Quit application.
 		quit = "cmd+q",
@@ -333,5 +356,80 @@ END = {
 
 		-- Focus pane to the right. Prefix-mode key.
 		pane_right = "l",
+
+		-- Insert a literal newline (LF) instead of carriage return.
+		newline = "shift+return",
+
+		-- Open the action list (command palette).
+		action_list = "?",
+
+		-- Action list position: "top" or "bottom".
+		action_list_position = "top",
 	},
+
+	-- ========================================================================
+	-- POPUP DEFAULTS
+	-- ========================================================================
+
+	popup = {
+		-- Default popup width as a fraction of the window width (0.1 - 1.0).
+		-- Individual popup entries can override this.
+		width = 0.6000000238418579,
+
+		-- Default popup height as a fraction of the window height (0.1 - 1.0).
+		-- Individual popup entries can override this.
+		height = 0.5,
+
+		-- Default popup position: "center".
+		position = "center",
+	},
+
+	-- ========================================================================
+	-- POPUPS
+	-- ========================================================================
+	--
+	-- Modal popup terminals. Each entry spawns a terminal running a command
+	-- in a glass overlay window. The popup blocks the main window until the
+	-- process exits (quit the TUI, Ctrl+C a script, etc.).
+	--
+	-- Each entry is a named table. The table key is the unique identifier.
+	--
+	-- Fields:
+	--   command  (string, required)  Shell command or executable to run.
+	--   args     (string, optional)  Arguments passed to the command.
+	--   cwd      (string, optional)  Working directory. Empty = inherit active terminal cwd.
+	--   width    (number, optional)  Fraction of window width (0.1-1.0). Overrides popup.width.
+	--   height   (number, optional)  Fraction of window height (0.1-1.0). Overrides popup.height.
+	--   modal    (string, optional)  Modal key: prefix + key. Can include modifiers (e.g. "cmd+t").
+	--   global   (string, optional)  Global key: direct shortcut, no prefix needed.
+	--
+	-- At least one of modal or global is required.
+	-- Both can coexist on the same entry.
+	--
+	-- Examples:
+	--
+	-- popups = {
+	--     tit = {
+	--         command = "tit.exe",
+	--         args = "",
+	--         cwd = "",
+	--         width = 0.8,
+	--         height = 0.6,
+	--         modal = "t",
+	--     },
+	--     lazygit = {
+	--         command = "lazygit",
+	--         width = 0.9,
+	--         height = 0.9,
+	--         modal = "g",
+	--     },
+	--     htop = {
+	--         command = "htop",
+	--         cwd = "~",
+	--         width = 0.7,
+	--         height = 0.5,
+	--         modal = "p",
+	--         global = "cmd+shift+p",
+	--     },
+	-- },
 }

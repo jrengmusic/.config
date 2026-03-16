@@ -332,13 +332,16 @@ end
 function M.setup()
   local dap = require('dap')
 
-  -- codelldb on all platforms: clang (macOS) and clang-cl (Windows) both produce DWARF symbols
-  local adapter = 'codelldb'
+  -- Standalone: gdb on Windows (GUI launch + stdout), codelldb on Mac
+  -- Plugin: codelldb on all platforms (attach to DAW)
+  local is_windows = vim.fn.has('win32') == 1
+  local standalone_adapter = is_windows and 'gdb' or 'codelldb'
+  local plugin_adapter = is_windows and 'whatdbg' or 'codelldb'
 
   dap.configurations.cpp = {
     {
       name = 'Launch Standalone',
-      type = adapter,
+      type = standalone_adapter,
       request = 'launch',
       program = function()
         local root = vim.fn.getcwd()
@@ -380,25 +383,28 @@ function M.setup()
     },
     {
       name = 'Attach to DAW (VST3)',
-      type = adapter,
-      request = 'attach',
+      type = plugin_adapter,
+      -- Windows: launch DAW through debugger (owns process from birth, tracks all DLL loads)
+      -- Mac: attach to already-running DAW
+      request = is_windows and 'launch' or 'attach',
       console = 'integratedTerminal',
-      pid = getDawPid,
+      pid = not is_windows and getDawPid or nil,
       program = function()
+        if is_windows then
+          -- Launch mode: program is the DAW executable
+          local cfg = require('dap.configurations').loadDawConfig()
+          if cfg and cfg.dawPath then return cfg.dawPath end
+          error('DAW path not configured. Run F5 to configure.')
+        end
+        -- Mac: attach mode, program is the plugin binary
         local root = vim.fn.getcwd()
         local patterns = {
-          -- macOS
           root .. '/Builds/Ninja/*artefacts*/Debug/VST3/*.vst3/Contents/MacOS/*',
           root .. '/Builds/Ninja/*artefacts*/Release/VST3/*.vst3/Contents/MacOS/*',
-          -- Windows
-          root .. '/Builds/Ninja/*artefacts*/Debug/VST3/*.vst3/Contents/x86_64-win/*.vst3',
-          root .. '/Builds/Ninja/*artefacts*/Release/VST3/*.vst3/Contents/x86_64-win/*.vst3',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
-          if #matches > 0 then
-            return matches[1]
-          end
+          if #matches > 0 then return matches[1] end
         end
         error('VST3 plugin not found. Build project first.')
       end,
@@ -407,7 +413,7 @@ function M.setup()
     },
     {
       name = 'Attach to DAW (AU)',
-      type = adapter,
+      type = plugin_adapter,
       request = 'attach',
       pid = getDawPid,
       program = function()
@@ -430,7 +436,7 @@ function M.setup()
     },
     {
       name = 'Attach to DAW (VST)',
-      type = adapter,
+      type = plugin_adapter,
       request = 'attach',
       pid = getDawPid,
       program = function()
@@ -456,7 +462,7 @@ function M.setup()
     },
     {
       name = 'Attach to DAW (AAX)',
-      type = adapter,
+      type = plugin_adapter,
       request = 'attach',
       pid = getDawPid,
       program = function()
@@ -482,14 +488,14 @@ function M.setup()
     },
     {
       name = 'Attach to Process',
-      type = adapter,
+      type = plugin_adapter,
       request = 'attach',
       pid = require('dap.utils').pick_process,
       cwd = '${workspaceFolder}',
     },
     {
       name = 'Launch Custom Executable',
-      type = adapter,
+      type = plugin_adapter,
       request = 'launch',
       program = function()
         return vim.fn.input('Executable: ', vim.fn.getcwd() .. '/', 'file')

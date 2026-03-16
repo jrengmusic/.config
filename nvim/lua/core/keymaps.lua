@@ -483,17 +483,27 @@ function M.setupDap()
     elseif projectType == 'plugin' then
       local function go(cfg)
         runBuildInTerminal({script, root, cfg.buildScheme, cfg.format}, function()
-          vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
-          vim.fn.jobstart({ cfg.dawPath })
           local configName = dapConfig.getConfigNameForFormat(cfg.format)
-          -- Windows DAWs take longer to start; wait longer before attaching
-          local delay = vim.fn.has('win32') == 1 and 3000 or 2000
-          vim.defer_fn(function()
-            for _, dapCfg in ipairs(dap.configurations.cpp) do
-              if dapCfg.name == configName then dap.run(dapCfg); return end
-            end
-            vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
-          end, delay)
+          if vim.fn.has('win32') == 1 then
+            -- Windows: whatdbg launches the DAW (owns process from birth)
+            vim.notify('Built! Launching DAW via debugger...', vim.log.levels.INFO, { timeout = 1500 })
+            vim.defer_fn(function()
+              for _, dapCfg in ipairs(dap.configurations.cpp) do
+                if dapCfg.name == configName then dap.run(dapCfg); return end
+              end
+              vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+            end, 500)
+          else
+            -- Mac: launch DAW separately, then attach
+            vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
+            vim.fn.jobstart({ cfg.dawPath })
+            vim.defer_fn(function()
+              for _, dapCfg in ipairs(dap.configurations.cpp) do
+                if dapCfg.name == configName then dap.run(dapCfg); return end
+              end
+              vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+            end, 2000)
+          end
         end)
       end
       local config = dapConfig.loadDawConfig(function(cfg) if cfg then go(cfg) end end)

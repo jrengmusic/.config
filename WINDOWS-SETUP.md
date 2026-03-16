@@ -82,6 +82,7 @@ Sets these as **Windows user environment variables** (persistent across reboots)
 | `MSYS` | `winsymlinks:nativestrict` | Native symlinks everywhere |
 | `MSYSTEM` | `MINGW64` | Use MinGW64 toolchain |
 | `MSYS2_PATH_TYPE` | `inherit` | Inherit Windows PATH |
+| `XDG_CONFIG_HOME` | `C:\Users\<name>\.config` | nvim and tools use `~/.config/` as SSOT (same as macOS) |
 
 ### 4. MSYS2 Packages
 
@@ -115,13 +116,9 @@ Creates `~/.zshrc` (machine-local, not tracked in repo):
 [ -f ~/.config/zsh/zshrc ] && source ~/.config/zsh/zshrc
 ```
 
-### 8. Neovim Symlink
+### 8. Neovim Config
 
-```
-~/AppData/Local/nvim → ~/.config/nvim
-```
-
-nvim on Windows reads config from `AppData/Local/nvim`. The symlink points it to the repo.
+With `XDG_CONFIG_HOME=C:\Users\<name>\.config` set as a Windows env var, nvim reads `~/.config/nvim` directly — no symlink needed. Same as macOS.
 
 ### 9. Carol + Opencode
 
