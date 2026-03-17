@@ -337,7 +337,7 @@ if [[ -d "$WINDOWS_HOME/.carol" ]]; then
     info "~/.carol already exists"
 else
     warn "Cloning carol..."
-    git clone https://github.com/jrengmusic/carol.git "$WINDOWS_HOME/.carol"
+    git clone git@github.com:jrengmusic/carol.git "$WINDOWS_HOME/.carol"
     info "Cloned carol to ~/.carol"
 fi
 
