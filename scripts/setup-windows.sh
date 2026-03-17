@@ -352,11 +352,13 @@ else
     echo "  cp packages/opencode/dist/opencode-windows-x64/bin/carolcode-x64.exe ~/.carol/bin/"
 fi
 
-if [[ -L "$WINDOWS_HOME/.local/bin/carol" ]]; then
-    info "carol symlink already exists"
+CAROL_LINK="$WINDOWS_HOME/.local/bin/carol"
+CAROL_TARGET="$WINDOWS_HOME/.carol/bin/carol"
+if [[ -L "$CAROL_LINK" && "$(readlink "$CAROL_LINK")" == "$CAROL_TARGET" ]]; then
+    info "carol symlink already correct"
 else
-    ln -sf "$WINDOWS_HOME/.carol/bin/carol" "$WINDOWS_HOME/.local/bin/carol"
-    info "Symlinked carol → ~/.local/bin/carol"
+    ln -sf "$CAROL_TARGET" "$CAROL_LINK"
+    info "Symlinked carol → $CAROL_TARGET"
 fi
 
 # ============================================================================
