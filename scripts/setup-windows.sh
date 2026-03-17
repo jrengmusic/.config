@@ -70,15 +70,15 @@ else
 fi
 
 # ============================================================================
-# 2. mingw64.ini — native symlinks
+# 2. MSYS2 ini files
 # ============================================================================
-step "2. MSYS2 native symlinks"
+step "2. MSYS2 ini files"
 
+# mingw64.ini — native symlinks
 MINGW_INI="/c/msys64/mingw64.ini"
 if grep -q "^MSYS=winsymlinks:nativestrict" "$MINGW_INI" 2>/dev/null; then
-    info "Already set: MSYS=winsymlinks:nativestrict"
+    info "Already set: MSYS=winsymlinks:nativestrict in mingw64.ini"
 else
-    # Uncomment or add the line
     if grep -q "winsymlinks" "$MINGW_INI" 2>/dev/null; then
         sed -i 's/^#*MSYS=winsymlinks.*/MSYS=winsymlinks:nativestrict/' "$MINGW_INI"
     else
@@ -86,6 +86,13 @@ else
     fi
     info "Set MSYS=winsymlinks:nativestrict in mingw64.ini"
 fi
+
+# msys2.ini — set MSYSTEM=MINGW64 and enable path inheritance and symlinks
+MSYS2_INI="/c/msys64/msys2.ini"
+sed -i 's/^#*MSYS=winsymlinks.*/MSYS=winsymlinks:nativestrict/' "$MSYS2_INI"
+sed -i 's/^#*MSYS2_PATH_TYPE=.*/MSYS2_PATH_TYPE=inherit/' "$MSYS2_INI"
+sed -i 's/^MSYSTEM=.*/MSYSTEM=MINGW64/' "$MSYS2_INI"
+info "Updated msys2.ini: MSYSTEM=MINGW64, MSYS2_PATH_TYPE=inherit, winsymlinks:nativestrict"
 
 # ============================================================================
 # 3. Windows user environment variables
@@ -239,11 +246,22 @@ link_bin() {
         warn "Skipping symlink for $name: source not found at $src"
         return
     fi
+    # Symlink without extension (for zsh/bash)
     if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
         info "Already symlinked: $name"
     else
         ln -sf "$src" "$dst"
         info "Symlinked: $name → $src"
+    fi
+    # Symlink with .exe extension (for Windows-native callers)
+    if [[ "$src" == *.exe ]]; then
+        local dst_exe="$WINDOWS_HOME/.local/bin/$name.exe"
+        if [[ -L "$dst_exe" && "$(readlink "$dst_exe")" == "$src" ]]; then
+            info "Already symlinked: $name.exe"
+        else
+            ln -sf "$src" "$dst_exe"
+            info "Symlinked: $name.exe → $src"
+        fi
     fi
 }
 
