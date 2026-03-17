@@ -11,7 +11,8 @@
 #   - MSYS2 home → Windows home
 #   - zsh as default shell with oh-my-posh
 #   - nvim with symlink, LSP, DAP, treesitter
-#   - CLI tools: eza, fzf, bat, zoxide
+#   - CLI tools: eza, fzf, bat, zoxide, bun
+#   - Languages: go, node, npm (via nodejs), bun
 #   - carolcode + opencode (separate installs)
 #   - JUCE build pipeline (MSVC + CMake + Ninja)
 # ============================================================================
@@ -43,6 +44,7 @@ if [[ "$MSYSTEM" != "MINGW64" ]]; then
 fi
 
 WINDOWS_HOME="/c/Users/$(whoami)"
+WIN_HOME="C:\\Users\\$(whoami)"
 if [[ ! -d "$WINDOWS_HOME" ]]; then
     error "Windows home not found at $WINDOWS_HOME"
     exit 1
@@ -105,7 +107,22 @@ set_win_env() {
 set_win_env "MSYS" "winsymlinks:nativestrict"
 set_win_env "MSYSTEM" "MINGW64"
 set_win_env "MSYS2_PATH_TYPE" "inherit"
-set_win_env "XDG_CONFIG_HOME" "$WINDOWS_HOME\\.config"
+set_win_env "XDG_CONFIG_HOME" "$WIN_HOME\\.config"
+
+add_to_system_path() {
+    local entry="$1"
+    local current
+    current=$(powershell.exe -Command "[System.Environment]::GetEnvironmentVariable('PATH', 'Machine')" 2>/dev/null | tr -d '\r')
+    if echo "$current" | grep -qi "$(echo "$entry" | sed 's/\\/\\\\/g')"; then
+        info "Already in system PATH: $entry"
+    else
+        powershell.exe -Command "[System.Environment]::SetEnvironmentVariable('PATH', '$entry;' + [System.Environment]::GetEnvironmentVariable('PATH', 'Machine'), 'Machine')" 2>/dev/null
+        info "Added to system PATH: $entry"
+    fi
+}
+
+add_to_system_path "C:\\msys64\\usr\\bin"
+add_to_system_path "$WIN_HOME\\.local\\bin"
 
 # ============================================================================
 # 4. Install MSYS2 packages
@@ -114,11 +131,18 @@ step "4. MSYS2 packages"
 
 PACMAN_PKGS=(
     zsh
+    git
+    unzip
+    mingw-w64-x86_64-git-lfs
+    mingw-w64-x86_64-cmake
+    mingw-w64-x86_64-go
+    mingw-w64-x86_64-nodejs
     mingw-w64-x86_64-eza
     mingw-w64-x86_64-fzf
     mingw-w64-x86_64-bat
     mingw-w64-x86_64-gcc
     mingw-w64-x86_64-ninja
+    mingw-w64-x86_64-python
 )
 
 for pkg in "${PACMAN_PKGS[@]}"; do
@@ -131,24 +155,63 @@ for pkg in "${PACMAN_PKGS[@]}"; do
 done
 
 # ============================================================================
-# 5. ~/.local/bin tools (oh-my-posh, zoxide)
+# 4b. bun (not in MSYS2 repos)
 # ============================================================================
-step "5. CLI tools in ~/.local/bin"
+step "4b. bun"
 
-mkdir -p "$HOME/.local/bin"
+BUN_DIR="$WINDOWS_HOME/.bun/bin"
+mkdir -p "$BUN_DIR"
+
+if [[ -f "$BUN_DIR/bun.exe" ]]; then
+    info "bun already installed"
+else
+    warn "Downloading bun..."
+    BUN_URL=$(curl -fsSL "https://api.github.com/repos/oven-sh/bun/releases/latest" \
+        | grep "browser_download_url.*bun-windows-x64\.zip" | head -1 | cut -d '"' -f 4)
+    if [[ -n "$BUN_URL" ]]; then
+        curl -fsSL "$BUN_URL" -o /tmp/bun.zip
+        unzip -o /tmp/bun.zip "bun-windows-x64/bun.exe" -d /tmp/bun-extract/
+        mv /tmp/bun-extract/bun-windows-x64/bun.exe "$BUN_DIR/bun.exe"
+        rm -rf /tmp/bun.zip /tmp/bun-extract
+        info "bun installed to $BUN_DIR"
+    else
+        error "Failed to find bun release URL"
+    fi
+fi
+
+# ============================================================================
+# 4c. zsh-syntax-highlighting (not in MSYS2 repos)
+# ============================================================================
+step "4c. zsh-syntax-highlighting"
+
+ZSH_HL_DIR="/usr/share/zsh-syntax-highlighting"
+if [[ -d "$ZSH_HL_DIR/.git" ]]; then
+    info "zsh-syntax-highlighting already cloned"
+else
+    warn "Cloning zsh-syntax-highlighting..."
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_HL_DIR"
+    info "zsh-syntax-highlighting cloned"
+fi
+
+# ============================================================================
+# 5. Download standalone tools (oh-my-posh, zoxide)
+# ============================================================================
+step "5. Standalone tools"
+
+mkdir -p "$WINDOWS_HOME/.local/bin"
 
 # oh-my-posh
-if [[ -f "$HOME/.local/bin/oh-my-posh.exe" ]]; then
+if [[ -f "$WINDOWS_HOME/.local/bin/oh-my-posh.exe" ]]; then
     info "oh-my-posh already installed"
 else
     warn "Downloading oh-my-posh..."
     curl -fsSL "https://github.com/JanDeDobbeleer/oh-my-posh/releases/latest/download/posh-windows-amd64.exe" \
-        -o "$HOME/.local/bin/oh-my-posh.exe"
+        -o "$WINDOWS_HOME/.local/bin/oh-my-posh.exe"
     info "oh-my-posh installed"
 fi
 
 # zoxide
-if [[ -f "$HOME/.local/bin/zoxide.exe" ]]; then
+if [[ -f "$WINDOWS_HOME/.local/bin/zoxide.exe" ]]; then
     info "zoxide already installed"
 else
     warn "Downloading zoxide..."
@@ -156,7 +219,7 @@ else
         | grep "browser_download_url.*x86_64-pc-windows-msvc.zip" | head -1 | cut -d '"' -f 4)
     if [[ -n "$ZOXIDE_URL" ]]; then
         curl -fsSL "$ZOXIDE_URL" -o /tmp/zoxide.zip
-        unzip -o /tmp/zoxide.zip zoxide.exe -d "$HOME/.local/bin/"
+        unzip -o /tmp/zoxide.zip zoxide.exe -d "$WINDOWS_HOME/.local/bin/"
         rm -f /tmp/zoxide.zip
         info "zoxide installed"
     else
@@ -165,36 +228,68 @@ else
 fi
 
 # ============================================================================
-# 6. Clone config repo
+# 5b. ~/.local/bin symlinks
 # ============================================================================
-step "6. Config repo"
+step "5b. ~/.local/bin symlinks"
 
-if [[ -d "$HOME/.config/.git" ]]; then
-    info "Config repo already cloned at ~/.config"
-else
-    warn "Cloning config repo..."
-    git clone git@github.com:jrengmusic/.config.git "$HOME/.config"
-    info "Config repo cloned"
-fi
+link_bin() {
+    local src="$1" name="$2"
+    local dst="$WINDOWS_HOME/.local/bin/$name"
+    if [[ ! -f "$src" ]]; then
+        warn "Skipping symlink for $name: source not found at $src"
+        return
+    fi
+    if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
+        info "Already symlinked: $name"
+    else
+        ln -sf "$src" "$dst"
+        info "Symlinked: $name → $src"
+    fi
+}
+
+# MSYS2 usr/bin
+link_bin "/usr/bin/zsh.exe"        "zsh"
+
+# MSYS2 mingw64/bin
+link_bin "/mingw64/bin/git-lfs.exe" "git-lfs"
+link_bin "/mingw64/bin/go.exe"      "go"
+link_bin "/mingw64/bin/node.exe"    "node"
+link_bin "/mingw64/bin/npm"         "npm"
+link_bin "/mingw64/bin/cmake.exe"   "cmake"
+link_bin "/mingw64/bin/gcc.exe"     "gcc"
+link_bin "/mingw64/bin/ninja.exe"   "ninja"
+link_bin "/mingw64/bin/eza.exe"     "eza"
+link_bin "/mingw64/bin/fzf.exe"     "fzf"
+link_bin "/mingw64/bin/bat.exe"     "bat"
+
+# mingw64 continued
+link_bin "/mingw64/bin/python.exe"  "python"
+link_bin "/mingw64/bin/python3.exe" "python3"
+
+# bun
+link_bin "$WINDOWS_HOME/.bun/bin/bun.exe"   "bun"
+
+# opencode
+link_bin "$WINDOWS_HOME/.opencode/bin/opencode.exe" "opencode"
 
 # ============================================================================
-# 7. Bootstrap ~/.zshrc
+# 6. zsh dotfile symlinks
 # ============================================================================
-step "7. Bootstrap ~/.zshrc"
+step "6. zsh dotfile symlinks"
 
-ZSHRC="$HOME/.zshrc"
-if [[ -f "$ZSHRC" ]] && grep -q "zsh/zprofile" "$ZSHRC"; then
-    info "~/.zshrc already configured"
-else
-    cat > "$ZSHRC" << 'EOF'
-# Created by setup-windows.sh
+link_dotfile() {
+    local src="$1" dst="$2"
+    if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
+        info "Already symlinked: $dst → $src"
+    else
+        [[ -f "$dst" && ! -L "$dst" ]] && rm -f "$dst"
+        ln -sf "$src" "$dst"
+        info "Symlinked: $dst → $src"
+    fi
+}
 
-# Source shared config from repo
-[ -f ~/.config/zsh/zprofile ] && source ~/.config/zsh/zprofile
-[ -f ~/.config/zsh/zshrc ] && source ~/.config/zsh/zshrc
-EOF
-    info "Created ~/.zshrc"
-fi
+link_dotfile "$WINDOWS_HOME/.config/zsh/zshrc"   "$WINDOWS_HOME/.zshrc"
+link_dotfile "$WINDOWS_HOME/.config/zsh/zprofile" "$WINDOWS_HOME/.zprofile"
 
 # ============================================================================
 # 8. Neovim config
@@ -223,15 +318,15 @@ echo "  - On Windows, clang-cl produces DWARF symbols that codelldb reads"
 # ============================================================================
 step "10. Carol"
 
-if [[ -d "$HOME/.carol" ]]; then
+if [[ -d "$WINDOWS_HOME/.carol" ]]; then
     info "~/.carol already exists"
 else
     warn "Cloning carol..."
-    git clone https://github.com/jrengmusic/carol.git "$HOME/.carol"
+    git clone https://github.com/jrengmusic/carol.git "$WINDOWS_HOME/.carol"
     info "Cloned carol to ~/.carol"
 fi
 
-if [[ -f "$HOME/.carol/bin/carolcode-x64.exe" ]]; then
+if [[ -f "$WINDOWS_HOME/.carol/bin/carolcode-x64.exe" ]]; then
     info "carolcode binary already in ~/.carol/bin"
 else
     warn "carolcode binary not found in ~/.carol/bin"
@@ -242,10 +337,10 @@ else
     echo "  cp packages/opencode/dist/opencode-windows-x64/bin/carolcode-x64.exe ~/.carol/bin/"
 fi
 
-if [[ -L "$HOME/.local/bin/carol" ]]; then
+if [[ -L "$WINDOWS_HOME/.local/bin/carol" ]]; then
     info "carol symlink already exists"
 else
-    ln -sf "$HOME/.carol/bin/carol" "$HOME/.local/bin/carol"
+    ln -sf "$WINDOWS_HOME/.carol/bin/carol" "$WINDOWS_HOME/.local/bin/carol"
     info "Symlinked carol → ~/.local/bin/carol"
 fi
 
@@ -293,7 +388,7 @@ EOF
 # ============================================================================
 step "13. END terminal"
 
-if [[ -f "$HOME/.local/bin/END.exe" ]]; then
+if [[ -f "$WINDOWS_HOME/.local/bin/END.exe" ]]; then
     info "END.exe found in ~/.local/bin"
 else
     warn "END.exe not found. Copy it to ~/.local/bin/END.exe"
