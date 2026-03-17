@@ -1,6 +1,10 @@
 # Ignore everything
 *
 
+# Whitelist files
+!.gitattributes
+!.gitignore
+
 # Whitelist directories
 !end/
 !end/**
