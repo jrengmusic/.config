@@ -20,28 +20,25 @@ All machines share the same config repo. OS-specific behavior is handled by:
 
 ## Prerequisites
 
-Install these before running the setup script:
+Install these manually before running the setup script:
 
 1. **MSYS2** — https://www.msys2.org/ (install to `C:\msys64`)
 2. **Visual Studio 2022+** — with "Desktop development with C++" workload (provides vcvarsall.bat, MSVC linker, headers)
 3. **LLVM** — `winget install LLVM.LLVM` (provides clang-cl compiler + clangd LSP)
 4. **Neovim** — `winget install Neovim.Neovim`
-5. **Git** — `winget install Git.Git`
-6. **Go** — `winget install GoLang.Go`
-7. **Bun** — `winget install oven-sh.Bun`
-8. **Node/npm** — for opencode
+
+Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, zoxide, oh-my-posh) is installed by the setup script.
 
 ## Quick Start
 
-Open MSYS2 MinGW64 terminal and run:
+Clone the config repo first, then run the script from MSYS2 MinGW64 **as Administrator**:
 
 ```sh
-# Clone config repo first (if not already)
 git clone git@github.com:jrengmusic/.config.git ~/.config
-
-# Run setup
 bash ~/.config/scripts/setup-windows.sh
 ```
+
+> Must run as Administrator — the script writes to system PATH.
 
 Then restart MSYS2 and launch nvim to install Mason tools:
 
@@ -84,39 +81,62 @@ Sets these as **Windows user environment variables** (persistent across reboots)
 | `MSYS2_PATH_TYPE` | `inherit` | Inherit Windows PATH |
 | `XDG_CONFIG_HOME` | `C:\Users\<name>\.config` | nvim and tools use `~/.config/` as SSOT (same as macOS) |
 
+Also adds to **Windows system PATH**:
+- `C:\msys64\usr\bin` — zsh, git, unzip
+- `C:\Users\<name>\.local\bin` — all tool symlinks (single PATH entry for everything)
+
 ### 4. MSYS2 Packages
 
 Via `pacman`:
-- `zsh` — shell
-- `mingw-w64-x86_64-eza` — ls replacement
-- `mingw-w64-x86_64-fzf` — fuzzy finder
-- `mingw-w64-x86_64-bat` — cat replacement
-- `mingw-w64-x86_64-gcc` — needed for some tools (not JUCE builds)
-- `mingw-w64-x86_64-ninja` — build system
+- `zsh`, `git`, `unzip`
+- `mingw-w64-x86_64-git-lfs`
+- `mingw-w64-x86_64-cmake`
+- `mingw-w64-x86_64-go`
+- `mingw-w64-x86_64-nodejs` (includes npm)
+- `mingw-w64-x86_64-python`
+- `mingw-w64-x86_64-eza`, `fzf`, `bat`, `gcc`, `ninja`
 
-### 5. CLI Tools
+### 4b. Bun
 
-Downloaded to `~/.local/bin/`:
+Downloaded from GitHub releases to `~/.bun/bin/bun.exe`.
+
+### 4c. zsh-syntax-highlighting
+
+Not in MSYS2 repos — cloned from source to `/usr/share/zsh-syntax-highlighting`.
+
+### 5. Standalone Tools
+
+Downloaded directly to `~/.local/bin/`:
 - `oh-my-posh.exe` — prompt theme engine
 - `zoxide.exe` — smart cd
 
-### 6. Config Repo
+### 5b. ~/.local/bin Symlinks
 
-Cloned to `~/.config/`. Contains all shared configuration:
-- `zsh/zprofile` + `zsh/zshrc` — shell config with OS branching
-- `nvim/` — neovim config with OS-branched keymaps, LSP, DAP
-- `end/end.lua` — END terminal config
+All tool binaries are symlinked into `~/.local/bin/` — the single directory on system PATH:
 
-### 7. Shell Bootstrap
+| symlink | source |
+|---|---|
+| `zsh` | `/usr/bin/zsh.exe` |
+| `git-lfs` | `/mingw64/bin/git-lfs.exe` |
+| `go` | `/mingw64/bin/go.exe` |
+| `node` | `/mingw64/bin/node.exe` |
+| `npm` | `/mingw64/bin/npm` |
+| `cmake` | `/mingw64/bin/cmake.exe` |
+| `gcc` | `/mingw64/bin/gcc.exe` |
+| `ninja` | `/mingw64/bin/ninja.exe` |
+| `eza` | `/mingw64/bin/eza.exe` |
+| `fzf` | `/mingw64/bin/fzf.exe` |
+| `bat` | `/mingw64/bin/bat.exe` |
+| `python` | `/mingw64/bin/python.exe` |
+| `python3` | `/mingw64/bin/python3.exe` |
+| `bun` | `~/.bun/bin/bun.exe` |
+| `opencode` | `~/.opencode/bin/opencode.exe` |
 
-Creates `~/.zshrc` (machine-local, not tracked in repo):
+### 6. zsh Dotfile Symlinks
 
-```sh
-[ -f ~/.config/zsh/zprofile ] && source ~/.config/zsh/zprofile
-[ -f ~/.config/zsh/zshrc ] && source ~/.config/zsh/zshrc
-```
+`~/.zshrc` and `~/.zprofile` are symlinked directly to `~/.config/zsh/zshrc` and `~/.config/zsh/zprofile` — same as macOS.
 
-### 8. Neovim Config
+### 7. Neovim Config
 
 With `XDG_CONFIG_HOME=C:\Users\<name>\.config` set as a Windows env var, nvim reads `~/.config/nvim` directly — no symlink needed. Same as macOS.
 
@@ -265,8 +285,9 @@ Terminal behavior on build:
         ├── build-debug.bat             # Windows build (clang-cl + MSVC env + cmake + ninja)
         └── clean-build.sh             # Clean (cross-platform, no compiler)
 
-~/.zshrc                                # Machine-local bootstrap (not in repo)
-~/.local/bin/                           # User binaries
+~/.zshrc → ~/.config/zsh/zshrc          # Symlink (same as macOS)
+~/.zprofile → ~/.config/zsh/zprofile   # Symlink (same as macOS)
+~/.local/bin/                           # All tool symlinks (single PATH entry)
 ~/.carol/                               # Carol repo + carolcode binary
 ~/.opencode/                            # Opencode data (binary from npm)
 
