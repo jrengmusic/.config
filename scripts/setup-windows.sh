@@ -14,7 +14,7 @@
 #   - CLI tools: eza, fzf, bat, zoxide, bun
 #   - Languages: go, node, npm (via nodejs), bun
 #   - carolcode + opencode (separate installs)
-#   - JUCE build pipeline (MSVC + CMake + Ninja)
+#   - JUCE build pipeline (MSVC cl.exe + VS-bundled CMake + Ninja)
 # ============================================================================
 set -e
 
@@ -142,14 +142,12 @@ PACMAN_PKGS=(
     git
     unzip
     mingw-w64-x86_64-git-lfs
-    mingw-w64-x86_64-cmake
     mingw-w64-x86_64-go
     mingw-w64-x86_64-nodejs
     mingw-w64-x86_64-eza
     mingw-w64-x86_64-fzf
     mingw-w64-x86_64-bat
     mingw-w64-x86_64-gcc
-    mingw-w64-x86_64-ninja
     mingw-w64-x86_64-python
 )
 
@@ -274,9 +272,7 @@ link_bin "/mingw64/bin/git-lfs.exe" "git-lfs"
 link_bin "/mingw64/bin/go.exe"      "go"
 link_bin "/mingw64/bin/node.exe"    "node"
 link_bin "/mingw64/bin/npm"         "npm"
-link_bin "/mingw64/bin/cmake.exe"   "cmake"
 link_bin "/mingw64/bin/gcc.exe"     "gcc"
-link_bin "/mingw64/bin/ninja.exe"   "ninja"
 link_bin "/mingw64/bin/eza.exe"     "eza"
 link_bin "/mingw64/bin/fzf.exe"     "fzf"
 link_bin "/mingw64/bin/bat.exe"     "bat"
@@ -324,13 +320,13 @@ info "XDG_CONFIG_HOME is set → nvim uses ~/.config/nvim directly"
 step "9. Neovim Mason tools"
 
 echo "After launching nvim, run:"
-echo "  :MasonInstall lua_ls pyright ts_ls zls stylua prettier codelldb"
+echo "  :MasonInstall lua_ls pyright ts_ls zls stylua prettier"
 echo ""
 echo "Notes:"
 echo "  - Do NOT install clangd via Mason (it's a .cmd wrapper, won't work)"
 echo "  - System clangd from LLVM.LLVM is used automatically"
-echo "  - codelldb is the DAP adapter for both macOS and Windows"
-echo "  - On Windows, clang-cl produces DWARF symbols that codelldb reads"
+echo "  - DAP adapter: codelldb on macOS, whatdbg on Windows"
+echo "  - whatdbg reads PDB symbols via dbgeng.dll (supports DAW plugin attach)"
 
 # ============================================================================
 # 10. Carol (carolcode wrapper)
@@ -383,7 +379,7 @@ cat << 'EOF'
 The following should be installed via winget or manually:
 
   winget install Neovim.Neovim
-  winget install LLVM.LLVM            # clang-cl (compiler) + clangd (LSP)
+  winget install LLVM.LLVM            # clangd (LSP)
   winget install GoLang.Go
   winget install oven-sh.Bun
   winget install Git.Git
@@ -391,15 +387,16 @@ The following should be installed via winget or manually:
     (with "Desktop development with C++" workload)
 
 LLVM provides:
-  - clang-cl: MSVC-compatible compiler that produces DWARF debug symbols
   - clangd: LSP server (Mason's clangd is .cmd on Windows, won't work)
 
 Visual Studio provides:
-  - vcvarsall.bat: sets up MSVC linker, headers, and libs
-  - JUCE rejects MinGW, so MSVC environment is required even with clang-cl
+  - cl.exe: MSVC compiler (produces PDB debug symbols)
+  - vcvarsall.bat: sets up MSVC compiler, linker, headers, and libs
+  - cmake + ninja: bundled with VS, used by build.bat
+  - JUCE rejects MinGW, so MSVC environment is required
 
-The build pipeline uses: clang-cl (compiler) + MSVC (linker/headers) + Ninja
-Debug symbols are DWARF format, read by codelldb/LLDB (same as macOS).
+The build pipeline uses: cl.exe (compiler) + MSVC (linker/headers) + Ninja
+Debug symbols are PDB format, read by whatdbg (dbgeng.dll DAP adapter).
 EOF
 
 # ============================================================================
