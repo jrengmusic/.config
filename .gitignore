@@ -27,3 +27,4 @@
 # Keep .gitignore itself
 !.gitignore
 end/state.xml
+end/conpty/

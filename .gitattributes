@@ -1,1 +1,10 @@
 * text=auto eol=lf
+
+# Shell scripts must always be LF
+*.sh text eol=lf
+zsh/zshrc text eol=lf
+
+# Binaries: never touch
+*.exe binary
+*.dll binary
+*.dylib binary

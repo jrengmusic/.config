@@ -35,10 +35,6 @@ alias modules='cd ~/Documents/Poems/inf/___modules___/'
 alias ls='eza -la'
 alias keju='~/Documents/Poems/inf/___user-modules___/automation/Keju_x64'
 
-# Windows-only aliases
-if [[ $OPERATING_SYSTEM == "windows" ]]; then
-  alias amp='AMP_HOME=/c/Users/jreng/.amp AMP_RIPGREP_PATH=/c/Users/jreng/.amp/bin/rg.exe /c/Users/jreng/.amp/bin/bun.exe run --cwd /c/Users/jreng/.amp/package /c/Users/jreng/.amp/package/dist/main.js'
-fi
 
 # fzf configuration
 # Dot directories to always include
