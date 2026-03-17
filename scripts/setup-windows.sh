@@ -18,6 +18,10 @@
 # ============================================================================
 set -e
 
+# Ensure native symlinks are used in THIS session, not just after restart.
+# Without this, ln -sf silently creates file copies on Windows/MSYS2.
+export MSYS=winsymlinks:nativestrict
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -246,9 +250,12 @@ link_bin() {
         return
     fi
     # Symlink without extension (for zsh/bash)
+    # Remove stale regular-file copies that ln -sf would silently produce
+    # when MSYS=winsymlinks:nativestrict was not active in a previous run.
     if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
         info "Already symlinked: $name"
     else
+        [[ -e "$dst" && ! -L "$dst" ]] && rm -f "$dst"
         ln -sf "$src" "$dst"
         info "Symlinked: $name → $src"
     fi
@@ -258,6 +265,7 @@ link_bin() {
         if [[ -L "$dst_exe" && "$(readlink "$dst_exe")" == "$src" ]]; then
             info "Already symlinked: $name.exe"
         else
+            [[ -e "$dst_exe" && ! -L "$dst_exe" ]] && rm -f "$dst_exe"
             ln -sf "$src" "$dst_exe"
             info "Symlinked: $name.exe → $src"
         fi
@@ -297,7 +305,8 @@ link_dotfile() {
     if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
         info "Already symlinked: $dst → $src"
     else
-        [[ -f "$dst" && ! -L "$dst" ]] && rm -f "$dst"
+        # Use -e (not -f) to also catch stale copies that are dirs/junctions
+        [[ -e "$dst" && ! -L "$dst" ]] && rm -f "$dst"
         ln -sf "$src" "$dst"
         info "Symlinked: $dst → $src"
     fi
@@ -357,6 +366,8 @@ CAROL_TARGET="$WINDOWS_HOME/.carol/bin/carol"
 if [[ -L "$CAROL_LINK" && "$(readlink "$CAROL_LINK")" == "$CAROL_TARGET" ]]; then
     info "carol symlink already correct"
 else
+    # Remove stale regular-file copy before symlinking (same fix as link_bin)
+    [[ -e "$CAROL_LINK" && ! -L "$CAROL_LINK" ]] && rm -f "$CAROL_LINK"
     ln -sf "$CAROL_TARGET" "$CAROL_LINK"
     info "Symlinked carol → $CAROL_TARGET"
 fi
