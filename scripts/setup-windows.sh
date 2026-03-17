@@ -119,16 +119,17 @@ set_win_env "XDG_CONFIG_HOME" "$WIN_HOME\\.config"
 add_to_system_path() {
     local entry="$1"
     local current
-    current=$(powershell.exe -Command "[System.Environment]::GetEnvironmentVariable('PATH', 'Machine')" 2>/dev/null | tr -d '\r')
+    current=$(powershell.exe -Command "[System.Environment]::GetEnvironmentVariable('PATH', 'Machine')" | tr -d '\r')
     if echo "$current" | grep -qi "$(echo "$entry" | sed 's/\\/\\\\/g')"; then
         info "Already in system PATH: $entry"
     else
-        powershell.exe -Command "[System.Environment]::SetEnvironmentVariable('PATH', '$entry;' + [System.Environment]::GetEnvironmentVariable('PATH', 'Machine'), 'Machine')" 2>/dev/null
+        powershell.exe -Command "[System.Environment]::SetEnvironmentVariable('PATH', '$entry;' + [System.Environment]::GetEnvironmentVariable('PATH', 'Machine'), 'Machine')"
         info "Added to system PATH: $entry"
     fi
 }
 
 add_to_system_path "C:\\msys64\\usr\\bin"
+add_to_system_path "C:\\msys64\\mingw64\\bin"
 add_to_system_path "$WIN_HOME\\.local\\bin"
 
 # ============================================================================
