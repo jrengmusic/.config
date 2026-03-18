@@ -33,22 +33,19 @@ local M = {}
       zls = {},
       ts_ls = {},
       pyright = {},
-      cmake = {},
+      -- cmake excluded: Mason requires python <3.14, MSYS2 ships 3.14+.
+      -- cmake-language-server is installed via pipx (step 4d in setup-windows.sh).
+      -- mason-lspconfig auto-enables it from PATH without Mason managing it.
     }
 
   local ensureInstalled = vim.tbl_keys(servers or {})
   vim.list_extend(ensureInstalled, { 'stylua', 'clangd', 'gopls', 'zls', 'prettier' })
   require('mason-tool-installer').setup({ ensure_installed = ensureInstalled })
 
+  -- handlers removed: mason-lspconfig dropped handlers support.
+  -- It now uses automatic_enable which calls vim.lsp.enable() for installed servers.
   require('mason-lspconfig').setup({
     ensure_installed = vim.tbl_keys(servers),
-    handlers = {
-      function(serverName)
-        local server = servers[serverName] or {}
-        server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
-        require('lspconfig')[serverName].setup(server)
-      end,
-    },
   })
 end
 

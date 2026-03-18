@@ -153,6 +153,8 @@ PACMAN_PKGS=(
     mingw-w64-x86_64-bat
     mingw-w64-x86_64-gcc
     mingw-w64-x86_64-python
+    mingw-w64-x86_64-python-pip   # required by pipx
+    mingw-w64-x86_64-python-pipx  # Mason uses pipx to install cmake-language-server
 )
 
 for pkg in "${PACMAN_PKGS[@]}"; do
@@ -204,6 +206,22 @@ else
 fi
 
 # ============================================================================
+# 4d. cmake-language-server (via pipx, not Mason)
+# ============================================================================
+# Mason's cmake-language-server package requires python <3.14, but MSYS2 ships
+# python 3.14+. pipx installs into its own isolated venv, bypassing the check.
+# Binary lands at ~/.local/bin/cmake-language-server (already in PATH).
+step "4d. cmake-language-server"
+
+if command -v cmake-language-server &>/dev/null; then
+    info "cmake-language-server already installed: $(cmake-language-server --version 2>&1 | head -1)"
+else
+    warn "Installing cmake-language-server via pipx..."
+    pipx install cmake-language-server
+    info "cmake-language-server installed"
+fi
+
+# ============================================================================
 # 5. Download standalone tools (oh-my-posh, zoxide)
 # ============================================================================
 step "5. Standalone tools"
@@ -242,6 +260,19 @@ fi
 # ============================================================================
 step "5b. ~/.local/bin symlinks"
 
+# NOTE: Do NOT symlink MSYS2-native tools (zsh, python, node, go, bat, eza,
+# fzf, gcc, git-lfs, npm) into ~/.local/bin.
+#
+# Reason: /usr/bin and /mingw64/bin are already in PATH (added above).
+# Many MSYS2 binaries (especially python.exe) are small launcher stubs that
+# depend on DLLs in their source directory. Copying or symlinking them into
+# ~/.local/bin causes DLL load failures (e.g. "ImportError: cannot import zlib")
+# because the binary runs from a different directory context.
+#
+# Only symlink tools whose source directory is NOT in PATH:
+#   - bun  (~/.bun/bin)
+#   - opencode (~/.opencode/bin)
+
 link_bin() {
     local src="$1" name="$2"
     local dst="$WINDOWS_HOME/.local/bin/$name"
@@ -272,27 +303,10 @@ link_bin() {
     fi
 }
 
-# MSYS2 usr/bin
-link_bin "/usr/bin/zsh.exe"        "zsh"
-
-# MSYS2 mingw64/bin
-link_bin "/mingw64/bin/git-lfs.exe" "git-lfs"
-link_bin "/mingw64/bin/go.exe"      "go"
-link_bin "/mingw64/bin/node.exe"    "node"
-link_bin "/mingw64/bin/npm"         "npm"
-link_bin "/mingw64/bin/gcc.exe"     "gcc"
-link_bin "/mingw64/bin/eza.exe"     "eza"
-link_bin "/mingw64/bin/fzf.exe"     "fzf"
-link_bin "/mingw64/bin/bat.exe"     "bat"
-
-# mingw64 continued
-link_bin "/mingw64/bin/python.exe"  "python"
-link_bin "/mingw64/bin/python3.exe" "python3"
-
-# bun
+# bun (~/.bun/bin is not in PATH)
 link_bin "$WINDOWS_HOME/.bun/bin/bun.exe"   "bun"
 
-# opencode
+# opencode (~/.opencode/bin is not in PATH)
 link_bin "$WINDOWS_HOME/.opencode/bin/opencode.exe" "opencode"
 
 # ============================================================================
@@ -328,12 +342,13 @@ info "XDG_CONFIG_HOME is set → nvim uses ~/.config/nvim directly"
 # ============================================================================
 step "9. Neovim Mason tools"
 
-echo "After launching nvim, run:"
-echo "  :MasonInstall lua_ls pyright ts_ls zls stylua prettier"
+echo "After launching nvim, Mason will auto-install all LSP servers."
 echo ""
 echo "Notes:"
 echo "  - Do NOT install clangd via Mason (it's a .cmd wrapper, won't work)"
 echo "  - System clangd from LLVM.LLVM is used automatically"
+echo "  - Do NOT install cmake-language-server via Mason (requires python <3.14,"
+echo "    but MSYS2 ships 3.14+). It was installed via pipx in step 4d instead."
 echo "  - DAP adapter: codelldb on macOS, whatdbg on Windows"
 echo "  - whatdbg reads PDB symbols via dbgeng.dll (supports DAW plugin attach)"
 
