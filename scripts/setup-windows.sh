@@ -157,6 +157,7 @@ PACMAN_PKGS=(
     mingw-w64-x86_64-python-pipx  # Mason uses pipx to install cmake-language-server
     mingw-w64-x86_64-gdb          # DAP adapter for standalone debugging (gdb --interpreter=dap)
     mingw-w64-x86_64-fd           # snacks.nvim file finder (find is disabled on Windows by snacks)
+    mingw-w64-x86_64-ripgrep      # snacks.nvim grep search (<leader>fg)
 )
 
 for pkg in "${PACMAN_PKGS[@]}"; do
