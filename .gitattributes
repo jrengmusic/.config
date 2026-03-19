@@ -1,10 +1,33 @@
+# Default: treat all text files as LF, let git detect text vs binary
 * text=auto eol=lf
 
-# Shell scripts must always be LF
-*.sh text eol=lf
-zsh/zshrc text eol=lf
+# Shell / zsh — must always be LF (zsh parse errors on CRLF)
+*.sh        text eol=lf
+*.zsh       text eol=lf
+zsh/zprofile text eol=lf
+zsh/zshrc    text eol=lf
 
-# Binaries: never touch
-*.exe binary
-*.dll binary
-*.dylib binary
+# Lua (Neovim config, Hammerspoon) — must be LF
+*.lua       text eol=lf
+
+# Config/markup formats — LF
+*.toml      text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.conf      text eol=lf
+*.scm       text eol=lf
+
+# Windows-native scripts — keep CRLF (cmd.exe requires it)
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binaries: never touch line endings
+*.exe       binary
+*.dll       binary
+*.dylib     binary
+*.png       binary
+*.jpg       binary
+*.gif       binary

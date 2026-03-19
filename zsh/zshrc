@@ -32,7 +32,7 @@ alias inf='cd ~/Documents/Poems/inf'
 alias dev='cd ~/Documents/Poems/dev'
 alias modules='cd ~/Documents/Poems/inf/___modules___/'
 
-alias ls='eza -la'
+command -v eza &>/dev/null && alias ls='eza -la'
 alias keju='~/Documents/Poems/inf/___user-modules___/automation/Keju_x64'
 
 
@@ -79,11 +79,20 @@ export FZF_CTRL_T_COMMAND="find . -type f $EXCLUDE \( -not -path \"*/\.*\" $DOT_
 [ -f "$_FZF_SHARE/key-bindings.zsh" ] && source "$_FZF_SHARE/key-bindings.zsh"
 [ -f "$_FZF_SHARE/completion.zsh" ]   && source "$_FZF_SHARE/completion.zsh"
 
+# OS-aware clipboard and file-opener helpers (used in fzf bindings below)
+if [[ $OPERATING_SYSTEM == "windows" ]]; then
+  _CLIP_CMD="clip"
+  _OPEN_CMD="start"
+elif [[ $OPERATING_SYSTEM == "macos-arm" || $OPERATING_SYSTEM == "macos-intel" ]]; then
+  _CLIP_CMD="pbcopy"
+  _OPEN_CMD="open"
+fi
+
 # Custom fzf options
 export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:500 {}' \
   --bind 'ctrl-v:execute(nvim {})' \
-  --bind 'ctrl-o:execute(open {})' \
-  --bind 'ctrl-y:execute-silent(echo {} | pbcopy)+abort'"
+  --bind 'ctrl-o:execute(${_OPEN_CMD} {})' \
+  --bind 'ctrl-y:execute-silent(echo {} | ${_CLIP_CMD})+abort'"
 
 # Ctrl+F for file search
 bindkey '^F' fzf-file-widget
@@ -139,7 +148,7 @@ if [[ $OPERATING_SYSTEM == "macos-intel" ]]; then
 fi
 
 # bun completions
-[ -s "~/.bun/_bun" ] && source "~/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
@@ -149,8 +158,7 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 export PATH=~/.opencode/bin:$PATH
 
 # This initializes zoxide and sets up the 'cd' alias automatically
-eval "$(zoxide init zsh --cmd cd)"
-alias zi='__zoxide_zi'
+command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)" && alias zi='__zoxide_zi'
 
 # Oh my posh
 if [ "$TERM_PROGRAM" != "Apple_Terminal" ] && command -v oh-my-posh &>/dev/null; then

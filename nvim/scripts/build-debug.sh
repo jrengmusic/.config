@@ -95,6 +95,31 @@ case "$FORMAT" in
         ;;
     Standalone)
         echo "✓ Standalone app built (no copy needed)"
+        # macOS Tahoe+: re-sign with get-task-allow so codelldb (or any debugger)
+        # can launch/attach to the process. CMake debug builds are ad-hoc signed
+        # with no entitlements; without get-task-allow the kernel refuses ptrace.
+        if [[ "$(uname)" == "Darwin" ]]; then
+            ENTITLEMENTS_FILE=$(mktemp /tmp/debug-entitlements-XXXX.xml)
+            cat > "$ENTITLEMENTS_FILE" << 'ENTEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
+</dict>
+</plist>
+ENTEOF
+            find "$BUILD_DIR" -path "*App_artefacts*" -name "*.app" -type d 2>/dev/null | while read -r app; do
+                app_name=$(basename "$app" .app)
+                bin="$app/Contents/MacOS/$app_name"
+                if [[ -x "$bin" ]]; then
+                    codesign --force --sign - --entitlements "$ENTITLEMENTS_FILE" "$bin"
+                    echo "✓ Re-signed for debugging: $app_name"
+                fi
+            done
+            rm -f "$ENTITLEMENTS_FILE"
+        fi
         ;;
 esac
 

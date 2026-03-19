@@ -147,52 +147,41 @@ function M.test()
 end
 
 -- Float standalone app windows (don't tile them in PaperWM)
+-- Uses per-window floating (toggleFloating) rather than setAppFilter, so that
+-- apps like END whose name matches the regular terminal are not globally
+-- excluded from tiling — only the specific newly-launched windows are floated.
 function M.floatStandaloneApp(appName)
-  -- Check if PaperWM is available
-  if not PaperWM or not PaperWM.window_filter then
+  if not PaperWM or not PaperWM.floating then
     return
   end
-  
-  -- Use PaperWM's window filter to exclude this app (same method as DAWs)
-  PaperWM.window_filter = PaperWM.window_filter:setAppFilter(appName, false)
-  
-  -- Bring app to front (wait for window to appear)
-  local function activateApp()
+
+  local maxAttempts = 20  -- 2 seconds
+  local attempts = 0
+
+  local function tryFloat()
+    attempts = attempts + 1
     local app = hs.application.find(appName)
-    
+
     if app then
       local windows = app:allWindows()
-      
       if #windows > 0 then
-        -- Activate app to bring windows to front
         app:activate()
-        
-        -- Remove from PaperWM management if it got tiled
-        local floated = 0
         for _, win in ipairs(windows) do
-          if PaperWM.windows and PaperWM.windows[win:id()] then
-            PaperWM.windows[win:id()] = nil
-            floated = floated + 1
+          -- Only float windows that are currently tiled (not already floating)
+          if not PaperWM.floating.isFloating(win) then
+            PaperWM.floating.toggleFloating(win)
           end
         end
-        
-        -- Force retile to remove floated windows from layout
-        if floated > 0 then
-          local space = hs.spaces.focusedSpace()
-          local screen = hs.screen.mainScreen()
-          if PaperWM.tiling and PaperWM.tiling.tileSpace then
-            PaperWM.tiling.tileSpace(space, screen)
-          end
-        end
-      else
-        -- Windows not ready yet, retry
-        hs.timer.doAfter(0.5, activateApp)
+        return
       end
     end
+
+    if attempts < maxAttempts then
+      hs.timer.doAfter(0.1, tryFloat)
+    end
   end
-  
-  -- Start activation with small delay
-  hs.timer.doAfter(0.2, activateApp)
+
+  hs.timer.doAfter(0.2, tryFloat)
 end
 
 -- Test terminal detection

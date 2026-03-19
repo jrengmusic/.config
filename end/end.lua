@@ -45,7 +45,7 @@ END = {
 		family = "Display Mono",
 
 		-- Font size in points before zoom is applied (1 - 200).
-		size = 11.0,
+		size = 14.0,
 
 		-- Enable OpenType ligature substitution (e.g. -> becomes arrow).
 		ligatures = true,
@@ -174,6 +174,9 @@ END = {
 		opacity = 0.75,
 
 		-- Background blur radius in pixels (0 = no blur).
+		-- macOS: controls blur intensity via CoreGraphics private SPI.
+		-- Windows: blur intensity is controlled by DWM (this value is accepted
+		-- but not forwarded — the acrylic effect has a fixed blur radius).
 		blur_radius = 32.0,
 
 		-- Keep window above all other windows.
@@ -248,7 +251,7 @@ END = {
 	shell = {
 		-- Shell program name or absolute path.
 		-- Examples: "zsh", "bash", "fish", "/opt/homebrew/bin/fish"
-		program = "C:\\msys64\\usr\\bin\\zsh.exe",
+		program = "zsh",
 
 		-- Arguments passed to the shell program (space-separated string).
 		-- Default: "-l" on Unix (login shell), "" on Windows.
@@ -299,10 +302,10 @@ END = {
 
 	keys = {
 		-- Copy selection to clipboard.
-		copy = "ctrl+c",
+		copy = "cmd+c",
 
 		-- Paste from clipboard.
-		paste = "ctrl+v",
+		paste = "cmd+v",
 
 		-- Quit application.
 		quit = "cmd+q",

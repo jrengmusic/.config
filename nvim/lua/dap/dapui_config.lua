@@ -41,88 +41,67 @@ function M.setup()
     virt_text_pos = 'eol',
   })
 
+  local is_mac = vim.fn.has('mac') == 1
+  local hs = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
+  local function hs_call(expr)
+    if is_mac then vim.fn.system(string.format('%s -c "%s"', hs, expr)) end
+  end
+
   -- Auto open/close DAP UI
   dap.listeners.before.attach.dapui_config = function()
     dapui.open()
-    -- Setup debug layout when attaching (plugin projects only)
-    local projectType = dapConfig.detectProjectType()
-    
-    if projectType == 'plugin' then
-      local config = dapConfig.loadDawConfig()
-      
-      if config and config.daw then
-        local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
-        local cmd = string.format('%s -c "require(\'debug-layout\').setupDebugLayout(\'%s\')"', hs_cmd, config.daw)
-        vim.fn.system(cmd)
+    if is_mac then
+      local projectType = dapConfig.detectProjectType()
+      if projectType == 'plugin' then
+        local config = dapConfig.loadDawConfig()
+        if config and config.daw then
+          hs_call(string.format("require('debug-layout').setupDebugLayout('%s')", config.daw))
+        end
       end
     end
   end
-  
+
   dap.listeners.before.launch.dapui_config = function()
     dapui.open()
-    -- Setup debug layout when launching (plugin projects only)
-    local projectType = dapConfig.detectProjectType()
-    
-    if projectType == 'plugin' then
-      local config = dapConfig.loadDawConfig()
-      
-      if config and config.daw then
-        local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
-        local cmd = string.format('%s -c "require(\'debug-layout\').setupDebugLayout(\'%s\')"', hs_cmd, config.daw)
-        vim.fn.system(cmd)
+    if is_mac then
+      local projectType = dapConfig.detectProjectType()
+      if projectType == 'plugin' then
+        local config = dapConfig.loadDawConfig()
+        if config and config.daw then
+          hs_call(string.format("require('debug-layout').setupDebugLayout('%s')", config.daw))
+        end
       end
     end
   end
-  
+
   dap.listeners.before.event_terminated.dapui_config = function()
     dapui.close()
-    -- Restore layout when terminated
-    local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
-    vim.fn.system(string.format('%s -c "require(\'debug-layout\').restoreNormalLayout()"', hs_cmd))
+    hs_call("require('debug-layout').restoreNormalLayout()")
   end
-  
+
   dap.listeners.before.event_exited.dapui_config = function()
     dapui.close()
-    -- Restore layout when exited
-    local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
-    vim.fn.system(string.format('%s -c "require(\'debug-layout\').restoreNormalLayout()"', hs_cmd))
+    hs_call("require('debug-layout').restoreNormalLayout()")
   end
 
-  -- Focus nvim pane when breakpoint hit
+  -- Focus nvim pane when breakpoint hit (macOS only — Hammerspoon not on Windows)
   dap.listeners.after.event_stopped.focus_nvim = function()
-    local hs_cmd = '/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
-    vim.fn.system(string.format('%s -c "require(\'debug-layout\').focusNvimPane()"', hs_cmd))
+    hs_call("require('debug-layout').focusNvimPane()")
   end
 
-  -- Float standalone app windows (don't tile them in PaperWM)
+  -- Float standalone app windows into PaperWM floating layer (macOS only)
   dap.listeners.after.launch.standalone_float = function(session, body)
-    -- Only for standalone projects
-    local projectType = dapConfig.detectProjectType()
-    if projectType ~= 'standalone' then
-      return
-    end
-    
-    -- Extract app name from executable path
-    -- For macOS: /path/to/MyApp.app/Contents/MacOS/MyApp → "MyApp"
-    local config = session.config
-    local program = config.program
-    
-    if type(program) == 'function' then
-      program = program()
-    end
-    
-    if not program then
-      return
-    end
-    
-    -- Extract app name (works for .app bundles or executables)
+    if not is_mac then return end
+    if dapConfig.detectProjectType() ~= 'standalone' then return end
+
+    local program = session.config.program
+    if type(program) == 'function' then program = program() end
+    if not program then return end
+
     local appName = program:match('/([^/]+)%.app/') or program:match('/([^/]+)$')
-    
     if appName then
-      -- Call Hammerspoon to float this app
-      local cmd = string.format('/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs -c "require(\'debug-layout\').floatStandaloneApp(\'%s\')"', appName)
       vim.defer_fn(function()
-        vim.fn.system(cmd)
+        hs_call(string.format("require('debug-layout').floatStandaloneApp('%s')", appName))
       end, 1000)
     end
   end

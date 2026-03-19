@@ -18,6 +18,8 @@
 !hammerspoon/**
 !zsh/
 !zsh/**
+!kitty/
+!kitty/**
 
 # Repo-level docs and scripts
 !WINDOWS-SETUP.md
