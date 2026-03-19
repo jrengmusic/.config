@@ -157,10 +157,10 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # opencode
 export PATH=~/.opencode/bin:$PATH
 
-# This initializes zoxide and sets up the 'cd' alias automatically
-command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)" && alias zi='__zoxide_zi'
-
 # Oh my posh
 if [ "$TERM_PROGRAM" != "Apple_Terminal" ] && command -v oh-my-posh &>/dev/null; then
   eval "$(oh-my-posh init zsh --config ~/.config/omp/gfx.json)"
 fi
+
+# zoxide — must be last
+command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)" && alias zi='__zoxide_zi'

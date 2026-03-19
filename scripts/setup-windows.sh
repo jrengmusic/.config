@@ -13,7 +13,7 @@
 #   - nvim with symlink, LSP, DAP, treesitter
 #   - CLI tools: eza, fzf, bat, zoxide, bun
 #   - Languages: go, node, npm (via nodejs), bun
-#   - carolcode + opencode (separate installs)
+#   - claude code + carol
 #   - JUCE build pipeline (MSVC cl.exe + VS-bundled CMake + Ninja)
 # ============================================================================
 set -e
@@ -274,7 +274,7 @@ step "5b. ~/.local/bin symlinks"
 #
 # Only symlink tools whose source directory is NOT in PATH:
 #   - bun  (~/.bun/bin)
-#   - opencode (~/.opencode/bin)
+#   - carol (~/.carol/bin)
 
 link_bin() {
     local src="$1" name="$2"
@@ -307,10 +307,7 @@ link_bin() {
 }
 
 # bun (~/.bun/bin is not in PATH)
-link_bin "$WINDOWS_HOME/.bun/bin/bun.exe"   "bun"
-
-# opencode (~/.opencode/bin is not in PATH)
-link_bin "$WINDOWS_HOME/.opencode/bin/opencode.exe" "opencode"
+link_bin "$WINDOWS_HOME/.bun/bin/bun.exe" "bun"
 
 # ============================================================================
 # 6. zsh dotfile symlinks
@@ -368,17 +365,6 @@ else
     info "Cloned carol to ~/.carol"
 fi
 
-if [[ -f "$WINDOWS_HOME/.carol/bin/carolcode-x64.exe" ]]; then
-    info "carolcode binary already in ~/.carol/bin"
-else
-    warn "carolcode binary not found in ~/.carol/bin"
-    echo "Build from source:"
-    echo "  cd ~/Documents/Poems/dev/carolcode"
-    echo "  bun install"
-    echo "  bun run packages/opencode/script/build.ts --single --skip-install"
-    echo "  cp packages/opencode/dist/opencode-windows-x64/bin/carolcode-x64.exe ~/.carol/bin/"
-fi
-
 CAROL_LINK="$WINDOWS_HOME/.local/bin/carol"
 CAROL_TARGET="$WINDOWS_HOME/.carol/bin/carol"
 if [[ -L "$CAROL_LINK" && "$(readlink "$CAROL_LINK")" == "$CAROL_TARGET" ]]; then
@@ -393,12 +379,12 @@ fi
 # ============================================================================
 # 11. Opencode (vanilla, via npm)
 # ============================================================================
-step "11. Opencode"
+step "11. Claude Code"
 
-if command -v opencode &>/dev/null; then
-    info "opencode already installed: $(which opencode)"
+if command -v claude &>/dev/null; then
+    info "claude already installed: $(which claude)"
 else
-    warn "Install opencode via: npm install -g opencode"
+    warn "Install Claude Code via: npm install -g @anthropic-ai/claude-code"
 fi
 
 # ============================================================================
@@ -460,8 +446,8 @@ Key paths:
   Build scripts:  ~/.config/nvim/scripts/build-debug.bat (Windows)
                   ~/.config/nvim/scripts/clean-build.sh  (cross-platform)
   CLI tools:      ~/.local/bin/ (oh-my-posh, zoxide, carol, END)
-  Carol:          ~/.carol/bin/ (carolcode binary + carol script)
-  Opencode:       npm global (separate from carol)
+  Carol:          ~/.carol/bin/carol
+  Claude Code:    npm global (@anthropic-ai/claude-code)
 
 nvim keybindings:
   <leader>bk  Clean build directory
