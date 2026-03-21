@@ -1,7 +1,27 @@
 -- Editor options
 local M = {}
 
+-- Augment PATH with platform-specific package manager bin directories.
+-- Required for external tools (rg, fd, etc.) that plugins resolve via PATH.
+-- MacPorts: /opt/local/bin | Homebrew: /opt/homebrew/bin | MSYS2: C:/msys64/mingw64/bin
+local function augment_path()
+  local is_windows = vim.fn.has('win32') == 1
+  local sep = is_windows and ';' or ':'
+  local candidates = is_windows
+    and { 'C:/msys64/mingw64/bin', 'C:/msys64/usr/bin' }
+    or  { '/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin' }
+
+  for _, dir in ipairs(candidates) do
+    local current = vim.env.PATH or ''
+    if vim.fn.isdirectory(dir) == 1 and not current:find(dir, 1, true) then
+      vim.env.PATH = dir .. sep .. current
+    end
+  end
+end
+
 function M.setup()
+  augment_path()
+
   -- Disable unused providers
   vim.g.loaded_node_provider = 0
   vim.g.loaded_perl_provider = 0
