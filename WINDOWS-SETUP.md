@@ -35,7 +35,7 @@ Clone the config repo first, then run the script from MSYS2 MinGW64 **as Adminis
 
 ```sh
 git clone git@github.com:jrengmusic/.config.git ~/.config
-bash ~/.config/scripts/setup-windows.sh
+bash ~/.config/scripts/setup.sh
 ```
 
 > Must run as Administrator — the script writes to system PATH.
@@ -260,7 +260,7 @@ Terminal behavior on build:
 ~/.config/                              # SSOT for all machines
 ├── WINDOWS-SETUP.md                    # This file
 ├── scripts/
-│   └── setup-windows.sh               # Automated setup script
+│   └── setup.sh               # Automated setup script
 ├── end/
 │   └── end.lua                         # END terminal config (OS-branched)
 ├── zsh/

@@ -1,11 +1,11 @@
 #!/bin/bash
 # ============================================================================
-# setup-windows.sh — Windows dev environment setup (MSYS2/zsh)
+# setup.sh — Windows dev environment setup (MSYS2/zsh)
 # ============================================================================
 # Prerequisite: MSYS2 installed at C:\msys64
 #
 # Run from MSYS2 MinGW64 shell:
-#   bash ~/.config/scripts/setup-windows.sh
+#   bash ~/.config/scripts/setup.sh
 #
 # This script replicates the macOS dev environment on Windows:
 #   - MSYS2 home → Windows home
@@ -39,7 +39,7 @@ step()  { echo ""; echo "${GREEN}━━━ $1 ━━━${NC}"; }
 step "Preflight checks"
 
 if [[ "$OSTYPE" != "msys" && "$OSTYPE" != "cygwin" ]]; then
-    error "This script must be run from MSYS2. Exiting."
+    error "This script only runs on Windows (MSYS2). Exiting."
     exit 1
 fi
 

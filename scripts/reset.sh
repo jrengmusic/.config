@@ -1,10 +1,10 @@
 #!/bin/bash
 # ============================================================================
-# teardown-windows.sh — Undo everything setup-windows.sh did
+# reset.sh — Undo everything setup.sh did
 # ============================================================================
 # Returns machine to blank MSYS2 + git state.
 # Run from MSYS2 MinGW64 shell as Administrator:
-#   bash ~/.config/scripts/teardown-windows.sh
+#   bash ~/.config/scripts/reset.sh
 #
 # After running, only MSYS2 base + git remain. ~/.config/ is NOT deleted
 # (you need it to re-run setup).
@@ -27,7 +27,7 @@ step()  { echo ""; echo "${GREEN}━━━ $1 ━━━${NC}"; }
 step "Preflight"
 
 if [[ "$OSTYPE" != "msys" && "$OSTYPE" != "cygwin" ]]; then
-    error "This script must be run from MSYS2. Exiting."
+    error "This script only runs on Windows (MSYS2). Exiting."
     exit 1
 fi
 
@@ -101,12 +101,19 @@ PACMAN_PKGS=(
     mingw-w64-x86_64-ripgrep
 )
 
+# Remove all at once to avoid dependency ordering issues
+INSTALLED=()
 for pkg in "${PACMAN_PKGS[@]}"; do
-    if pacman -Q "$pkg" &>/dev/null; then
-        pacman -Rns --noconfirm "$pkg" 2>/dev/null || warn "Failed to remove: $pkg"
-        info "Removed: $pkg"
-    fi
+    pacman -Q "$pkg" &>/dev/null && INSTALLED+=("$pkg")
 done
+if [[ ${#INSTALLED[@]} -gt 0 ]]; then
+    pacman -Rns --noconfirm "${INSTALLED[@]}" 2>/dev/null || \
+        pacman -Rd --noconfirm "${INSTALLED[@]}" 2>/dev/null || \
+        warn "Some packages failed to remove"
+    info "Removed: ${INSTALLED[*]}"
+else
+    info "No managed packages installed"
+fi
 
 # ============================================================================
 # 4. Claude Code (npm global)
