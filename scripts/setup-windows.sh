@@ -377,14 +377,16 @@ else
 fi
 
 # ============================================================================
-# 11. Opencode (vanilla, via npm)
+# 11. Claude Code (via npm — native installer does not work on Windows/MSYS2)
 # ============================================================================
 step "11. Claude Code"
 
 if command -v claude &>/dev/null; then
     info "claude already installed: $(which claude)"
 else
-    warn "Install Claude Code via: npm install -g @anthropic-ai/claude-code"
+    info "Installing Claude Code via npm..."
+    npm install -g @anthropic-ai/claude-code
+    info "Note: npm may warn about native installation — ignore it, npm is the only working method on Windows/MSYS2"
 fi
 
 # ============================================================================

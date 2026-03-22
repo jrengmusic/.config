@@ -34,8 +34,6 @@ tmux select-pane -t 5 -T CARETAKER
 
 
 
-sleep 1
-tmux send-keys -t "3" 'opencode --prompt "@.carol/CAROL.md you are assigned as SCAFFOLDER register yourself"' Enter
 tmux select-pane -t 3 -T SCAFFOLDER
 
 

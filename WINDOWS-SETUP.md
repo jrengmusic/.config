@@ -130,7 +130,7 @@ All tool binaries are symlinked into `~/.local/bin/` — the single directory on
 | `python` | `/mingw64/bin/python.exe` |
 | `python3` | `/mingw64/bin/python3.exe` |
 | `bun` | `~/.bun/bin/bun.exe` |
-| `opencode` | `~/.opencode/bin/opencode.exe` |
+| `carol` | `~/.carol/bin/carol` |
 
 ### 6. zsh Dotfile Symlinks
 
@@ -140,23 +140,19 @@ All tool binaries are symlinked into `~/.local/bin/` — the single directory on
 
 With `XDG_CONFIG_HOME=C:\Users\<name>\.config` set as a Windows env var, nvim reads `~/.config/nvim` directly — no symlink needed. Same as macOS.
 
-### 9. Carol + Opencode
-
-Two separate tools, must not be confused:
+### 9. Carol + Claude Code
 
 | Tool | Binary Location | Command | Install Method |
 |---|---|---|---|
-| opencode | `~/.../npm/opencode` | `opencode` | `npm install -g opencode` |
-| carolcode | `~/.carol/bin/carolcode-x64.exe` | `carol` | Build from source |
-| carol (script) | `~/.carol/bin/carol` → `~/.local/bin/carol` | `carol` | Symlink |
+| Claude Code | npm global | `claude` | `npm install -g @anthropic-ai/claude-code` |
+| carol (script) | `~/.carol/bin/carol` → `~/.local/bin/carol` | `carol` | Symlink from cloned repo |
 
-To build carolcode from source:
+**Claude Code on Windows**: The native installers (`.ps1`, `.cmd`, `winget`) do not work under MSYS2/zsh. npm is the only working method. Ignore the "moving to native installation" warning — it does not apply here.
+
+Clone carol repo:
 
 ```sh
-cd ~/Documents/Poems/dev/carolcode
-bun install
-bun run packages/opencode/script/build.ts --single --skip-install
-cp packages/opencode/dist/opencode-windows-x64/bin/carolcode-x64.exe ~/.carol/bin/
+git clone git@github.com:jrengmusic/carol.git ~/.carol
 ```
 
 ## Key Differences from macOS
@@ -288,8 +284,8 @@ Terminal behavior on build:
 ~/.zshrc → ~/.config/zsh/zshrc          # Symlink (same as macOS)
 ~/.zprofile → ~/.config/zsh/zprofile   # Symlink (same as macOS)
 ~/.local/bin/                           # All tool symlinks (single PATH entry)
-~/.carol/                               # Carol repo + carolcode binary
-~/.opencode/                            # Opencode data (binary from npm)
+~/.carol/                               # Carol repo + carol script
+~/.local/bin/claude                     # Claude Code (npm global symlink)
 
 /c/msys64/etc/nsswitch.conf             # MSYS2: db_home: windows
 /c/msys64/mingw64.ini                   # MSYS2: native symlinks, MSYSTEM
