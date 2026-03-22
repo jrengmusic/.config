@@ -487,3 +487,6 @@ nvim keybindings:
   <F5>        Configure DAP (select format/DAW/scheme)
 
 EOF
+
+# Reload shell so new env vars take effect immediately
+exec zsh
