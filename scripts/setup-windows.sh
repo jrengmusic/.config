@@ -22,16 +22,16 @@ set -e
 # Without this, ln -sf silently creates file copies on Windows/MSYS2.
 export MSYS=winsymlinks:nativestrict
 
-# Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+# Colors — use $'...' so echo doesn't need -e (which mangles \b in paths)
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+RED=$'\033[0;31m'
+NC=$'\033[0m'
 
-info()  { echo -e "${GREEN}[OK]${NC} $1"; }
-warn()  { echo -e "${YELLOW}[!!]${NC} $1"; }
-error() { echo -e "${RED}[ERR]${NC} $1"; }
-step()  { echo -e "\n${GREEN}━━━ $1 ━━━${NC}"; }
+info()  { echo "${GREEN}[OK]${NC} $1"; }
+warn()  { echo "${YELLOW}[!!]${NC} $1"; }
+error() { echo "${RED}[ERR]${NC} $1"; }
+step()  { echo ""; echo "${GREEN}━━━ $1 ━━━${NC}"; }
 
 # ============================================================================
 # Preflight checks
@@ -54,6 +54,33 @@ if [[ ! -d "$WINDOWS_HOME" ]]; then
     exit 1
 fi
 info "Windows home: $WINDOWS_HOME"
+
+# ============================================================================
+# 0. Reset — clear all env vars this script manages so they're always set fresh
+# ============================================================================
+step "0. Reset previous environment"
+
+# User env vars managed by this script
+MANAGED_USER_VARS=(MSYS MSYSTEM MSYS2_PATH_TYPE XDG_CONFIG_HOME CLAUDE_CODE_GIT_BASH_PATH)
+for var in "${MANAGED_USER_VARS[@]}"; do
+    powershell.exe -Command "[System.Environment]::SetEnvironmentVariable('$var', \$null, 'User')" 2>/dev/null
+done
+info "Cleared user env vars: ${MANAGED_USER_VARS[*]}"
+
+# System PATH entries managed by this script — remove stale/corrupted entries
+MANAGED_PATH_ENTRIES=(
+    'C:\\msys64\\usr\\bin'
+    'C:\\msys64\\mingw64\\bin'
+    "$WIN_HOME\\.local\\bin"
+)
+for entry in "${MANAGED_PATH_ENTRIES[@]}"; do
+    powershell.exe -Command "
+        \$path = [System.Environment]::GetEnvironmentVariable('PATH', 'Machine')
+        \$entries = \$path -split ';' | Where-Object { \$_ -ne '$entry' -and \$_ -ne '' }
+        [System.Environment]::SetEnvironmentVariable('PATH', (\$entries -join ';'), 'Machine')
+    " 2>/dev/null
+done
+info "Cleaned managed entries from system PATH"
 
 # ============================================================================
 # 1. MSYS2 home → Windows home
@@ -119,7 +146,7 @@ set_win_env "MSYS" "winsymlinks:nativestrict"
 set_win_env "MSYSTEM" "MINGW64"
 set_win_env "MSYS2_PATH_TYPE" "inherit"
 set_win_env "XDG_CONFIG_HOME" "$WIN_HOME\\.config"
-set_win_env "CLAUDE_CODE_GIT_BASH_PATH" "C:\\\\msys64\\\\usr\\\\bin\\\\bash.exe"
+set_win_env "CLAUDE_CODE_GIT_BASH_PATH" "C:\\msys64\\usr\\bin\\bash.exe"
 
 add_to_system_path() {
     local entry="$1"
