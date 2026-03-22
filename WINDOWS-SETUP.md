@@ -80,6 +80,7 @@ Sets these as **Windows user environment variables** (persistent across reboots)
 | `MSYSTEM` | `MINGW64` | Use MinGW64 toolchain |
 | `MSYS2_PATH_TYPE` | `inherit` | Inherit Windows PATH |
 | `XDG_CONFIG_HOME` | `C:\Users\<name>\.config` | nvim and tools use `~/.config/` as SSOT (same as macOS) |
+| `CLAUDE_CODE_GIT_BASH_PATH` | `C:\msys64\usr\bin\bash.exe` | Claude Code uses MSYS2 bash (no Git for Windows) |
 
 Also adds to **Windows system PATH**:
 - `C:\msys64\usr\bin` — zsh, git, unzip
@@ -147,7 +148,7 @@ With `XDG_CONFIG_HOME=C:\Users\<name>\.config` set as a Windows env var, nvim re
 | Claude Code | npm global | `claude` | `npm install -g @anthropic-ai/claude-code` |
 | carol (script) | `~/.carol/bin/carol` → `~/.local/bin/carol` | `carol` | Symlink from cloned repo |
 
-**Claude Code on Windows**: The native installers (`.ps1`, `.cmd`, `winget`) do not work under MSYS2/zsh. npm is the only working method. Ignore the "moving to native installation" warning — it does not apply here.
+**Claude Code on Windows**: The native installers (`.ps1`, `.cmd`) do not work under MSYS2/zsh. npm is the only working method. Ignore the "moving to native installation" warning — it does not apply here. The `CLAUDE_CODE_GIT_BASH_PATH` env var must point to MSYS2 bash since Git for Windows is not installed.
 
 Clone carol repo:
 

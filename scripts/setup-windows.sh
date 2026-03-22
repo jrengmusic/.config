@@ -119,6 +119,7 @@ set_win_env "MSYS" "winsymlinks:nativestrict"
 set_win_env "MSYSTEM" "MINGW64"
 set_win_env "MSYS2_PATH_TYPE" "inherit"
 set_win_env "XDG_CONFIG_HOME" "$WIN_HOME\\.config"
+set_win_env "CLAUDE_CODE_GIT_BASH_PATH" "C:\\msys64\\usr\\bin\\bash.exe"
 
 add_to_system_path() {
     local entry="$1"

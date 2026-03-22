@@ -152,6 +152,11 @@ fi
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
+# Claude Code — point to MSYS2 bash on Windows (no Git for Windows)
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  export CLAUDE_CODE_GIT_BASH_PATH="C:\\msys64\\usr\\bin\\bash.exe"
+fi
+
 # Oh my posh
 if [ "$TERM_PROGRAM" != "Apple_Terminal" ] && command -v oh-my-posh &>/dev/null; then
   eval "$(oh-my-posh init zsh --config ~/.config/omp/gfx.json)"
