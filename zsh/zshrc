@@ -32,9 +32,7 @@ alias inf='cd ~/Documents/Poems/inf'
 alias dev='cd ~/Documents/Poems/dev'
 alias modules='cd ~/Documents/Poems/inf/___modules___/'
 
-command -v eza &>/dev/null && alias ls='eza -la'
-alias keju='~/Documents/Poems/inf/___user-modules___/automation/Keju_x64'
-
+command -v eza &>/dev/null && alias ls='eza'
 
 # fzf configuration
 # Dot directories to always include

@@ -21,9 +21,8 @@
 -- Invalid or missing values fall back to defaults silently.
 -- Reload with Cmd+R (no restart needed).
 --
--- Colour format: "#AARRGGBB" where AA = alpha, RR/GG/BB = red/green/blue.
---   - "#RRGGBB" is also accepted (fully opaque, alpha = FF).
---   - "#RGB" shorthand is supported (each nibble expanded to two digits).
+-- Colour format: "#RRGGBB" (fully opaque) or "#RRGGBBAA" (with alpha).
+--   - "#RGB" and "#RGBA" shorthand supported (each nibble expanded to two digits).
 --   - "rgba(r, g, b, a)" functional notation (a is 0.0 - 1.0).
 --
 -- Key binding format: "modifier+key" (e.g. "cmd+c", "ctrl+shift+t").
@@ -72,7 +71,7 @@ END = {
 
 		-- Blink interval in milliseconds (100 - 5000).
 		-- Full cycle = 2x this value (on for interval, off for interval).
-		blink_interval = 500,
+		blink_interval = 500.0,
 
 		-- Force user-configured cursor, ignoring DECSCUSR and OSC 12.
 		-- When true, programs cannot change cursor shape or colour.
@@ -85,72 +84,94 @@ END = {
 	--
 	-- The 16 ANSI colours are used by terminal programs via SGR escape codes.
 	-- Indices 0-7 are normal colours, 8-15 are bright variants.
-	-- Format: "#AARRGGBB" (alpha + red + green + blue).
+	-- Format: "#RRGGBB" (opaque) or "#RRGGBBAA" (with alpha).
 	--
 
 	colours = {
 		-- Default text foreground colour.
-		foreground = "#FF4E8C93",
+		foreground = "#4E8C93",
 
 		-- Default background colour.
 		-- Alpha channel controls terminal background opacity.
-		background = "#E0090D12",
+		background = "#090D12E0",
 
 		-- Cursor colour.
 		-- Can be overridden per-session by programs via OSC 12.
-		cursor = "#FF4E8C93",
+		cursor = "#4E8C93",
 
 		-- Selection highlight colour.
 		-- Semi-transparent recommended so text remains readable.
-		selection = "#8000C8D8",
+		selection = "#00C8D880",
+
+		-- Selection-mode cursor colour.
+		-- Shown instead of the normal cursor when selection mode is active.
+		selection_cursor = "#00D8FF",
 
 		-- ANSI colour 0: black
-		black = "#FF090D12",
+		black = "#090D12",
 
 		-- ANSI colour 1: red
-		red = "#FFFC704C",
+		red = "#FC704C",
 
 		-- ANSI colour 2: green
-		green = "#FFC5F0E9",
+		green = "#C5F0E9",
 
 		-- ANSI colour 3: yellow
-		yellow = "#FFF3F5C5",
+		yellow = "#F3F5C5",
 
 		-- ANSI colour 4: blue
-		blue = "#FF8CC9D9",
+		blue = "#8CC9D9",
 
 		-- ANSI colour 5: magenta
-		magenta = "#FF519299",
+		magenta = "#519299",
 
 		-- ANSI colour 6: cyan
-		cyan = "#FF699DAA",
+		cyan = "#699DAA",
 
 		-- ANSI colour 7: white
-		white = "#FFFF0000",
+		white = "#FF0000",
 
 		-- ANSI colour 8: bright black
-		bright_black = "#FF33535B",
+		bright_black = "#33535B",
 
 		-- ANSI colour 9: bright red
-		bright_red = "#FFFC704C",
+		bright_red = "#FC704C",
 
 		-- ANSI colour 10: bright green
-		bright_green = "#FFBAFFFD",
+		bright_green = "#BAFFFD",
 
 		-- ANSI colour 11: bright yellow
-		bright_yellow = "#FFFEFFD2",
+		bright_yellow = "#FEFFD2",
 
 		-- ANSI colour 12: bright blue
-		bright_blue = "#FF67DFEF",
+		bright_blue = "#67DFEF",
 
 		-- ANSI colour 13: bright magenta
-		bright_magenta = "#FF01C2D2",
+		bright_magenta = "#01C2D2",
 
 		-- ANSI colour 14: bright cyan
-		bright_cyan = "#FF00C8D8",
+		bright_cyan = "#00C8D8",
 
 		-- ANSI colour 15: bright white
-		bright_white = "#FFBAFFFD",
+		bright_white = "#BAFFFD",
+
+		-- Status bar full background colour.
+		-- Default matches the active tab background (tab.active).
+		status_bar = "#090D12",
+
+		-- Status bar mode label background colour.
+		-- Default matches the active tab indicator colour (tab.indicator).
+		status_bar_label_bg = "#01C2D2",
+
+		-- Status bar mode label text colour.
+		status_bar_label_fg = "#444444",
+
+		-- Open File mode hint label background colour.
+		-- Shown as the badge background behind single- or double-letter hint keys.
+		hint_label_bg = "#FFD700",
+
+		-- Open File mode hint label foreground (text) colour.
+		hint_label_fg = "#111111",
 	},
 
 	-- ========================================================================
@@ -162,10 +183,10 @@ END = {
 		title = "END",
 
 		-- Initial window width in pixels.
-		width = 640,
+		width = 640.0,
 
 		-- Initial window height in pixels.
-		height = 480,
+		height = 480.0,
 
 		-- Window background tint colour (no alpha, used for blur tint).
 		colour = "#090D12",
@@ -202,22 +223,22 @@ END = {
 		size = 24.0,
 
 		-- Active tab text colour.
-		foreground = "#FF00C8D8",
+		foreground = "#00C8D8",
 
 		-- Inactive tab text colour.
-		inactive = "#FF33535B",
+		inactive = "#33535B",
 
 		-- Tab bar position: "top", "bottom", "left", "right".
 		position = "left",
 
 		-- Tab separator line colour.
-		line = "#FF2C4144",
+		line = "#2C4144",
 
 		-- Active tab background colour.
-		active = "#FF002B35",
+		active = "#002B35",
 
 		-- Active tab indicator colour.
-		indicator = "#FF01C2D2",
+		indicator = "#01C2D2",
 	},
 
 	-- ========================================================================
@@ -226,7 +247,7 @@ END = {
 
 	menu = {
 		-- Popup menu background opacity (0.0 - 1.0).
-		opacity = 0.6499999761581421,
+		opacity = 0.65,
 	},
 
 	-- ========================================================================
@@ -250,13 +271,19 @@ END = {
 
 	shell = {
 		-- Shell program name or absolute path.
-		-- Examples: "zsh", "bash", "fish", "/opt/homebrew/bin/fish"
 		program = "zsh",
 
-		-- Arguments passed to the shell program (space-separated string).
-		-- Default: "-l" on Unix (login shell), "" on Windows.
-		-- Set to "" to launch the shell with no arguments.
+		-- Arguments passed to the shell program.
 		args = "-l",
+
+		-- Enable automatic shell integration (OSC 133 markers).
+		-- When true, END creates shell hook scripts in ~/.config/end/
+		-- and injects them on shell startup. This enables:
+		--   - Clickable file links in command output
+		--   - Output block detection for the Open File feature
+		-- Supported shells: zsh, bash, fish.
+		-- Set to false to disable and remove integration scripts.
+		integration = true,
 	},
 
 	-- ========================================================================
@@ -265,10 +292,10 @@ END = {
 
 	terminal = {
 		-- Maximum number of scrollback lines retained in the ring buffer (100 - 1000000).
-		scrollback_lines = 10000,
+		scrollback_lines = 10000.0,
 
 		-- Lines scrolled per mouse wheel tick and per Shift+PgUp/PgDn step (1 - 100).
-		scroll_step = 5,
+		scroll_step = 5.0,
 
 		-- Grid padding in logical pixels — space between the window edge and the
 		-- terminal grid on each side.  Four values in CSS order:
@@ -276,7 +303,7 @@ END = {
 		-- All four values must be present.  Valid range: 0 - 200.
 		-- Example: { 10, 10, 10, 10 } gives equal padding on all sides.
 		--          { 4, 10, 10, 10 } gives a tighter top edge.
-		padding = { 10, 10, 10, 10 },
+		padding = { 10.0, 10.0, 10.0, 10.0 },
 
 		-- Separator for multiple dropped file paths.
 		-- "space" joins paths with spaces (shell convention).
@@ -295,10 +322,10 @@ END = {
 
 	pane = {
 		-- Pane divider bar colour.
-		bar_colour = "#FF1B2A31",
+		bar_colour = "#1B2A31",
 
 		-- Pane divider bar colour when dragging or hovering.
-		bar_highlight = "#FF4E8C93",
+		bar_highlight = "#4E8C93",
 	},
 
 	-- ========================================================================
@@ -356,7 +383,7 @@ END = {
 
 		-- Prefix key timeout in milliseconds (100 - 5000).
 		-- How long to wait for a pane action key after pressing prefix.
-		prefix_timeout = 1000,
+		prefix_timeout = 1000.0,
 
 		-- Focus pane to the left. Prefix-mode key.
 		pane_left = "h",
@@ -373,11 +400,61 @@ END = {
 		-- Insert a literal newline (LF) instead of carriage return.
 		newline = "shift+return",
 
+		-- Enter text selection mode. Prefix-mode key.
+		enter_selection = "[",
+
+		-- Enter open-file mode (hyperlink hint labels). Prefix-mode key.
+		enter_open_file = "o",
+
+		-- ---- Selection mode ----
+
+		-- Move cursor up in selection mode.
+		selection_up = "k",
+
+		-- Move cursor down in selection mode.
+		selection_down = "j",
+
+		-- Move cursor left in selection mode.
+		selection_left = "h",
+
+		-- Move cursor right in selection mode.
+		selection_right = "l",
+
+		-- Toggle character-wise visual selection.
+		selection_visual = "v",
+
+		-- Toggle line-wise visual selection.
+		selection_visual_line = "shift+v",
+
+		-- Toggle block visual selection.
+		selection_visual_block = "ctrl+v",
+
+		-- Yank (copy) the current selection and exit selection mode.
+		selection_copy = "y",
+
+		-- Jump to top of buffer (press twice: gg).
+		selection_top = "g",
+
+		-- Jump to bottom of buffer.
+		selection_bottom = "shift+g",
+
+		-- Jump to start of current line.
+		selection_line_start = "0",
+
+		-- Jump to end of current line.
+		selection_line_end = "$",
+
+		-- Exit selection mode.
+		selection_exit = "escape",
+
 		-- Open the action list (command palette).
 		action_list = "?",
 
 		-- Action list position: "top" or "bottom".
 		action_list_position = "top",
+
+		-- Status bar position: "top" or "bottom".
+		status_bar_position = "bottom",
 	},
 
 	-- ========================================================================
@@ -387,7 +464,7 @@ END = {
 	popup = {
 		-- Default popup width as a fraction of the window width (0.1 - 1.0).
 		-- Individual popup entries can override this.
-		width = 0.6000000238418579,
+		width = 0.6,
 
 		-- Default popup height as a fraction of the window height (0.1 - 1.0).
 		-- Individual popup entries can override this.
@@ -395,6 +472,17 @@ END = {
 
 		-- Default popup position: "center".
 		position = "center",
+	},
+
+	-- ========================================================================
+	-- HYPERLINKS
+	-- ========================================================================
+
+	hyperlinks = {
+		-- Editor command for opening files from hyperlinks and Open File mode.
+		-- The command receives the file path as its first argument.
+		-- Example: "nvim", "vim", "nano", "/usr/local/bin/hx"
+		editor = "nvim",
 	},
 
 	-- ========================================================================
