@@ -169,6 +169,12 @@ add_to_system_path "$WIN_HOME\\.local\\bin"
 # ============================================================================
 step "4. MSYS2 packages"
 
+# Remove stale lock from interrupted pacman runs
+if [[ -f /var/lib/pacman/db.lck ]]; then
+    rm -f /var/lib/pacman/db.lck
+    warn "Removed stale pacman lock file"
+fi
+
 PACMAN_PKGS=(
     zsh
     git

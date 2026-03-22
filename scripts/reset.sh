@@ -84,6 +84,12 @@ done
 # ============================================================================
 step "3. Remove MSYS2 packages"
 
+# Remove stale lock from interrupted pacman runs
+if [[ -f /var/lib/pacman/db.lck ]]; then
+    rm -f /var/lib/pacman/db.lck
+    warn "Removed stale pacman lock file"
+fi
+
 PACMAN_PKGS=(
     zsh
     mingw-w64-x86_64-git-lfs
