@@ -417,6 +417,18 @@ else
     info "Note: npm may warn about native installation — ignore it, npm is the only working method on Windows/MSYS2"
 fi
 
+# Global CLAUDE.md — symlink from config repo to ~/.claude/
+mkdir -p "$WINDOWS_HOME/.claude"
+CLAUDE_MD_SRC="$WINDOWS_HOME/.config/claude/CLAUDE.md"
+CLAUDE_MD_DST="$WINDOWS_HOME/.claude/CLAUDE.md"
+if [[ -L "$CLAUDE_MD_DST" && "$(readlink "$CLAUDE_MD_DST")" == "$CLAUDE_MD_SRC" ]]; then
+    info "CLAUDE.md symlink already correct"
+else
+    [[ -e "$CLAUDE_MD_DST" && ! -L "$CLAUDE_MD_DST" ]] && rm -f "$CLAUDE_MD_DST"
+    ln -sf "$CLAUDE_MD_SRC" "$CLAUDE_MD_DST"
+    info "Symlinked CLAUDE.md → $CLAUDE_MD_SRC"
+fi
+
 # ============================================================================
 # 12. Windows software (manual steps)
 # ============================================================================

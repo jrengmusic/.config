@@ -20,6 +20,8 @@
 !zsh/**
 !kitty/
 !kitty/**
+!claude/
+!claude/**
 
 # Repo-level docs and scripts
 !WINDOWS-SETUP.md
