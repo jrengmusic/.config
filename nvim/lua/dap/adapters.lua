@@ -7,23 +7,24 @@ function M.setup()
 
   if is_windows then
     -- Windows standalone: GDB native DAP (proper GUI launch + stdout capture)
-    local gdbPath = 'C:\\msys64\\mingw64\\bin\\gdb.exe'
+    -- REPLACED BY WHATDBG — testing whatdbg as standalone adapter
+    -- local gdbPath = 'C:\\msys64\\mingw64\\bin\\gdb.exe'
+    --
+    -- if vim.fn.executable(gdbPath) == 1 then
+    --   dap.adapters.gdb = {
+    --     type = 'executable',
+    --     command = gdbPath,
+    --     args = {
+    --       '--nx',
+    --       '--interpreter=dap',
+    --       '--init-eval-command', 'set new-console on',
+    --       '--init-eval-command', 'set shell off',
+    --     },
+    --   }
+    -- end
 
-    if vim.fn.executable(gdbPath) == 1 then
-      dap.adapters.gdb = {
-        type = 'executable',
-        command = gdbPath,
-        args = {
-          '--nx',
-          '--interpreter=dap',
-          '--init-eval-command', 'set new-console on',
-          '--init-eval-command', 'set shell off',
-        },
-      }
-    end
-
-    -- Windows plugin: whatdbg (dbgeng-based, reads PDB natively, tracks DLL loads)
-    local whatdbgPath = vim.fn.expand('~/Documents/Poems/dev/whatdbg/Builds/Ninja/whatdbg.exe')
+    -- Windows: whatdbg (dbgeng-based, reads PDB natively, tracks DLL loads)
+    local whatdbgPath = vim.fn.expand('~/Documents/Poems/dev/whatdbg/Builds/Ninja/whatdbg_artefacts/Debug/whatdbg.exe')
 
     if vim.fn.executable(whatdbgPath) == 1 then
       dap.adapters.whatdbg = {

@@ -335,7 +335,8 @@ function M.setup()
   -- Standalone: gdb on Windows (GUI launch + stdout), codelldb on Mac
   -- Plugin: codelldb on all platforms (attach to DAW)
   local is_windows = vim.fn.has('win32') == 1
-  local standalone_adapter = is_windows and 'gdb' or 'codelldb'
+  -- local standalone_adapter = is_windows and 'gdb' or 'codelldb'  -- ORIGINAL: gdb for standalone
+  local standalone_adapter = is_windows and 'whatdbg' or 'codelldb'  -- TESTING: whatdbg for standalone
   local plugin_adapter = is_windows and 'whatdbg' or 'codelldb'
 
   dap.configurations.cpp = {

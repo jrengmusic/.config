@@ -32,7 +32,11 @@ alias inf='cd ~/Documents/Poems/inf'
 alias dev='cd ~/Documents/Poems/dev'
 alias modules='cd ~/Documents/Poems/inf/___modules___/'
 
-command -v eza &>/dev/null && alias ls='eza'
+if [[ $OPERATING_SYSTEM == "windows" ]]; then
+  command -v eza &>/dev/null && alias ls='eza -a --ignore-glob=".*"'
+else
+  command -v eza &>/dev/null && alias ls='eza'
+fi
 
 # fzf configuration
 # Dot directories to always include
