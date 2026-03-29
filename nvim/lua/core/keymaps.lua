@@ -353,14 +353,14 @@ function M.setupDap()
       -- Standalone: only ask for build scheme
       dapConfig.showStandaloneSchemeDialog(function(config)
         if config then
-          vim.notify('Standalone config saved. Press <leader><C-r> to build.')
+          vim.notify('Standalone config saved. Press <leader>br to build.')
         end
       end)
     elseif projectType == 'plugin' then
       -- Plugin: ask for format + DAW + build scheme
       dapConfig.showDawFormatDialog(function(config)
         if config then
-          vim.notify('Plugin config saved. Press <leader><C-r> to build.')
+          vim.notify('Plugin config saved. Press <leader>br to build.')
         end
       end)
     else
