@@ -19,6 +19,9 @@ elif [[ $OPERATING_SYSTEM == "windows" ]]; then
   _ZSH_HL="/usr/share/zsh-syntax-highlighting"
 fi
 
+export EDITOR=nvim
+export VISUAL=nvim
+
 alias vim="nvim"
 alias :q="exit"
 
