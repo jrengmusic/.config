@@ -91,6 +91,13 @@ function M.setup()
     hs_call("require('debug-layout').restoreNormalLayout()")
   end
 
+  -- Fires on the outgoing terminate request (e.g. STOP button, dap.terminate()).
+  -- Guarantees dapui closes even when the adapter never responds with events.
+  dap.listeners.after.terminate.dapui_config = function()
+    dapui.close()
+    hs_call("require('debug-layout').restoreNormalLayout()")
+  end
+
   -- Focus nvim pane when breakpoint hit (macOS only — Hammerspoon not on Windows)
   dap.listeners.after.event_stopped.focus_nvim = function()
     hs_call("require('debug-layout').focusNvimPane()")
