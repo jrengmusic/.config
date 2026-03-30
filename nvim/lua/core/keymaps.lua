@@ -267,7 +267,6 @@ function M.setupDap()
         local buf = vim.api.nvim_win_get_buf(win)
         if vim.bo[buf].buftype == 'terminal' then
           vim.api.nvim_win_close(win, true)
-          break
         end
       end
 
@@ -443,7 +442,6 @@ function M.setupDap()
         local buf = vim.api.nvim_win_get_buf(win)
         if vim.bo[buf].buftype == 'terminal' then
           vim.api.nvim_win_close(win, true)
-          break
         end
       end
       vim.cmd('botright 15split')
