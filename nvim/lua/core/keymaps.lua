@@ -335,11 +335,24 @@ function M.setupDap()
     local script = cleanScript()
     vim.cmd('botright 20split')
     local buf = vim.api.nvim_create_buf(false, true)
+    local win = vim.api.nvim_get_current_win()
     vim.api.nvim_set_current_buf(buf)
+    local function closeTerminal(_, exit_code)
+      vim.schedule(function()
+        if vim.api.nvim_win_is_valid(win) then
+          vim.api.nvim_win_close(win, true)
+        end
+        if exit_code == 0 then
+          vim.notify('Clean succeeded', vim.log.levels.INFO)
+        else
+          vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+        end
+      end)
+    end
     if is_windows then
-      vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true})
+      vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = closeTerminal})
     else
-      vim.fn.termopen({script, root})
+      vim.fn.termopen({script, root}, {on_exit = closeTerminal})
     end
     vim.cmd('startinsert')
   end
