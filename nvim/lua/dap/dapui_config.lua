@@ -84,6 +84,13 @@ function M.setup()
     hs_call("require('debug-layout').restoreNormalLayout()")
   end
 
+  -- Covers adapters (e.g. whatdbg/dbgeng on Windows) that close the transport
+  -- without emitting event_terminated or event_exited.
+  dap.listeners.before.disconnect.dapui_config = function()
+    dapui.close()
+    hs_call("require('debug-layout').restoreNormalLayout()")
+  end
+
   -- Focus nvim pane when breakpoint hit (macOS only — Hammerspoon not on Windows)
   dap.listeners.after.event_stopped.focus_nvim = function()
     hs_call("require('debug-layout').focusNvimPane()")

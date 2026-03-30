@@ -24,7 +24,7 @@ function M.setup()
     -- end
 
     -- Windows: whatdbg (dbgeng-based, reads PDB natively, tracks DLL loads)
-    local whatdbgPath = vim.fn.expand('~/Documents/Poems/dev/whatdbg/Builds/Ninja/whatdbg_artefacts/Debug/whatdbg.exe')
+    local whatdbgPath = vim.fn.expand('~/.local/bin/whatdbg.exe')
 
     if vim.fn.executable(whatdbgPath) == 1 then
       dap.adapters.whatdbg = {
