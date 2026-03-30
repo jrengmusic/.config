@@ -401,6 +401,7 @@ function M.setupDap()
   -- Terminate + close DAW/App (auto-detects project type)
   vim.keymap.set('n', '<leader>dt', function()
     dap.terminate()
+    dapui.close()
     
     local projectType = dapConfig.detectProjectType()
     
