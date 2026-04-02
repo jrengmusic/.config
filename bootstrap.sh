@@ -1,11 +1,11 @@
 #!/bin/bash
 # ============================================================================
-# setup.sh — Windows dev environment setup (MSYS2/zsh)
+# bootstrap.sh — Windows dev environment setup (MSYS2/zsh)
 # ============================================================================
 # Prerequisite: MSYS2 installed at C:\msys64
 #
 # Run from MSYS2 MinGW64 or CLANGARM64 shell as Administrator:
-#   bash ~/.config/setup.sh
+#   bash ~/.config/bootstrap.sh
 #
 # Supports x64 (MINGW64) and ARM64 (CLANGARM64).
 # Architecture is auto-detected via PROCESSOR_ARCHITECTURE — uname -m is

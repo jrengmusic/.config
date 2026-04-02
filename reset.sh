@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# reset.sh — Undo everything setup.sh did
+# reset.sh — Undo everything bootstrap.sh did
 # ============================================================================
 # Returns machine to blank MSYS2 + git state.
 # Run from MSYS2 MinGW64 or CLANGARM64 shell as Administrator:
@@ -65,7 +65,7 @@ esac
 info "MSYSTEM=$MSYSTEM → PKG_PREFIX=${PKG_PREFIX}-"
 
 echo ""
-echo "${RED}This will undo everything setup.sh installed.${NC}"
+echo "${RED}This will undo everything bootstrap.sh installed.${NC}"
 echo "MSYS2 base + git will remain. ~/.config/ will NOT be deleted."
 echo ""
 read -r -p "Continue? [y/N] " confirm
@@ -264,7 +264,7 @@ What remains:
   git                 (MSYS2 git package)
 
 To re-setup:
-  bash ~/.config/setup.sh
+  bash ~/.config/bootstrap.sh
 
 Note: Restart MSYS2 for ini/nsswitch changes to take effect.
 After restart, ~ will be /home/<user> again (not Windows home).

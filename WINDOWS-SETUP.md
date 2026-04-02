@@ -68,20 +68,20 @@ Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, z
 
 ### Bootstrap (fresh machine — do this once)
 
-MSYS2 ships without git or openssh. `pre-setup.sh` handles the bootstrap before `.config` exists.
+MSYS2 ships without git or openssh. `install.sh` handles the bootstrap before `.config` exists.
 
 ```sh
 # 1. Launch MSYS2 (CLANGARM64 on ARM64, MINGW64 on x64)
 #    No Administrator needed for this step.
 
-# 2. Run pre-setup (installs git + openssh, sets up SSH key, clones .config)
-curl -fsSL https://raw.githubusercontent.com/jrengmusic/.config/main/pre-setup.sh | bash
+# 2. Run install.sh (installs git + openssh, sets up SSH key, clones .config, chains to bootstrap.sh)
+curl -fsSL https://raw.githubusercontent.com/jrengmusic/.config/main/install.sh | bash
 
-# 3. Relaunch MSYS2 as Administrator, then run setup
-bash /c/Users/$(whoami)/.config/setup.sh
+
+bash /c/Users/$(whoami)/.config/bootstrap.sh
 ```
 
-> setup.sh must run as Administrator — it writes to system PATH.
+> bootstrap.sh must run as Administrator — it writes to system PATH.
 > Launch via **CLANGARM64** shortcut on ARM64 Windows, **MINGW64** on x64.
 
 Then restart MSYS2 and launch nvim to install Mason tools:
@@ -304,7 +304,7 @@ Terminal behavior on build:
 ```
 ~/.config/                              # SSOT for all machines
 ├── WINDOWS-SETUP.md                    # This file
-├── setup.sh                            # Automated setup script (arch-aware: x64 + ARM64)
+├── bootstrap.sh                        # Automated setup script (arch-aware: x64 + ARM64)
 ├── reset.sh                            # Teardown script (arch-aware)
 ├── end/
 │   └── end.lua                         # END terminal config (OS-branched)
