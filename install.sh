@@ -111,17 +111,24 @@ fi
 # ============================================================================
 step "4. Start SSH agent"
 
+if [[ -z "$SSH_KEY" || ! -f "$SSH_KEY" ]]; then
+    error "No SSH key available — cannot continue. Add a key and re-run."
+    exit 1
+fi
+
 eval "$(ssh-agent -s)" > /dev/null
 ssh-add "$SSH_KEY"
-info "SSH agent started, key loaded"
+info "SSH agent started, key loaded: $SSH_KEY"
 
 info "Testing GitHub connection..."
-if ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+# ssh -T always exits 1 even on success — capture output, don't rely on exit code
+SSH_TEST=$(ssh -T git@github.com 2>&1 || true)
+if echo "$SSH_TEST" | grep -q "successfully authenticated"; then
     info "GitHub auth OK"
 else
-    warn "If you see 'Hi <user>! You've successfully authenticated' above, auth is fine."
+    warn "$SSH_TEST"
     warn "If you see 'Permission denied', the public key is not on GitHub yet:"
-    warn "  cat ~/.ssh/id_ed25519.pub  →  https://github.com/settings/keys"
+    warn "  cat ${SSH_KEY}.pub  →  https://github.com/settings/keys"
     read -r -p "Press Enter to continue anyway, or Ctrl-C to abort..."
 fi
 
@@ -149,16 +156,23 @@ step "6. bootstrap.sh"
 
 BOOTSTRAP="$CONFIG_DIR/bootstrap.sh"
 
-# Detect if already running as Administrator
-if net session &>/dev/null 2>&1; then
+# Detect if already running as Administrator (group 544 = Administrators)
+if id -G | grep -qw 544 2>/dev/null; then
     info "Running as Administrator — chaining to bootstrap.sh"
     exec bash "$BOOTSTRAP"
 else
-    echo ""
     warn "Not running as Administrator."
     echo ""
-    echo "Relaunch MSYS2 as Administrator, then run:"
+    echo "Launching bootstrap.sh elevated via UAC..."
+    echo "(A UAC prompt will appear — click Yes)"
     echo ""
-    echo "  bash $BOOTSTRAP"
-    echo ""
+    # Convert MSYS path to Windows path for PowerShell
+    BOOTSTRAP_WIN=$(cygpath -w "$BOOTSTRAP")
+    BASH_WIN="C:\\msys64\\usr\\bin\\bash.exe"
+    powershell.exe -Command "Start-Process '$BASH_WIN' -ArgumentList '--login','-c','bash \"$BOOTSTRAP_WIN\"' -Verb RunAs" 2>/dev/null || {
+        warn "Auto-elevation failed. Run manually as Administrator:"
+        echo ""
+        echo "  bash $BOOTSTRAP"
+        echo ""
+    }
 fi
