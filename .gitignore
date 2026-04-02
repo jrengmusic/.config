@@ -25,6 +25,7 @@
 
 # Repo-level docs and scripts
 !WINDOWS-SETUP.md
+!README.md
 !bootstrap.sh
 !reset.sh
 !install.sh
