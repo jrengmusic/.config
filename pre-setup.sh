@@ -59,7 +59,25 @@ else
     fi
 fi
 
-step "4. Clone .config"
+step "4. Start SSH agent"
+
+# Agent must be running before git can use the key
+eval "$(ssh-agent -s)" > /dev/null
+ssh-add ~/.ssh/id_ed25519
+info "SSH agent started, key loaded"
+
+# Verify GitHub accepts the key before attempting clone
+info "Testing GitHub connection..."
+if ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+    info "GitHub auth OK"
+else
+    warn "GitHub returned non-success. If you see 'Hi <user>! You've successfully authenticated' above, it's fine."
+    warn "If you see 'Permission denied', the public key is not on GitHub yet."
+    warn "  cat ~/.ssh/id_ed25519.pub  → add to https://github.com/settings/keys"
+    read -r -p "Press Enter to continue anyway, or Ctrl-C to abort..."
+fi
+
+step "5. Clone .config"
 
 WIN_HOME="/c/Users/$(whoami)"
 CONFIG_DIR="$WIN_HOME/.config"
