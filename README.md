@@ -2,6 +2,8 @@
 
 One config repo. 3 machines. 4 OS. Identical DX everywhere.
 
+Change on any machine, push, pull everywhere. No daemon, no subscription, no black box — git is the sync layer and shell scripts are the installer. Own the whole stack.
+
 | Machine | OS | Terminal | Shell |
 |---|---|---|---|
 | iMac 5K 2015 | macOS Monterey | kitty | zsh |
