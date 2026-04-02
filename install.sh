@@ -121,10 +121,11 @@ ssh-add "$SSH_KEY"
 info "SSH agent started, key loaded: $SSH_KEY"
 
 info "Testing GitHub connection..."
-# ssh -T always exits 1 even on success — capture output, don't rely on exit code.
-# BatchMode=yes: fail immediately instead of hanging on any interactive prompt.
-# ConnectTimeout=10: don't hang indefinitely on network issues.
-SSH_TEST=$(ssh -T -o BatchMode=yes -o ConnectTimeout=10 git@github.com 2>&1) || true
+# ssh -T always exits 1 even on success (GitHub behavior).
+# set +e so the assignment doesn't kill the script regardless of bash version.
+set +e
+SSH_TEST=$(ssh -T -o BatchMode=yes -o ConnectTimeout=10 git@github.com 2>&1)
+set -e
 if echo "$SSH_TEST" | grep -q "successfully authenticated"; then
     info "GitHub auth OK"
 else
