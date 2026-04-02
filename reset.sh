@@ -128,7 +128,6 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-python"
     "${PKG_PREFIX}-python-pip"
     "${PKG_PREFIX}-python-pipx"
-    "${PKG_PREFIX}-gdb"
     "${PKG_PREFIX}-fd"
     "${PKG_PREFIX}-ripgrep"
 )
