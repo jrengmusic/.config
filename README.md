@@ -1,6 +1,6 @@
 # .config
 
-Personal dev environment. One config repo for all machines.
+One config repo. 3 machines. 4 OS. Identical DX everywhere.
 
 | Machine | OS | Terminal | Shell |
 |---|---|---|---|
