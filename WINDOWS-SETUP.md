@@ -13,6 +13,35 @@ MBP M4               macOS latest    kitty       zsh      clang (Xcode)
 MBP M4               Windows 11 UTM  END         zsh      cl.exe (MSVC)
 ```
 
+## Which MSYS2 Shell to Launch
+
+> **Intel x86_64 = AMD64** — same instruction set. AMD invented 64-bit x86, Intel adopted it.
+> "x86_64", "x64", "AMD64" all mean the same thing. Use the same shell.
+
+| Machine | CPU | Windows | MSYS2 Shell | `$MSYSTEM` |
+|---|---|---|---|---|
+| iMac 5K 2015 | Intel Core i5/i7 (x86_64) | Windows 10 | **MINGW64** | `MINGW64` |
+| MBP M4 (UTM) | Apple M4 → ARM64 guest | Windows 11 ARM64 | **CLANGARM64** | `CLANGARM64` |
+
+**Why these and not the others:**
+
+| Environment | Use case | Notes |
+|---|---|---|
+| `MSYS` | Script running only | No Windows toolchain. Avoid for dev work. |
+| `MINGW64` | x86_64 native dev | GCC toolchain. Our x64 choice. |
+| `UCRT64` | x86_64 (modern runtime) | Like MINGW64 but newer C runtime. Not needed here. |
+| `CLANG64` | x86_64 Clang toolchain | x64 but Clang-based. Not needed — we use MSVC for builds. |
+| `CLANGARM64` | ARM64 native dev | ARM64 Clang toolchain. Our ARM64 choice. |
+| `MINGW32` | 32-bit x86 | Legacy. Never use. |
+
+**How to launch the right shell:**
+
+After installing MSYS2, the Start Menu has shortcuts for each environment. Launch:
+- **iMac / any x64 machine** → `MSYS2 MINGW64`
+- **MBP M4 UTM / any ARM64 machine** → `MSYS2 CLANGARM64`
+
+The shell sets `$MSYSTEM` automatically. The setup script reads `$MSYSTEM` to pick the right package prefix and paths — no manual configuration needed.
+
 All machines share the same config repo. OS-specific behavior is handled by:
 - **zsh**: `$OPERATING_SYSTEM` variable (`windows`, `macos-arm`, `macos-intel`)
 - **nvim/lua**: `vim.fn.has('win32') == 1`
@@ -23,22 +52,29 @@ All machines share the same config repo. OS-specific behavior is handled by:
 Install these manually before running the setup script:
 
 1. **MSYS2** — https://www.msys2.org/ (install to `C:\msys64`)
+   - On ARM64 Windows (UTM on Apple Silicon): install MSYS2 ARM64, then launch via **CLANGARM64** shortcut
+   - On x64 Windows: install MSYS2 x64, launch via **MINGW64** shortcut
 2. **Visual Studio 2022+** — with "Desktop development with C++" workload (provides vcvarsall.bat, MSVC linker, headers)
 3. **LLVM** — `winget install LLVM.LLVM` (provides clang-cl compiler + clangd LSP)
 4. **Neovim** — `winget install Neovim.Neovim`
 
 Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, zoxide, oh-my-posh) is installed by the setup script.
 
+> **ARM64 note:** `uname -m` always returns `x86_64` in every MSYS2 environment — the MSYS2 runtime is an x64 binary running under Windows x64 emulation ([msys2-runtime#171](https://github.com/msys2/msys2-runtime/issues/171)). `PROCESSOR_ARCHITECTURE` is also unreliable: Windows reports `AMD64` for x64 bash processes even on ARM64 hardware ([MSYS2-packages#4960](https://github.com/msys2/MSYS2-packages/issues/4960)).
+>
+> The scripts use `$MSYSTEM` — the canonical method used by MSYS2 and Git for Windows. Launch the **CLANGARM64** terminal shortcut on ARM64 hardware; the script sees `MSYSTEM=CLANGARM64` and selects `mingw-w64-clang-aarch64-*` packages automatically. A secondary check on `uname -s` (which carries a `-ARM64` suffix on ARM64 hosts via [msys2-runtime PR#244](https://github.com/msys2/msys2-runtime/pull/244)) warns if you launched the wrong shell.
+
 ## Quick Start
 
-Clone the config repo first, then run the script from MSYS2 MinGW64 **as Administrator**:
+Clone the config repo first, then run the script from MSYS2 **as Administrator**:
 
 ```sh
 git clone git@github.com:jrengmusic/.config.git ~/.config
-bash ~/.config/scripts/setup.sh
+bash ~/.config/setup.sh
 ```
 
 > Must run as Administrator — the script writes to system PATH.
+> Launch via **CLANGARM64** shortcut on ARM64 Windows, **MINGW64** on x64.
 
 Then restart MSYS2 and launch nvim to install Mason tools:
 
@@ -62,7 +98,7 @@ This means `~` = `/c/Users/<name>` = `C:\Users\<name>`. SSH keys, config files, 
 
 ### 2. Native Symlinks
 
-Enables native Windows symlinks in `/c/msys64/mingw64.ini`:
+Enables native Windows symlinks in the arch-specific ini (`/c/msys64/mingw64.ini` on x64, `/c/msys64/clangarm64.ini` on ARM64):
 
 ```
 MSYS=winsymlinks:nativestrict
@@ -77,25 +113,26 @@ Sets these as **Windows user environment variables** (persistent across reboots)
 | Variable | Value | Purpose |
 |---|---|---|
 | `MSYS` | `winsymlinks:nativestrict` | Native symlinks everywhere |
-| `MSYSTEM` | `MINGW64` | Use MinGW64 toolchain |
+| `MSYSTEM` | `MINGW64` (x64) or `CLANGARM64` (ARM64) | Use correct toolchain for host arch |
 | `MSYS2_PATH_TYPE` | `inherit` | Inherit Windows PATH |
 | `XDG_CONFIG_HOME` | `C:\Users\<name>\.config` | nvim and tools use `~/.config/` as SSOT (same as macOS) |
 | `CLAUDE_CODE_GIT_BASH_PATH` | `C:\msys64\usr\bin\bash.exe` | Claude Code uses MSYS2 bash (no Git for Windows) |
 
 Also adds to **Windows system PATH**:
 - `C:\msys64\usr\bin` — zsh, git, unzip
+- `C:\msys64\mingw64\bin` (x64) or `C:\msys64\clangarm64\bin` (ARM64) — toolchain binaries
 - `C:\Users\<name>\.local\bin` — all tool symlinks (single PATH entry for everything)
 
 ### 4. MSYS2 Packages
 
-Via `pacman`:
+Via `pacman` (prefix is `mingw-w64-x86_64-` on x64, `mingw-w64-clang-aarch64-` on ARM64):
 - `zsh`, `git`, `unzip`
-- `mingw-w64-x86_64-git-lfs`
-- `mingw-w64-x86_64-cmake`
-- `mingw-w64-x86_64-go`
-- `mingw-w64-x86_64-nodejs` (includes npm)
-- `mingw-w64-x86_64-python`
-- `mingw-w64-x86_64-eza`, `fzf`, `bat`, `gcc`, `ninja`
+- `<prefix>-git-lfs`
+- `<prefix>-go`
+- `<prefix>-nodejs` (includes npm)
+- `<prefix>-python`, `<prefix>-python-pip`, `<prefix>-python-pipx`
+- `<prefix>-eza`, `<prefix>-fzf`, `<prefix>-bat`, `<prefix>-gcc`
+- `<prefix>-gdb`, `<prefix>-fd`, `<prefix>-ripgrep`
 
 ### 4b. Bun
 
@@ -259,8 +296,8 @@ Terminal behavior on build:
 ```
 ~/.config/                              # SSOT for all machines
 ├── WINDOWS-SETUP.md                    # This file
-├── scripts/
-│   └── setup.sh               # Automated setup script
+├── setup.sh                            # Automated setup script (arch-aware: x64 + ARM64)
+├── reset.sh                            # Teardown script (arch-aware)
 ├── end/
 │   └── end.lua                         # END terminal config (OS-branched)
 ├── zsh/

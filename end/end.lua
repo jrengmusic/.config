@@ -1,6 +1,6 @@
---	████████████████████  ████████████    ████  ████    ████    ████
---	████████████████████  ████████████    ████  ████    ████    ████
---	████░░░░░░░░░░░░████  ████░░░░████    ████  ░░░░    ░░░░    ████
+--	████████████████████  ████████████    ████                  ████
+--	████████████████████  ████████████    ████                  ████
+--	████░░░░░░░░░░░░████  ████░░░░████    ████                  ████
 --	████            ████  ████    ████    ████                  ████
 --	████████████████████  ████    ████    ████  ████████████████████
 --	████████████████████  ████    ████    ████  ████████████████████
@@ -10,7 +10,7 @@
 --	████████████████████  ████    ████████████  ████████████████████
 --	░░░░░░░░░░░░░░░░░░░░  ░░░░    ░░░░░░░░░░░░  ░░░░░░░░░░░░░░░░░░░░
 --
---	                Ephemeral Nexus Display  v%versionString%
+--	                Ephemeral Nexus Display  v0.1.0
 -- ============================================================================
 -- Configuration
 -- https://github.com/jrengmusic/end
@@ -67,6 +67,14 @@ END = {
 		-- Make text appear bolder.
 		-- Useful for thin fonts that are hard to read at small sizes.
 		embolden = true,
+
+		-- Line height multiplier applied to terminal cell height (0.5 - 3.0).
+		-- 1.0 = no adjustment. Values above 1.0 increase spacing, below decrease it.
+		line_height = 1.0,
+
+		-- Cell width multiplier applied to terminal cell width (0.5 - 3.0).
+		-- 1.0 = no adjustment. Values above 1.0 widen cells, below narrow them.
+		cell_width = 1.0,
 	},
 
 	-- ========================================================================
@@ -223,7 +231,7 @@ END = {
 		-- Window opacity (0.0 fully transparent - 1.0 fully opaque).
 		-- GPU only. Has no effect with CPU rendering.
 		-- macOS and Windows 10 only. No effect on Windows 11.
-		opacity = 0.9,
+		opacity = 0.75,
 
 		-- Background blur radius in pixels (0 = no blur).
 		-- GPU only. Has no effect with CPU rendering.
@@ -252,7 +260,7 @@ END = {
 		family = "Display Mono",
 
 		-- Tab bar font size in points.
-		size = 24.0,
+		size = 12.0,
 
 		-- Active tab text colour.
 		foreground = "#00C8D8",
@@ -563,11 +571,11 @@ END = {
 	--
 	popups = {
 		tit = {
-			command = "~/.local/bin/tit",
+			command = "tit",
 			args = "",
 			cwd = "",
-			cols = 80,
-			rows = 24,
+			cols = 70,
+			rows = 30,
 			modal = "t",
 		},
 		--     btop = {
