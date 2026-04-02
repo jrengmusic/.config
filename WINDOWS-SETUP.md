@@ -66,11 +66,29 @@ Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, z
 
 ## Quick Start
 
-Clone the config repo first, then run the script from MSYS2 **as Administrator**:
+### Bootstrap (fresh machine — do this once)
+
+MSYS2 ships without git or openssh. Before setup.sh can run you need both and your SSH key.
 
 ```sh
-git clone git@github.com:jrengmusic/.config.git ~/.config
-bash ~/.config/setup.sh
+# 1. Launch MSYS2 as Administrator (CLANGARM64 on ARM64, MINGW64 on x64)
+
+# 2. Update and install bootstrap deps
+pacman -Syu
+pacman -S git openssh
+
+# 3. Copy SSH keys in (from USB, another machine, etc.)
+mkdir -p ~/.ssh
+# copy id_ed25519 and id_ed25519.pub into ~/.ssh/
+chmod 600 ~/.ssh/id_ed25519
+
+# 4. Clone to Windows home directly.
+#    IMPORTANT: at this point MSYS2 home is still /home/<user>, not /c/Users/<user>.
+#    setup.sh switches it — but you need .config there first.
+git clone git@github.com:jrengmusic/.config.git /c/Users/$(whoami)/.config
+
+# 5. Run setup
+bash /c/Users/$(whoami)/.config/setup.sh
 ```
 
 > Must run as Administrator — the script writes to system PATH.
