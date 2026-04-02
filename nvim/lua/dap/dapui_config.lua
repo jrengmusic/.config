@@ -12,21 +12,20 @@ function M.setup()
     layouts = {
       {
         elements = {
-          { id = 'scopes', size = 0.4 },
-          { id = 'breakpoints', size = 0.2 },
-          { id = 'stacks', size = 0.2 },
-          { id = 'watches', size = 0.2 },
+          { id = 'scopes', size = 0.5 },
+          { id = 'repl',   size = 0.5 },
         },
-        size = 50,
-        position = 'left',
+        size = 15,
+        position = 'bottom',
       },
       {
         elements = {
-          { id = 'repl', size = 0.5 },
-          { id = 'console', size = 0.5 },
+          { id = 'watches',     size = 0.34 },
+          { id = 'breakpoints', size = 0.33 },
+          { id = 'stacks',      size = 0.33 },
         },
-        size = 12,
-        position = 'bottom',
+        size = 40,
+        position = 'left',
       },
     },
   })
