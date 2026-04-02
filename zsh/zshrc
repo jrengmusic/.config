@@ -15,7 +15,7 @@ elif [[ $OPERATING_SYSTEM == "macos-intel" ]]; then
   _FZF_SHARE="/opt/local/share/fzf/shell"
   _ZSH_HL="/opt/local/share/zsh-syntax-highlighting"
 elif [[ $OPERATING_SYSTEM == "windows" ]]; then
-  _FZF_SHARE="/mingw64/share/fzf"
+  _FZF_SHARE="/${MSYSTEM,,}/share/fzf"
   _ZSH_HL="/usr/share/zsh-syntax-highlighting"
 fi
 
