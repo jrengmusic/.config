@@ -140,7 +140,7 @@ Via `pacman` (prefix is `mingw-w64-x86_64-` on x64, `mingw-w64-clang-aarch64-` o
 - `<prefix>-nodejs` (includes npm)
 - `<prefix>-python`, `<prefix>-python-pip`, `<prefix>-python-pipx`
 - `<prefix>-eza`, `<prefix>-fzf`, `<prefix>-bat`, `<prefix>-gcc`
-- `<prefix>-gdb`, `<prefix>-fd`, `<prefix>-ripgrep`
+- `<prefix>-fd`, `<prefix>-ripgrep`
 
 ### 4b. Bun
 
