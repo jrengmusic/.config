@@ -68,31 +68,20 @@ Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, z
 
 ### Bootstrap (fresh machine — do this once)
 
-MSYS2 ships without git or openssh. Before setup.sh can run you need both and your SSH key.
+MSYS2 ships without git or openssh. `pre-setup.sh` handles the bootstrap before `.config` exists.
 
 ```sh
-# 1. Launch MSYS2 as Administrator (CLANGARM64 on ARM64, MINGW64 on x64)
+# 1. Launch MSYS2 (CLANGARM64 on ARM64, MINGW64 on x64)
+#    No Administrator needed for this step.
 
-# 2. Update and install bootstrap deps
-pacman -Syu
-pacman -S git openssh
+# 2. Run pre-setup (installs git + openssh, sets up SSH key, clones .config)
+curl -fsSL https://raw.githubusercontent.com/jrengmusic/.config/main/pre-setup.sh | bash
 
-# 3. Copy SSH keys in (from USB, another machine, etc.)
-mkdir -p ~/.ssh
-# copy id_ed25519 and id_ed25519.pub into ~/.ssh/
-chmod 600 ~/.ssh/id_ed25519
-
-# 4. Navigate to Windows home and clone.
-#    IMPORTANT: at this point MSYS2 home is still /home/<user>, not /c/Users/<user>.
-#    setup.sh switches it — but you need .config there first.
-cd /c/Users/$(whoami)
-git clone git@github.com:jrengmusic/.config.git .config
-
-# 5. Run setup
-bash .config/setup.sh
+# 3. Relaunch MSYS2 as Administrator, then run setup
+bash /c/Users/$(whoami)/.config/setup.sh
 ```
 
-> Must run as Administrator — the script writes to system PATH.
+> setup.sh must run as Administrator — it writes to system PATH.
 > Launch via **CLANGARM64** shortcut on ARM64 Windows, **MINGW64** on x64.
 
 Then restart MSYS2 and launch nvim to install Mason tools:

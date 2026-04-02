@@ -27,6 +27,7 @@
 !WINDOWS-SETUP.md
 !setup.sh
 !reset.sh
+!pre-setup.sh
 !scripts/
 !scripts/**
 
