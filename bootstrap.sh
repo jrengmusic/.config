@@ -457,6 +457,10 @@ step "11. Claude Code"
 if command -v claude &>/dev/null; then
     info "claude already installed: $(which claude)"
 else
+    # Stub ~/.zshrc at MSYS2 home so npm's postinstall zsh shell does not
+    # trigger the new-user wizard. ~ is still /home/<user> here — nsswitch
+    # change (db_home: windows) requires a restart to take effect.
+    [[ ! -f "$HOME/.zshrc" ]] && touch "$HOME/.zshrc"
     info "Installing Claude Code via npm..."
     npm install -g @anthropic-ai/claude-code
     info "Note: npm may warn about native installation — ignore it, npm is the only working method on Windows/MSYS2"
