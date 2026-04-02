@@ -82,13 +82,14 @@ mkdir -p ~/.ssh
 # copy id_ed25519 and id_ed25519.pub into ~/.ssh/
 chmod 600 ~/.ssh/id_ed25519
 
-# 4. Clone to Windows home directly.
+# 4. Navigate to Windows home and clone.
 #    IMPORTANT: at this point MSYS2 home is still /home/<user>, not /c/Users/<user>.
 #    setup.sh switches it — but you need .config there first.
-git clone git@github.com:jrengmusic/.config.git /c/Users/$(whoami)/.config
+cd /c/Users/$(whoami)
+git clone git@github.com:jrengmusic/.config.git .config
 
 # 5. Run setup
-bash /c/Users/$(whoami)/.config/setup.sh
+bash .config/setup.sh
 ```
 
 > Must run as Administrator — the script writes to system PATH.
