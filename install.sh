@@ -43,30 +43,34 @@ info "ssh: $(ssh -V 2>&1)"
 # ============================================================================
 step "3. SSH key"
 
-SSH_KEY="$HOME/.ssh/id_ed25519"
+# $HOME is /home/<user> at this point — bootstrap.sh hasn't run yet.
+# Use Windows home explicitly.
+WIN_HOME="/c/Users/$(whoami)"
+SSH_KEY="$WIN_HOME/.ssh/id_ed25519"
 if [[ -f "$SSH_KEY" ]]; then
     info "SSH key already exists at $SSH_KEY"
 else
     warn "No SSH key found. Options:"
     echo ""
     echo "  a) Copy existing key:"
-    echo "       mkdir -p ~/.ssh"
-    echo "       cp /path/to/id_ed25519 ~/.ssh/"
-    echo "       cp /path/to/id_ed25519.pub ~/.ssh/"
-    echo "       chmod 600 ~/.ssh/id_ed25519"
+    echo "       mkdir -p $WIN_HOME/.ssh"
+    echo "       cp /path/to/id_ed25519 $WIN_HOME/.ssh/"
+    echo "       cp /path/to/id_ed25519.pub $WIN_HOME/.ssh/"
+    echo "       chmod 600 $WIN_HOME/.ssh/id_ed25519"
     echo ""
     echo "  b) Generate new key:"
-    echo "       ssh-keygen -t ed25519 -C 'your@email.com'"
-    echo "       cat ~/.ssh/id_ed25519.pub  # add to GitHub → Settings → SSH keys"
+    echo "       ssh-keygen -t ed25519 -C 'your@email.com' -f $WIN_HOME/.ssh/id_ed25519"
+    echo "       cat $WIN_HOME/.ssh/id_ed25519.pub  # add to GitHub → Settings → SSH keys"
     echo ""
     read -r -p "Generate new SSH key now? [y/N] " gen
     if [[ "$gen" == "y" || "$gen" == "Y" ]]; then
         read -r -p "Email for key comment: " email
-        ssh-keygen -t ed25519 -C "$email"
+        mkdir -p "$WIN_HOME/.ssh"
+        ssh-keygen -t ed25519 -C "$email" -f "$WIN_HOME/.ssh/id_ed25519"
         echo ""
         info "Public key (add to GitHub → Settings → SSH keys):"
         echo ""
-        cat ~/.ssh/id_ed25519.pub
+        cat "$WIN_HOME/.ssh/id_ed25519.pub"
         echo ""
         read -r -p "Press Enter once the key is added to GitHub..."
     fi
@@ -78,7 +82,7 @@ fi
 step "4. Start SSH agent"
 
 eval "$(ssh-agent -s)" > /dev/null
-ssh-add ~/.ssh/id_ed25519
+ssh-add "$SSH_KEY"
 info "SSH agent started, key loaded"
 
 info "Testing GitHub connection..."
