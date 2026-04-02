@@ -176,6 +176,9 @@ WHELMED = {
     scrollbar_track      = "0D141CFF",      -- scrollbar track
     scrollbar_background = "0D141CFF", -- scrollbar background
 
+    -- Selection highlight colour (RRGGBBAA).
+    selection_colour = "00C8D880",         -- Selection highlight (RRGGBBAA)
+
     -- =========================================================================
     -- NAVIGATION
     -- =========================================================================

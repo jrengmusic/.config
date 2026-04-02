@@ -11,6 +11,7 @@ local daws = {
     "Studio One",
     "Ableton",
     "FL Studio",
+    "UTM",
 }
 
 for _, daw in ipairs(daws) do

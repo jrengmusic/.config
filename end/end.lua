@@ -223,7 +223,7 @@ END = {
 		-- Window opacity (0.0 fully transparent - 1.0 fully opaque).
 		-- GPU only. Has no effect with CPU rendering.
 		-- macOS and Windows 10 only. No effect on Windows 11.
-		opacity = 0.75,
+		opacity = 0.9,
 
 		-- Background blur radius in pixels (0 = no blur).
 		-- GPU only. Has no effect with CPU rendering.
@@ -303,7 +303,7 @@ END = {
 
 	shell = {
 		-- Shell program name or absolute path.
-		program = "C:\\msys64\\usr\\bin\\zsh.exe",
+		program = "zsh",
 
 		-- Arguments passed to the shell program.
 		args = "-l",
@@ -370,10 +370,10 @@ END = {
 
 	keys = {
 		-- Copy selection to clipboard.
-		copy = "ctrl+c",
+		copy = "cmd+c",
 
 		-- Paste from clipboard.
-		paste = "ctrl+v",
+		paste = "cmd+v",
 
 		-- Quit application.
 		quit = "cmd+q",
@@ -563,7 +563,7 @@ END = {
 	--
 	popups = {
 		tit = {
-			command = "tit",
+			command = "~/.local/bin/tit",
 			args = "",
 			cwd = "",
 			cols = 80,
