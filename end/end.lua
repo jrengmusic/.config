@@ -46,7 +46,7 @@ END = {
 	--
 
 	gpu = {
-		acceleration = "auto",
+		acceleration = "false",
 	},
 
 	-- ========================================================================
@@ -59,7 +59,7 @@ END = {
 		family = "Display Mono",
 
 		-- Font size in points before zoom is applied (1 - 200).
-		size = 12.0,
+		size = 10.0,
 
 		-- Combine certain character sequences into symbols (e.g. -> becomes an arrow).
 		ligatures = true,
@@ -74,7 +74,7 @@ END = {
 
 		-- Cell width multiplier applied to terminal cell width (0.5 - 3.0).
 		-- 1.0 = no adjustment. Values above 1.0 widen cells, below narrow them.
-		cell_width = 1.0,
+		cell_width = 1.1,
 	},
 
 	-- ========================================================================
