@@ -46,33 +46,63 @@ step "3. SSH key"
 # $HOME is /home/<user> at this point — bootstrap.sh hasn't run yet.
 # Use Windows home explicitly.
 WIN_HOME="/c/Users/$(whoami)"
-SSH_KEY="$WIN_HOME/.ssh/id_ed25519"
-if [[ -f "$SSH_KEY" ]]; then
-    info "SSH key already exists at $SSH_KEY"
+SSH_DIR="$WIN_HOME/.ssh"
+
+# Resolve which key to use for GitHub:
+# 1. IdentityFile from ~/.ssh/config Host github.com block
+# 2. Common key name fallbacks
+# 3. Prompt
+resolve_github_key() {
+    local config="$SSH_DIR/config"
+    if [[ -f "$config" ]]; then
+        # Extract IdentityFile from the github.com host block
+        local key
+        key=$(awk '
+            /^[Hh]ost / { in_github = ($2 == "github.com") }
+            in_github && /[Ii]dentity[Ff]ile/ { print $2; exit }
+        ' "$config")
+        if [[ -n "$key" ]]; then
+            # Expand ~ to WIN_HOME (~ is /home/<user> here, not what we want)
+            key="${key/#\~/$WIN_HOME}"
+            echo "$key"
+            return
+        fi
+    fi
+    # Fallback: common key names
+    local candidates=("id_ed25519_github" "id_ed25519" "id_rsa")
+    for name in "${candidates[@]}"; do
+        [[ -f "$SSH_DIR/$name" ]] && echo "$SSH_DIR/$name" && return
+    done
+}
+
+SSH_KEY=$(resolve_github_key)
+
+if [[ -n "$SSH_KEY" && -f "$SSH_KEY" ]]; then
+    info "SSH key found: $SSH_KEY"
 else
     warn "No SSH key found. Options:"
     echo ""
     echo "  a) Copy existing key:"
-    echo "       mkdir -p $WIN_HOME/.ssh"
-    echo "       cp /path/to/id_ed25519 $WIN_HOME/.ssh/"
-    echo "       cp /path/to/id_ed25519.pub $WIN_HOME/.ssh/"
-    echo "       chmod 600 $WIN_HOME/.ssh/id_ed25519"
+    echo "       mkdir -p $SSH_DIR"
+    echo "       cp /path/to/key $SSH_DIR/"
+    echo "       chmod 600 $SSH_DIR/<keyname>"
     echo ""
     echo "  b) Generate new key:"
-    echo "       ssh-keygen -t ed25519 -C 'your@email.com' -f $WIN_HOME/.ssh/id_ed25519"
-    echo "       cat $WIN_HOME/.ssh/id_ed25519.pub  # add to GitHub → Settings → SSH keys"
+    echo "       ssh-keygen -t ed25519 -C 'your@email.com' -f $SSH_DIR/id_ed25519_github"
+    echo "       cat $SSH_DIR/id_ed25519_github.pub  # add to GitHub → Settings → SSH keys"
     echo ""
     read -r -p "Generate new SSH key now? [y/N] " gen
     if [[ "$gen" == "y" || "$gen" == "Y" ]]; then
         read -r -p "Email for key comment: " email
-        mkdir -p "$WIN_HOME/.ssh"
-        ssh-keygen -t ed25519 -C "$email" -f "$WIN_HOME/.ssh/id_ed25519"
+        mkdir -p "$SSH_DIR"
+        ssh-keygen -t ed25519 -C "$email" -f "$SSH_DIR/id_ed25519_github"
         echo ""
         info "Public key (add to GitHub → Settings → SSH keys):"
         echo ""
-        cat "$WIN_HOME/.ssh/id_ed25519.pub"
+        cat "$SSH_DIR/id_ed25519_github.pub"
         echo ""
         read -r -p "Press Enter once the key is added to GitHub..."
+        SSH_KEY="$SSH_DIR/id_ed25519_github"
     fi
 fi
 
