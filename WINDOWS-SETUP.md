@@ -87,10 +87,12 @@ bash /c/Users/$(whoami)/.config/bootstrap.sh
 Then restart MSYS2 and launch nvim to install Mason tools:
 
 ```vim
-:MasonInstall lua_ls pyright ts_ls zls stylua prettier codelldb
+:MasonInstall lua_ls pyright ts_ls zls stylua prettier
 ```
 
-Note: Do NOT install clangd via Mason on Windows. Use the system clangd from `winget install LLVM.LLVM`.
+Notes:
+- Do NOT install clangd via Mason on Windows. Use the system clangd from `winget install LLVM.LLVM`.
+- Do NOT install codelldb via Mason on Windows. whatdbg is installed by bootstrap.sh to `~/.local/bin/whatdbg.exe`.
 
 ## What the Setup Script Does
 
@@ -154,6 +156,7 @@ Not in MSYS2 repos — cloned from source to `/usr/share/zsh-syntax-highlighting
 
 Downloaded directly to `~/.local/bin/`:
 - `oh-my-posh.exe` — prompt theme engine
+- `whatdbg.exe` — DAP debug adapter (dbgeng-based, reads PDB symbols natively)
 - `zoxide.exe` — smart cd
 
 ### 5b. ~/.local/bin Symlinks
@@ -244,16 +247,16 @@ The `.bat` file:
 
 Mason's clangd on Windows is a `.cmd` wrapper that nvim can't execute directly. The system clangd from LLVM works.
 
-### DAP (codelldb)
+### DAP (codelldb / whatdbg)
 
-codelldb is used on both platforms. On macOS, clang produces DWARF symbols. On Windows, clang-cl produces DWARF symbols with `-gdwarf`. Same adapter, same debug format, same experience.
+macOS uses codelldb (Mason) with DWARF symbols from clang. Windows uses whatdbg — a dbgeng-based DAP adapter that reads MSVC PDB symbols natively. This means Windows builds use `cl.exe` (MSVC) directly, no `-gdwarf` workaround needed.
 
 **vsdbg (Microsoft's debugger) won't work** — it's licensed exclusively for VS Code and rejects nvim as a client.
 
 | | macOS | Windows |
 |---|---|---|
-| Adapter | codelldb (Mason) | codelldb (Mason) |
-| Debug symbols | DWARF (clang) | DWARF (clang-cl with `-gdwarf`) |
+| Adapter | codelldb (Mason) | whatdbg (`~/.local/bin/whatdbg.exe`) |
+| Debug symbols | DWARF (clang) | PDB (cl.exe / MSVC) |
 | Process lookup | `pgrep -x 'DAW'` | `tasklist /FI "IMAGENAME eq DAW.exe"` |
 | Kill process | `killall DAW` | `taskkill /F /IM DAW` |
 | DAW launch delay | 2000ms | 3000ms |

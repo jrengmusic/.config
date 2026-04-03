@@ -70,6 +70,7 @@ case "$MSYSTEM" in
         BUN_ARCH="windows-aarch64"
         OMP_ARCH="arm64"
         ZOXIDE_PATTERN="aarch64-pc-windows-msvc"
+        WHATDBG_ASSET="whatdbg-win-arm64"
         ;;
     MINGW64|UCRT64|*)
         PKG_PREFIX="mingw-w64-x86_64"
@@ -78,6 +79,7 @@ case "$MSYSTEM" in
         BUN_ARCH="windows-x64"
         OMP_ARCH="amd64"
         ZOXIDE_PATTERN="x86_64-pc-windows-msvc"
+        WHATDBG_ASSET="whatdbg-win-x64"
         ;;
 esac
 
@@ -312,6 +314,23 @@ else
     curl -fsSL "https://github.com/JanDeDobbeleer/oh-my-posh/releases/latest/download/posh-windows-${OMP_ARCH}.exe" \
         -o "$WINDOWS_HOME/.local/bin/oh-my-posh.exe"
     info "oh-my-posh installed"
+fi
+
+# whatdbg (DAP adapter — dbgeng-based, reads PDB natively)
+if [[ -f "$WINDOWS_HOME/.local/bin/whatdbg.exe" ]]; then
+    info "whatdbg already installed"
+else
+    warn "Downloading whatdbg ($WHATDBG_ASSET)..."
+    WHATDBG_URL=$(curl -fsSL "https://api.github.com/repos/jrengmusic/whatdbg/releases/latest" \
+        | grep "browser_download_url.*${WHATDBG_ASSET}\.zip" | head -1 | cut -d '"' -f 4)
+    if [[ -n "$WHATDBG_URL" ]]; then
+        curl -fsSL "$WHATDBG_URL" -o /tmp/whatdbg.zip
+        unzip -o /tmp/whatdbg.zip whatdbg.exe -d "$WINDOWS_HOME/.local/bin/"
+        rm -f /tmp/whatdbg.zip
+        info "whatdbg installed"
+    else
+        error "Failed to find whatdbg release URL"
+    fi
 fi
 
 # zoxide
