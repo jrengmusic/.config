@@ -497,6 +497,17 @@ else
     info "Symlinked CLAUDE.md → $CLAUDE_MD_SRC"
 fi
 
+# Project CLAUDE.md — symlink CAROL.md as project-level instructions
+CAROL_MD_SRC="$WINDOWS_HOME/.carol/CAROL.md"
+CAROL_MD_DST="$WINDOWS_HOME/.config/CLAUDE.md"
+if [[ -L "$CAROL_MD_DST" && "$(readlink "$CAROL_MD_DST")" == "$CAROL_MD_SRC" ]]; then
+    info "Project CLAUDE.md symlink already correct"
+else
+    [[ -e "$CAROL_MD_DST" && ! -L "$CAROL_MD_DST" ]] && rm -f "$CAROL_MD_DST"
+    ln -sf "$CAROL_MD_SRC" "$CAROL_MD_DST"
+    info "Symlinked project CLAUDE.md → $CAROL_MD_SRC"
+fi
+
 # ============================================================================
 # 12. Windows software (manual steps)
 # ============================================================================
