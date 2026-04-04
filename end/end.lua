@@ -1,6 +1,6 @@
---	████████████████████  ████████████    ████                  ████
---	████████████████████  ████████████    ████                  ████
---	████░░░░░░░░░░░░████  ████░░░░████    ████                  ████
+--	████████████████████  ████████████    ████  ████    ████    ████
+--	████████████████████  ████████████    ████  ████    ████    ████
+--	████░░░░░░░░░░░░████  ████░░░░████    ████  ░░░░    ░░░░    ████
 --	████            ████  ████    ████    ████                  ████
 --	████████████████████  ████    ████    ████  ████████████████████
 --	████████████████████  ████    ████    ████  ████████████████████
@@ -10,7 +10,7 @@
 --	████████████████████  ████    ████████████  ████████████████████
 --	░░░░░░░░░░░░░░░░░░░░  ░░░░    ░░░░░░░░░░░░  ░░░░░░░░░░░░░░░░░░░░
 --
---	                Ephemeral Nexus Display  v0.1.0
+--	                Ephemeral Nexus Display  v0.0.1
 -- ============================================================================
 -- Configuration
 -- https://github.com/jrengmusic/end
@@ -46,7 +46,7 @@ END = {
 	--
 
 	gpu = {
-		acceleration = "false",
+		acceleration = "auto",
 	},
 
 	-- ========================================================================
@@ -59,7 +59,7 @@ END = {
 		family = "Display Mono",
 
 		-- Font size in points before zoom is applied (1 - 200).
-		size = 10.0,
+		size = 12.0,
 
 		-- Combine certain character sequences into symbols (e.g. -> becomes an arrow).
 		ligatures = true,
@@ -74,7 +74,7 @@ END = {
 
 		-- Cell width multiplier applied to terminal cell width (0.5 - 3.0).
 		-- 1.0 = no adjustment. Values above 1.0 widen cells, below narrow them.
-		cell_width = 1.1,
+		cell_width = 1.0,
 	},
 
 	-- ========================================================================
@@ -506,11 +506,11 @@ END = {
 	popup = {
 		-- Default popup width in columns.
 		-- Individual popup entries can override this.
-		cols = 70,
+		cols = 70.0,
 
 		-- Default popup height in rows.
 		-- Individual popup entries can override this.
-		rows = 20,
+		rows = 20.0,
 
 		-- Default popup position: "center".
 		position = "center",
@@ -578,13 +578,13 @@ END = {
 			rows = 30,
 			modal = "t",
 		},
-		--     btop = {
-		--         command = "htop",
-		--         cwd = "~",
-		--         cols = 80,
-		--         rows = 24,
-		--         modal = "p",
-		--         global = "cmd+shift+p",
-		--     },
+	--	btop = {
+	--		command = "htop",
+	--		cwd = "~",
+	--		cols = 80,
+	--		rows = 24,
+	--		modal = "p",
+	--		global = "cmd+shift+p",
+	--     },
 	},
 }

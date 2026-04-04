@@ -93,6 +93,9 @@ elif [[ $OPERATING_SYSTEM == "macos-arm" || $OPERATING_SYSTEM == "macos-intel" ]
   _OPEN_CMD="open"
 fi
 
+# fzf colour scheme — END palette
+export FZF_DEFAULT_OPTS="--color=fg:#699DAA,bg:#090D12,hl:#FC704C,fg+:#00C8D8,bg+:#112130,hl+:#FC704C,info:#33535B,border:#33535B,prompt:#4E8C93,pointer:#00C8D8,marker:#FC704C,spinner:#01C2D2,header:#519299"
+
 # Custom fzf options
 export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:500 {}' \
   --bind 'ctrl-v:execute(nvim {})' \

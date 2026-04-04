@@ -20,6 +20,8 @@
 !zsh/**
 !kitty/
 !kitty/**
+!bat/
+!bat/**
 !claude/
 !claude/**
 

@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>name</key>
+  <string>gfx</string>
+  <key>settings</key>
+  <array>
+    <dict>
+      <key>settings</key>
+      <dict>
+        <key>background</key>
+        <string>#090D12</string>
+        <key>foreground</key>
+        <string>#699DAA</string>
+        <key>caret</key>
+        <string>#4E8C93</string>
+        <key>selection</key>
+        <string>#FC704C80</string>
+        <key>lineHighlight</key>
+        <string>#112130</string>
+      </dict>
+    </dict>
+
+    <!-- Comments — mediterranea -->
+    <dict>
+      <key>name</key>
+      <string>Comment</string>
+      <key>scope</key>
+      <string>comment, punctuation.definition.comment</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#33535B</string>
+        <key>fontStyle</key>
+        <string>italic</string>
+      </dict>
+    </dict>
+
+    <!-- Keywords — preciousPersimmon -->
+    <dict>
+      <key>name</key>
+      <string>Keyword</string>
+      <key>scope</key>
+      <string>keyword, keyword.control, keyword.operator.word, storage, storage.type, storage.modifier</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#FC704C</string>
+      </dict>
+    </dict>
+
+    <!-- Operators — lagoon -->
+    <dict>
+      <key>name</key>
+      <string>Operator</string>
+      <key>scope</key>
+      <string>keyword.operator</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#519299</string>
+      </dict>
+    </dict>
+
+    <!-- Strings — lagoon -->
+    <dict>
+      <key>name</key>
+      <string>String</string>
+      <key>scope</key>
+      <string>string, string.quoted, string.template</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#519299</string>
+      </dict>
+    </dict>
+
+    <!-- String escape — paleSky -->
+    <dict>
+      <key>name</key>
+      <string>String Escape</string>
+      <key>scope</key>
+      <string>constant.character.escape, string.regexp</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#BAFFFD</string>
+      </dict>
+    </dict>
+
+    <!-- Numbers — blueBikini -->
+    <dict>
+      <key>name</key>
+      <string>Number</string>
+      <key>scope</key>
+      <string>constant.numeric</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#00C8D8</string>
+      </dict>
+    </dict>
+
+    <!-- Constants — mattWhite -->
+    <dict>
+      <key>name</key>
+      <string>Constant</string>
+      <key>scope</key>
+      <string>constant, constant.language, constant.character</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#FEFFD2</string>
+      </dict>
+    </dict>
+
+    <!-- Functions — dolphin -->
+    <dict>
+      <key>name</key>
+      <string>Function</string>
+      <key>scope</key>
+      <string>entity.name.function, meta.function-call, support.function</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#8CC9D9</string>
+      </dict>
+    </dict>
+
+    <!-- Types — dolphin -->
+    <dict>
+      <key>name</key>
+      <string>Type</string>
+      <key>scope</key>
+      <string>entity.name.type, entity.name.class, entity.name.struct, support.type, support.class</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#8CC9D9</string>
+      </dict>
+    </dict>
+
+    <!-- Variables — tranquiliTeal -->
+    <dict>
+      <key>name</key>
+      <string>Variable</string>
+      <key>scope</key>
+      <string>variable, variable.parameter, variable.other</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#699DAA</string>
+      </dict>
+    </dict>
+
+    <!-- Variable Language — caribbeanBlue -->
+    <dict>
+      <key>name</key>
+      <string>Variable Language</string>
+      <key>scope</key>
+      <string>variable.language</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#01C2D2</string>
+      </dict>
+    </dict>
+
+    <!-- Preprocessor — lagoon -->
+    <dict>
+      <key>name</key>
+      <string>Preprocessor</string>
+      <key>scope</key>
+      <string>meta.preprocessor, keyword.control.import, keyword.control.directive, entity.name.function.preprocessor</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#519299</string>
+      </dict>
+    </dict>
+
+    <!-- Tags — dolphin -->
+    <dict>
+      <key>name</key>
+      <string>Tag</string>
+      <key>scope</key>
+      <string>entity.name.tag, punctuation.definition.tag</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#8CC9D9</string>
+      </dict>
+    </dict>
+
+    <!-- Attributes — silkStar -->
+    <dict>
+      <key>name</key>
+      <string>Attribute</string>
+      <key>scope</key>
+      <string>entity.other.attribute-name</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#F3F5C5</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Headings — preciousPersimmon -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Heading</string>
+      <key>scope</key>
+      <string>markup.heading, markup.heading.markdown, entity.name.section.markdown, punctuation.definition.heading.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#FC704C</string>
+        <key>fontStyle</key>
+        <string>bold</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Bold — blueBikini -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Bold</string>
+      <key>scope</key>
+      <string>markup.bold, punctuation.definition.bold.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#00C8D8</string>
+        <key>fontStyle</key>
+        <string>bold</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Italic — paradiso -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Italic</string>
+      <key>scope</key>
+      <string>markup.italic, punctuation.definition.italic.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#4E8C93</string>
+        <key>fontStyle</key>
+        <string>italic</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Inline code — paleSky -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Inline Code</string>
+      <key>scope</key>
+      <string>markup.inline.raw.string.markdown, punctuation.definition.raw.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#BAFFFD</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Code block fences — mediterranea -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Code Block</string>
+      <key>scope</key>
+      <string>markup.fenced_code.block.markdown, punctuation.definition.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#33535B</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Code block language label — silkStar -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Fenced Language</string>
+      <key>scope</key>
+      <string>constant.other.language-name.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#F3F5C5</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: List — dolphin -->
+    <dict>
+      <key>name</key>
+      <string>Markdown List</string>
+      <key>scope</key>
+      <string>markup.list, punctuation.definition.list.begin.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#8CC9D9</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Links — dolphin -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Link Text</string>
+      <key>scope</key>
+      <string>string.other.link.title.markdown, meta.link.inline.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#8CC9D9</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Link URL — tranquiliTeal -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Link URL</string>
+      <key>scope</key>
+      <string>markup.underline.link.markdown, markup.underline.link.image.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#699DAA</string>
+        <key>fontStyle</key>
+        <string>underline</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: Blockquote — lagoon -->
+    <dict>
+      <key>name</key>
+      <string>Markdown Blockquote</string>
+      <key>scope</key>
+      <string>markup.quote.markdown, punctuation.definition.blockquote.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#519299</string>
+        <key>fontStyle</key>
+        <string>italic</string>
+      </dict>
+    </dict>
+
+    <!-- Markdown: HR — mediterranea -->
+    <dict>
+      <key>name</key>
+      <string>Markdown HR</string>
+      <key>scope</key>
+      <string>meta.separator.markdown</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#33535B</string>
+      </dict>
+    </dict>
+
+    <!-- Invalid — frostbite on blueBikini -->
+    <dict>
+      <key>name</key>
+      <string>Invalid</string>
+      <key>scope</key>
+      <string>invalid</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#DDDDDD</string>
+        <key>background</key>
+        <string>#00C8D8</string>
+      </dict>
+    </dict>
+
+  </array>
+  <key>uuid</key>
+  <string>e4d24e8a-1c2f-4b3a-9d7e-2a5f8c3b1e6d</string>
+</dict>
+</plist>
