@@ -1,0 +1,10 @@
+[auto_scan]
+enabled = true
+interval_minutes = 10
+
+[appearance]
+theme = 'gfx'
+
+[build]
+last_project = ''
+last_configuration = 'Debug'

@@ -1,0 +1,6 @@
+[auto_update]
+enabled = true
+interval_minutes = 5
+
+[appearance]
+theme = 'default'

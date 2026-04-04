@@ -1,0 +1,75 @@
+name = "Summer"
+description = "Warm summer blues and bright sunshine"
+
+[palette]
+# Backgrounds - blueMarguerite → havelockBlue → violetBlue
+mainBackgroundColor = "#000000"       # black (main background)
+inlineBackgroundColor = "#4D88D1"     # havelockBlue (secondary areas)
+selectionBackgroundColor = "#090D12"  # bunker (highlight areas)
+
+# Text - Content & Body - electric cyan/bright for positives, hot reds for negatives
+contentTextColor = "#3CA7E0"          # violetBlue - readable neutral
+labelTextColor = "#19E5FF"            # cyan (labels)
+dimmedTextColor = "#5E68C1"           # indigo (dimmed)
+accentTextColor = "#FFBF16"           # lightningYellow - electric shortcuts
+highlightTextColor = "#D1D5DA"        # off-white (highlights)
+terminalTextColor = "#999999"         # neutral gray
+
+# Special Text
+cwdTextColor = "#FFBF16"              # lightningYellow - electric accent
+footerTextColor = "#8667BF"           # blueMarguerite - muted descriptions
+
+# Borders
+boxBorderColor = "#19E5FF"            # cyan
+separatorColor = "#4D88D1"            # havelockBlue
+
+# Confirmation Dialog
+confirmationDialogBackground = "#2BC6F0"  # pictonBlue
+
+# Conflict Resolver - Borders
+conflictPaneUnfocusedBorder = "#2C4144"
+conflictPaneFocusedBorder = "#19E5FF"
+
+# Conflict Resolver - Selection
+conflictSelectionForeground = "#3CA7E0"   # pictonBlue
+conflictSelectionBackground = "#7EB8C5"   # brighter muted teal
+
+# Conflict Resolver - Pane Headers
+conflictPaneTitleColor = "#19E5FF"        # cyan
+
+# Status Colors - electric cyan for clean, hot red for dirty
+statusClean = "#19E5FF"               # cyan - electric positive
+statusDirty = "#FF3469"               # radicalRed (dirty)
+
+# Timeline Colors
+timelineSynchronized = "#00FFFF"      # electric cyan (synced)
+timelineLocalAhead = "#19E5FF"        # cyan (ahead)
+timelineLocalBehind = "#FF9700"       # pizazz (behind)
+
+# Operation Colors - electric colors for positive ops
+operationReady = "#00FFFF"            # electric cyan (ready)
+operationNotRepo = "#FF3469"          # radicalRed (not repo)
+operationTimeTravel = "#FFBF16"       # lightningYellow (time travel)
+operationConflicted = "#FF3469"       # radicalRed (conflicted)
+operationMerging = "#19E5FF"          # cyan (merging)
+operationRebasing = "#19E5FF"         # cyan (rebasing)
+operationDirtyOp = "#FF3469"          # radicalRed (dirty)
+
+# UI Elements
+menuSelectionBackground = "#FE62B9"   # hotPink - electric highlight
+buttonSelectedTextColor = "#8667BF"   # blueMarguerite - dark contrast
+
+# Animation
+spinnerColor = "#00FFFF"              # electric cyan
+
+# Diff Colors
+diffAddedLineColor = "#19E5FF"        # cyan (added)
+diffRemovedLineColor = "#FF3469"      # radicalRed (removed)
+
+# Console Output Colors
+outputStdoutColor = "#999999"         # neutral gray
+outputStderrColor = "#FF3469"         # radicalRed
+outputStatusColor = "#00FFFF"         # electric cyan
+outputWarningColor = "#FF9700"        # pizazz
+outputDebugColor = "#5E68C1"          # indigo
+outputInfoColor = "#2BC6F0"           # pictonBlue

@@ -1,0 +1,75 @@
+name = "Winter"
+description = "Cool winter purples with subtle elegance"
+
+[palette]
+# Backgrounds - cloudBurst → sanJuan → sanMarino
+mainBackgroundColor = "#233253"       # cloudBurst (main background)
+inlineBackgroundColor = "#334676"     # sanJuan (secondary areas)
+selectionBackgroundColor = "#090D12"  # bunker (highlight areas)
+
+# Text - Content & Body - professional blues for positive, soft pinks for negative
+contentTextColor = "#CAD0E6"          # cyanGray - cool readable
+labelTextColor = "#7F95D6"            # chetwodeBlue (labels)
+dimmedTextColor = "#9BA9D0"           # rockBlue (dimmed)
+accentTextColor = "#F6F5FA"           # whisper - bright shortcuts
+highlightTextColor = "#D1D5DA"        # off-white (highlights)
+terminalTextColor = "#999999"         # neutral gray
+
+# Special Text
+cwdTextColor = "#F6F5FA"              # whisper - bright white
+footerTextColor = "#9BA9D0"           # rockBlue - muted descriptions
+
+# Borders
+boxBorderColor = "#7F95D6"            # chetwodeBlue
+separatorColor = "#334676"            # sanJuan
+
+# Confirmation Dialog
+confirmationDialogBackground = "#233253"  # cloudBurst
+
+# Conflict Resolver - Borders
+conflictPaneUnfocusedBorder = "#2C4144"
+conflictPaneFocusedBorder = "#7F95D6"
+
+# Conflict Resolver - Selection
+conflictSelectionForeground = "#233253"   # cloudBurst
+conflictSelectionBackground = "#7EB8C5"   # brighter muted teal
+
+# Conflict Resolver - Pane Headers
+conflictPaneTitleColor = "#7F95D6"        # chetwodeBlue
+
+# Status Colors - professional blue for clean, soft pink for dirty
+statusClean = "#6281DC"               # havelockBlue - professional positive
+statusDirty = "#E0BACF"               # melanie (dirty = soft pink)
+
+# Timeline Colors
+timelineSynchronized = "#435A98"      # sanMarino (synced)
+timelineLocalAhead = "#6281DC"        # havelockBlue (ahead)
+timelineLocalBehind = "#CEBAC5"       # lily (behind)
+
+# Operation Colors - professional blue colors for positive ops
+operationReady = "#435A98"            # sanMarino (ready)
+operationNotRepo = "#E0BACF"          # melanie (not repo)
+operationTimeTravel = "#CEBAC5"       # lily (time travel)
+operationConflicted = "#E0BACF"       # melanie (conflicted)
+operationMerging = "#6281DC"          # havelockBlue (merging)
+operationRebasing = "#6281DC"         # havelockBlue (rebasing)
+operationDirtyOp = "#E0BACF"          # melanie (dirty)
+
+# UI Elements
+menuSelectionBackground = "#7F95D6"   # chetwodeBlue - professional blue accent
+buttonSelectedTextColor = "#F6F5FA"   # whisper - light contrast
+
+# Animation
+spinnerColor = "#00FFFF"              # electric cyan
+
+# Diff Colors
+diffAddedLineColor = "#6281DC"        # havelockBlue (added)
+diffRemovedLineColor = "#E0BACF"      # melanie (removed)
+
+# Console Output Colors
+outputStdoutColor = "#999999"         # neutral gray
+outputStderrColor = "#E0BACF"         # melanie
+outputStatusColor = "#435A98"         # sanMarino
+outputWarningColor = "#CEBAC5"        # lily
+outputDebugColor = "#9BA9D0"          # rockBlue
+outputInfoColor = "#435A98"           # sanMarino

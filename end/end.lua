@@ -113,12 +113,12 @@ END = {
 
 	colours = {
 		-- Default text foreground colour.
-		foreground = "#5FAEB5",
+		foreground = "#A1D6E5",
 
 		-- Default background colour.
 		-- The last two hex digits control background transparency (GPU only).
 		-- CPU rendering always uses a fully opaque background.
-		background = "#090D12E0",
+		background = "#090D12FF",
 
 		-- Cursor colour.
 		-- Programs may change this colour while running.
@@ -126,11 +126,11 @@ END = {
 
 		-- Selection highlight colour.
 		-- Semi-transparent recommended so text remains readable.
-		selection = "#00C8D880",
+		selection = "#00DDEE10",
 
 		-- Selection-mode cursor colour.
 		-- Shown instead of the normal cursor when selection mode is active.
-		selection_cursor = "#00D8FF",
+		selection_cursor = "#00DDEE",
 
 		-- Black
 		black = "#090D12",
@@ -245,6 +245,15 @@ END = {
 
 		-- Show native window buttons (close / minimise / maximise).
 		buttons = false,
+
+		-- Force DWM visual effects on Windows 11 virtual machines.
+		-- When true, injects the ForceEffectMode registry key to enable
+		-- rounded window corners that DWM normally disables inside VMs.
+		-- Only takes effect on Windows 11 running on a software renderer (VM).
+		-- Requires elevated privileges (Run as Administrator).
+		-- Reload config and restart END to apply.
+		-- No effect on macOS, Linux, or physical Windows machines.
+		force_dwm = true,
 
 		-- Zoom multiplier (1.0 - 4.0).
 		-- Scales the terminal grid and font proportionally.
@@ -506,11 +515,11 @@ END = {
 	popup = {
 		-- Default popup width in columns.
 		-- Individual popup entries can override this.
-		cols = 70.0,
+		cols = 70,
 
 		-- Default popup height in rows.
 		-- Individual popup entries can override this.
-		rows = 20.0,
+		rows = 20,
 
 		-- Default popup position: "center".
 		position = "center",

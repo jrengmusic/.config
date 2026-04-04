@@ -1,0 +1,75 @@
+name = "Autumn"
+description = "Rich autumn oranges and warm earth tones"
+
+[palette]
+# Backgrounds - jacaranda → mulberryWood → roseBudCherry
+mainBackgroundColor = "#3E0338"       # jacaranda (main background)
+inlineBackgroundColor = "#5E063E"     # mulberryWood (secondary areas)
+selectionBackgroundColor = "#090D12"  # bunker (highlight areas)
+
+# Text - Content & Body - gold colors for positive, deep reds for negative
+contentTextColor = "#E78C79"          # apricot - warm readable
+labelTextColor = "#F9C94D"            # saffronMango (labels)
+dimmedTextColor = "#F09D06"           # tulipTree (dimmed)
+accentTextColor = "#F5BB09"           # corn - bright shortcuts
+highlightTextColor = "#D1D5DA"        # off-white (highlights)
+terminalTextColor = "#999999"         # neutral gray
+
+# Special Text
+cwdTextColor = "#F5BB09"              # corn - golden bright
+footerTextColor = "#CD5861"           # chestnutRose - muted descriptions
+
+# Borders
+boxBorderColor = "#F9C94D"            # saffronMango
+separatorColor = "#5E063E"            # mulberryWood
+
+# Confirmation Dialog
+confirmationDialogBackground = "#7D0E36"  # roseBudCherry
+
+# Conflict Resolver - Borders
+conflictPaneUnfocusedBorder = "#2C4144"
+conflictPaneFocusedBorder = "#F9C94D"
+
+# Conflict Resolver - Selection
+conflictSelectionForeground = "#3E0338"   # jacaranda
+conflictSelectionBackground = "#7EB8C5"   # brighter muted teal
+
+# Conflict Resolver - Pane Headers
+conflictPaneTitleColor = "#F9C94D"        # saffronMango
+
+# Status Colors - gold for clean, deep red for dirty
+statusClean = "#F5BB09"               # corn (clean = gold)
+statusDirty = "#DC3003"               # grenadier (dirty = deep red)
+
+# Timeline Colors
+timelineSynchronized = "#F5BB09"      # corn (synced)
+timelineLocalAhead = "#F9C94D"        # saffronMango (ahead)
+timelineLocalBehind = "#E85C03"       # trinidad (behind)
+
+# Operation Colors - gold colors for positive ops
+operationReady = "#F5BB09"            # corn (ready)
+operationNotRepo = "#DC3003"          # grenadier (not repo)
+operationTimeTravel = "#F2AB53"       # safflower (time travel)
+operationConflicted = "#DC3003"       # grenadier (conflicted)
+operationMerging = "#F5BB09"          # corn (merging)
+operationRebasing = "#F5BB09"         # corn (rebasing)
+operationDirtyOp = "#DC3003"          # grenadier (dirty)
+
+# UI Elements
+menuSelectionBackground = "#F1AE37"   # tulipTree - golden harvest highlight
+buttonSelectedTextColor = "#3E0338"   # jacaranda - darkest contrast
+
+# Animation
+spinnerColor = "#00FFFF"              # electric cyan
+
+# Diff Colors
+diffAddedLineColor = "#F5BB09"        # corn (added)
+diffRemovedLineColor = "#DC3003"      # grenadier (removed)
+
+# Console Output Colors
+outputStdoutColor = "#999999"         # neutral gray
+outputStderrColor = "#DC3003"         # grenadier
+outputStatusColor = "#F5BB09"         # corn
+outputWarningColor = "#E85C03"        # trinidad
+outputDebugColor = "#F09D06"          # tulipTree
+outputInfoColor = "#F48C06"           # tangerine

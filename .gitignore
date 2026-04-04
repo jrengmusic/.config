@@ -1,40 +1,49 @@
 # Ignore everything
 *
 
-# Whitelist files
-!.gitattributes
-!.gitignore
-
-# Whitelist directories
-!end/
-!end/**
-!omp/
-!omp/**
-!nvim/
-!nvim/**
-!tmux/
-!tmux/**
-!hammerspoon/
-!hammerspoon/**
-!zsh/
-!zsh/**
-!kitty/
-!kitty/**
+# ── Whitelisted directories ──────────────────────────────────────────────
+!.claude/
+!.claude/**
+!amp/
+!amp/**
 !bat/
 !bat/**
+!cake/
+!cake/**
 !claude/
 !claude/**
+!end/
+!end/**
+!gh/
+!gh/**
+!git/
+!git/**
+!hammerspoon/
+!hammerspoon/**
+!nvim/
+!nvim/**
+!omp/
+!omp/**
+!tit/
+!tit/**
+!tmux/
+!tmux/**
+!zsh/
+!zsh/**
 
-# Repo-level docs and scripts
-!WINDOWS-SETUP.md
-!README.md
-!bootstrap.sh
-!reset.sh
-!install.sh
-!scripts/
-!scripts/**
-
-# Keep .gitignore itself
+# ── Whitelisted root files ───────────────────────────────────────────────
+!.gitattributes
 !.gitignore
+!README.md
+!WINDOWS-SETUP.md
+!install.sh
+!bootstrap-macos.sh
+!bootstrap-windows.sh
+!reset-windows.sh
+
+# ── Excluded from whitelisted directories ────────────────────────────────
+.DS_Store
 end/state.xml
 end/conpty/
+gh/hosts.yml
+nvim/lazy-lock.json

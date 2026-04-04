@@ -1,0 +1,79 @@
+name = "Spring"
+description = "Fresh spring greens with vibrant energy"
+
+[palette]
+# Backgrounds - sapphire → ceruleanBlue → sapphire gradient
+mainBackgroundColor = "#323B9E"       # sapphire (main background)
+inlineBackgroundColor = "#0972BB"     # easternBlue (secondary areas)
+selectionBackgroundColor = "#090D12"  # bunker (highlight areas)
+
+# Text - Content & Body - green colors for positive, red for negative
+contentTextColor = "#179CA8"          # easternBlue - neutral readable
+labelTextColor = "#90D88D"            # feijoa (labels)
+dimmedTextColor = "#C8E189"           # yellowGreen (dimmed)
+accentTextColor = "#FEEA85"           # salomie - bright shortcuts
+highlightTextColor = "#D1D5DA"        # off-white (highlights)
+terminalTextColor = "#999999"         # neutral gray
+
+# Special Text
+cwdTextColor = "#FEEA85"              # salomie - bright yellow accent
+footerTextColor = "#58C9BA"           # downy - muted descriptions
+
+# Borders
+boxBorderColor = "#90D88D"            # feijoa
+separatorColor = "#0972BB"            # easternBlue
+
+# Confirmation Dialog
+confirmationDialogBackground = "#244DA8"  # ceruleanBlue
+
+# Conflict Resolver - Borders
+conflictPaneUnfocusedBorder = "#2C4144"
+conflictPaneFocusedBorder = "#90D88D"
+
+# Conflict Resolver - Selection
+conflictSelectionForeground = "#323B9E"  # sapphire
+conflictSelectionBackground = "#7EB8C5"  # brighter muted teal
+
+# Conflict Resolver - Pane Headers
+conflictPaneTitleColor = "#90D88D"       # feijoa
+
+# Status Colors - green for clean, red for dirty
+statusClean = "#5BCF90"               # emerald - vibrant positive
+statusDirty = "#FD5B68"               # wildWatermelon (dirty = red)
+
+# Timeline Colors
+timelineSynchronized = "#4ECB71"      # emerald (synced)
+timelineLocalAhead = "#5BCF90"        # emerald (ahead)
+timelineLocalBehind = "#F67F78"       # froly (behind)
+
+# Operation Colors - green for positive operations
+operationReady = "#4ECB71"            # emerald (ready)
+operationNotRepo = "#FD5B68"          # wildWatermelon (not repo)
+operationTimeTravel = "#F19A84"       # apricot (time travel)
+operationConflicted = "#FD5B68"       # wildWatermelon (conflicted)
+operationMerging = "#5BCF90"          # emerald (merging)
+operationRebasing = "#5BCF90"         # emerald (rebasing)
+operationDirtyOp = "#FD5B68"          # wildWatermelon (dirty)
+
+# UI Elements
+menuSelectionBackground = "#5BCF90"   # emerald - natural green
+buttonSelectedTextColor = "#3F2894"   # daisyBush - dark contrast
+
+# Animation
+spinnerColor = "#00FFFF"              # electric cyan
+
+# Diff Colors
+diffAddedLineColor = "#5BCF90"        # emerald (added)
+diffRemovedLineColor = "#FD5B68"      # wildWatermelon (removed)
+
+# Copy Hash Mode
+copyHashLabelForeground = "#323B9E"   # sapphire (dark contrast)
+copyHashLabelBackground = "#FEEA85"   # salomie (bright yellow)
+
+# Console Output Colors
+outputStdoutColor = "#999999"         # neutral gray
+outputStderrColor = "#FD5B68"         # wildWatermelon
+outputStatusColor = "#4ECB71"         # emerald
+outputWarningColor = "#F67F78"        # froly
+outputDebugColor = "#C8E189"          # yellowGreen
+outputInfoColor = "#37CB9F"           # shamrock

@@ -1,0 +1,66 @@
+name = "Default (TIT)"
+description = "TIT color scheme"
+
+[palette]
+mainBackgroundColor = "#090D12"       # bunker (main app background)
+inlineBackgroundColor = "#1B2A31"     # dark (secondary areas)
+selectionBackgroundColor = "#0D141C"  # corbeau (highlight areas)
+
+# Text - Content & Body
+contentTextColor = "#4E8C93"           # paradiso (body text in boxes)
+labelTextColor = "#8CC9D9"             # dolphin (labels, headers, borders)
+dimmedTextColor = "#33535B"            # mediterranea (disabled/muted)
+accentTextColor = "#01C2D2"            # caribbeanBlue (keyboard shortcuts)
+highlightTextColor = "#D1D5DA"         # off-white (bright contrast text)
+terminalTextColor = "#999999"          # neutral gray (command output)
+
+# Special Text
+cwdTextColor = "#67DFEF"               # poseidonJr (current working directory)
+footerTextColor = "#519299"            # lagoon (footer hints)
+
+# Borders - Conflict Resolver specific
+boxBorderColor = "#8CC9D9"                    # dolphin (borders for all boxes)
+conflictPaneUnfocusedBorder = "#2C4144"       # littleMermaid (OLD-TIT EXACT - unfocused)
+conflictPaneFocusedBorder = "#8CC9D9"         # dolphin (OLD-TIT EXACT - focused)
+
+# Selection - Conflict Resolver specific
+conflictSelectionForeground = "#090D12"       # bunker (selection text color)
+conflictSelectionBackground = "#7EB8C5"       # brighter muted teal (selection background)
+
+# Pane Headers
+conflictPaneTitleColor = "#8CC9D9"            # dolphin (pane title text)
+
+# Status & State
+statusClean = "#01C2D2"               # caribbeanBlue
+statusDirty = "#FC704C"            # preciousPersimmon
+timelineSynchronized = "#01C2D2"      # caribbeanBlue
+timelineLocalAhead = "#00C8D8"        # blueBikini
+timelineLocalBehind = "#F2AB53"       # safflower
+
+# Operation Colors
+operationReady = "#4ECB71"            # emerald green (ready state)
+operationNotRepo = "#FC704C"          # preciousPersimmon (error/not repo)
+operationTimeTravel = "#F2AB53"       # safflower (time travel - warm orange)
+operationConflicted = "#FC704C"       # preciousPersimmon (conflicts)
+operationMerging = "#00C8D8"          # blueBikini (merge in progress)
+operationRebasing = "#00C8D8"         # blueBikini (rebase in progress)
+operationDirtyOp = "#FC704C"          # preciousPersimmon (dirty operation)
+
+# Menu / Buttons
+menuSelectionBackground = "#7EB8C5"    # brighter muted teal (background when highlighted)
+buttonSelectedTextColor = "#0D1418"    # dark text on bright button background
+
+# Animation
+spinnerColor = "#00FFFF"               # electric cyan (vivid loading spinner)
+
+# Diff Colors (muted/desaturated for readability - old-tit exact)
+diffAddedLineColor = "#5A9C7A"          # muted green (added lines in diff)
+diffRemovedLineColor = "#B07070"        # muted red/burgundy (removed lines in diff)
+
+# Console Output (semantic colors for different output types)
+outputStdoutColor = "#999999"           # TerminalTextColor - regular command output
+outputStderrColor = "#FC704C"           # ErrorTextColor - stderr/error messages
+outputStatusColor = "#01C2D2"           # SuccessTextColor - status/success messages
+outputWarningColor = "#F2AB53"          # WarningTextColor - warning messages
+outputDebugColor = "#33535B"            # DimmedTextColor - debug/info messages
+outputInfoColor = "#01C2D2"             # InfoTextColor - TIT-generated info

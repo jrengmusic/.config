@@ -1,16 +1,21 @@
 #!/bin/bash
 # ============================================================================
-# install.sh — One-shot Windows dev environment install
+# install.sh — Universal dev environment installer
 # ============================================================================
-# Run on a fresh MSYS2 install (no .config repo yet).
-# Bootstraps git + openssh, clones .config, then chains to bootstrap.sh.
+# Detects OS/arch, bootstraps prerequisites, clones .config, then dispatches
+# to the appropriate bootstrap-<os>.sh script.
 #
-# One-liner (no Admin needed for this script):
+# Supports:
+#   macOS ARM64  (MBP M4)          → Homebrew
+#   macOS x86_64 (iMac 5K 2015)    → MacPorts
+#   Windows x64  (Bootcamp, ROG)   → MSYS2/MINGW64
+#   Windows ARM64 (UTM)            → MSYS2/CLANGARM64
+#
+# Fresh machine (no .config yet):
 #   curl -fsSL https://raw.githubusercontent.com/jrengmusic/.config/main/install.sh | bash
 #
-# Launch the correct shell first:
-#   ARM64 Windows → MSYS2 CLANGARM64
-#   x64 Windows   → MSYS2 MINGW64
+# Existing machine (fix SSOT, re-bootstrap):
+#   bash ~/.config/install.sh
 # ============================================================================
 set -e
 
@@ -19,56 +24,116 @@ YELLOW=$'\033[1;33m'
 RED=$'\033[0;31m'
 NC=$'\033[0m'
 
-info() { echo "${GREEN}[OK]${NC} $1"; }
-warn() { echo "${YELLOW}[!!]${NC} $1"; }
+info()  { echo "${GREEN}[OK]${NC} $1"; }
+warn()  { echo "${YELLOW}[!!]${NC} $1"; }
 error() { echo "${RED}[ERR]${NC} $1"; }
-step() { echo ""; echo "${GREEN}━━━ $1 ━━━${NC}"; }
+step()  { echo ""; echo "${GREEN}━━━ $1 ━━━${NC}"; }
 
 # ============================================================================
-# 1. Update pacman
+# 1. Detect OS and architecture
 # ============================================================================
-step "1. Update pacman"
-pacman -Syu --noconfirm
+step "1. Detect OS / architecture"
+
+OS=""
+ARCH=""
+BOOTSTRAP_SCRIPT=""
+
+case "$(uname -s)" in
+    Darwin)
+        OS="macos"
+        ARCH="$(uname -m)"
+        BOOTSTRAP_SCRIPT="bootstrap-macos.sh"
+        if [[ "$ARCH" == "arm64" ]]; then
+            info "macOS ARM64 (Apple Silicon)"
+        else
+            info "macOS x86_64 (Intel)"
+        fi
+        ;;
+    *MINGW*|*MSYS*|*CYGWIN*)
+        OS="windows"
+        BOOTSTRAP_SCRIPT="bootstrap-windows.sh"
+        # MSYSTEM is canonical for Windows arch detection (see bootstrap-windows.sh)
+        case "$MSYSTEM" in
+            CLANGARM64)
+                ARCH="arm64"
+                info "Windows ARM64 (CLANGARM64)"
+                ;;
+            *)
+                ARCH="x64"
+                info "Windows x64 ($MSYSTEM)"
+                ;;
+        esac
+        ;;
+    *)
+        error "Unsupported OS: $(uname -s)"
+        exit 1
+        ;;
+esac
 
 # ============================================================================
-# 2. Install git + openssh
+# 2. Resolve home directory
 # ============================================================================
-step "2. Install git + openssh"
-pacman -S --noconfirm --needed git openssh
-info "git: $(git --version)"
-info "ssh: $(ssh -V 2>&1)"
+step "2. Home directory"
+
+if [[ "$OS" == "windows" ]]; then
+    # MSYS2 home may be /home/<user> before nsswitch is configured
+    USER_HOME="/c/Users/$(whoami)"
+else
+    USER_HOME="$HOME"
+fi
+CONFIG_DIR="$USER_HOME/.config"
+info "Home: $USER_HOME"
+info "Config: $CONFIG_DIR"
 
 # ============================================================================
-# 3. SSH key
+# 3. Ensure git + SSH (Windows needs explicit install, macOS has Xcode CLT)
 # ============================================================================
-step "3. SSH key"
+step "3. Prerequisites"
 
-# $HOME is /home/<user> at this point — bootstrap.sh hasn't run yet.
-# Use Windows home explicitly.
-WIN_HOME="/c/Users/$(whoami)"
-SSH_DIR="$WIN_HOME/.ssh"
+if [[ "$OS" == "windows" ]]; then
+    # Update pacman and install git + openssh
+    pacman -Syu --noconfirm
+    pacman -S --noconfirm --needed git openssh
+    info "git: $(git --version)"
+    info "ssh: $(ssh -V 2>&1)"
+elif [[ "$OS" == "macos" ]]; then
+    # Xcode CLT provides git; prompt install if missing
+    if ! command -v git &>/dev/null; then
+        warn "Installing Xcode Command Line Tools (provides git)..."
+        xcode-select --install
+        echo "Press Enter after Xcode CLT finishes installing..."
+        read -r
+    fi
+    info "git: $(git --version)"
+fi
 
-# Resolve which key to use for GitHub:
-# 1. IdentityFile from ~/.ssh/config Host github.com block
-# 2. Common key name fallbacks
-# 3. Prompt
+# ============================================================================
+# 4. SSH key (for cloning private repos)
+# ============================================================================
+step "4. SSH key"
+
+if [[ "$OS" == "windows" ]]; then
+    WIN_HOME="/c/Users/$(whoami)"
+    SSH_DIR="$WIN_HOME/.ssh"
+else
+    SSH_DIR="$USER_HOME/.ssh"
+fi
+
+# Resolve which key to use for GitHub
 resolve_github_key() {
     local config="$SSH_DIR/config"
     if [[ -f "$config" ]]; then
-        # Extract IdentityFile from the github.com host block
         local key
         key=$(awk '
             /^[Hh]ost / { in_github = ($2 == "github.com") }
             in_github && /[Ii]dentity[Ff]ile/ { print $2; exit }
         ' "$config")
         if [[ -n "$key" ]]; then
-            # Expand ~ to WIN_HOME (~ is /home/<user> here, not what we want)
-            key="${key/#\~/$WIN_HOME}"
+            key="${key/#\~/$USER_HOME}"
             echo "$key"
             return
         fi
     fi
-    # Fallback: common key names
     local candidates=("id_ed25519_github" "id_ed25519" "id_rsa")
     for name in "${candidates[@]}"; do
         [[ -f "$SSH_DIR/$name" ]] && echo "$SSH_DIR/$name" && return
@@ -106,61 +171,63 @@ else
     fi
 fi
 
-# ============================================================================
-# 4. Start SSH agent
-# ============================================================================
-step "4. Start SSH agent"
-
-if [[ -z "$SSH_KEY" || ! -f "$SSH_KEY" ]]; then
-    error "No SSH key available — cannot continue. Add a key and re-run."
-    exit 1
+# Start SSH agent if key exists
+if [[ -n "$SSH_KEY" && -f "$SSH_KEY" ]]; then
+    eval "$(ssh-agent -s)" > /dev/null 2>&1
+    ssh-add "$SSH_KEY" 2>/dev/null
+    info "SSH agent started, key loaded"
 fi
 
-eval "$(ssh-agent -s)" > /dev/null
-ssh-add "$SSH_KEY"
-info "SSH agent started, key loaded: $SSH_KEY"
-
 # ============================================================================
-# 5. Clone .config
+# 5. Clone .config (if not already present)
 # ============================================================================
 step "5. Clone .config"
-
-WIN_HOME="/c/Users/$(whoami)"
-CONFIG_DIR="$WIN_HOME/.config"
 
 if [[ -d "$CONFIG_DIR/.git" ]]; then
     info ".config already cloned at $CONFIG_DIR"
 else
+    if [[ -z "$SSH_KEY" || ! -f "$SSH_KEY" ]]; then
+        error "No SSH key available — cannot clone. Add a key and re-run."
+        exit 1
+    fi
     info "Cloning to $CONFIG_DIR ..."
-    cd "$WIN_HOME"
-    git clone git@github.com:jrengmusic/.config.git .config
+    git clone git@github.com:jrengmusic/.config.git "$CONFIG_DIR"
     info "Cloned."
 fi
 
 # ============================================================================
-# 6. Chain to bootstrap.sh
+# 6. Dispatch to OS-specific bootstrap
 # ============================================================================
-step "6. bootstrap.sh"
+step "6. Dispatch → $BOOTSTRAP_SCRIPT"
 
-BOOTSTRAP="$CONFIG_DIR/bootstrap.sh"
+BOOTSTRAP="$CONFIG_DIR/$BOOTSTRAP_SCRIPT"
 
-# Detect if already running as Administrator (group 544 = Administrators)
-if id -G | grep -qw 544 2>/dev/null; then
-    info "Running as Administrator — chaining to bootstrap.sh"
-    exec bash "$BOOTSTRAP"
+if [[ ! -f "$BOOTSTRAP" ]]; then
+    error "Bootstrap script not found: $BOOTSTRAP"
+    exit 1
+fi
+
+if [[ "$OS" == "windows" ]]; then
+    # Windows bootstrap needs Administrator for system PATH, env vars, nsswitch
+    if id -G | grep -qw 544 2>/dev/null; then
+        info "Running as Administrator — chaining to $BOOTSTRAP_SCRIPT"
+        exec bash "$BOOTSTRAP"
+    else
+        warn "Not running as Administrator."
+        echo ""
+        echo "Launching $BOOTSTRAP_SCRIPT elevated via UAC..."
+        echo "(A UAC prompt will appear — click Yes)"
+        echo ""
+        BOOTSTRAP_WIN=$(cygpath -w "$BOOTSTRAP")
+        BASH_WIN="C:\\msys64\\usr\\bin\\bash.exe"
+        powershell.exe -Command "Start-Process '$BASH_WIN' -ArgumentList '--login','-c','bash \"$BOOTSTRAP_WIN\"' -Verb RunAs" 2>/dev/null || {
+            warn "Auto-elevation failed. Run manually as Administrator:"
+            echo ""
+            echo "  bash $BOOTSTRAP"
+            echo ""
+        }
+    fi
 else
-    warn "Not running as Administrator."
-    echo ""
-    echo "Launching bootstrap.sh elevated via UAC..."
-    echo "(A UAC prompt will appear — click Yes)"
-    echo ""
-    # Convert MSYS path to Windows path for PowerShell
-    BOOTSTRAP_WIN=$(cygpath -w "$BOOTSTRAP")
-    BASH_WIN="C:\\msys64\\usr\\bin\\bash.exe"
-    powershell.exe -Command "Start-Process '$BASH_WIN' -ArgumentList '--login','-c','bash \"$BOOTSTRAP_WIN\"' -Verb RunAs" 2>/dev/null || {
-        warn "Auto-elevation failed. Run manually as Administrator:"
-        echo ""
-        echo "  bash $BOOTSTRAP"
-        echo ""
-    }
+    info "Chaining to $BOOTSTRAP_SCRIPT"
+    exec bash "$BOOTSTRAP"
 fi

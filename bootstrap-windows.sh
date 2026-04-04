@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# bootstrap.sh — Windows dev environment setup (MSYS2/zsh)
+# bootstrap-windows.sh — Windows dev environment setup (MSYS2/zsh)
 # ============================================================================
 # Prerequisite: MSYS2 installed at C:\msys64
 #
