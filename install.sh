@@ -171,8 +171,10 @@ else
     fi
 fi
 
-# Start SSH agent if key exists
-if [[ -n "$SSH_KEY" && -f "$SSH_KEY" ]]; then
+# Start SSH agent only if not already functional
+if ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+    info "SSH already authenticated with GitHub"
+elif [[ -n "$SSH_KEY" && -f "$SSH_KEY" ]]; then
     eval "$(ssh-agent -s)" > /dev/null 2>&1
     ssh-add "$SSH_KEY" 2>/dev/null
     info "SSH agent started, key loaded"

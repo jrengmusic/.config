@@ -75,7 +75,6 @@ step "2. Packages"
 # Common packages (name may differ between brew/port)
 if [[ "$PLATFORM" == "macos-arm" ]]; then
     PACKAGES=(
-        zsh
         git
         git-lfs
         neovim
@@ -95,7 +94,6 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
     )
 else
     PACKAGES=(
-        zsh
         git
         git-lfs
         neovim
