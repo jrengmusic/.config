@@ -6,9 +6,9 @@ Change on any machine, push, pull everywhere. No daemon, no subscription, no bla
 
 | Machine | OS | Terminal | Shell |
 |---|---|---|---|
-| iMac 5K 2015 | macOS Monterey | kitty | zsh |
+| iMac 5K 2015 | macOS Monterey | END | zsh |
 | iMac 5K 2015 | Windows 10 | END | zsh |
-| MBP M4 | macOS | kitty | zsh |
+| MBP M4 | macOS | END | zsh |
 | MBP M4 | Windows 11 UTM | END | zsh |
 
 ## Windows Setup
