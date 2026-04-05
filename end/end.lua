@@ -126,7 +126,7 @@ END = {
 
 		-- Selection highlight colour.
 		-- Semi-transparent recommended so text remains readable.
-		selection = "#00DDEE10",
+		selection = "#00DDEE20",
 
 		-- Selection-mode cursor colour.
 		-- Shown instead of the normal cursor when selection mode is active.
@@ -509,6 +509,49 @@ END = {
 	},
 
 	-- ========================================================================
+	-- ACTION LIST
+	-- ========================================================================
+
+	action_list = {
+		-- Close the action list after running an action.
+		-- When false, the list stays open after execution.
+		close_on_run = true,
+
+		-- Font family for action name labels.
+		name_font_family = "Display",
+
+		-- Font size for action name labels in points (6 - 72).
+		name_font_size = 13.0,
+
+		-- Font family for keyboard shortcut labels. Should be monospace.
+		shortcut_font_family = "Display Mono Bold",
+
+		-- Font size for keyboard shortcut labels in points (6 - 72).
+		shortcut_font_size = 12.0,
+
+		-- Space between the action list edge and content, in pixels.
+		-- Four values: { top, right, bottom, left }. Valid range: 0 - 200.
+		padding = { 10.0, 10.0, 10.0, 10.0 },
+
+		-- Text colour for action name labels.
+		name_colour = "#A1D6E5",
+
+		-- Text colour for keyboard shortcut labels.
+		shortcut_colour = "#00C8D8",
+
+		-- Proportional width of the action list relative to the terminal window (0.1 - 1.0).
+		width = 0.3,
+
+		-- Maximum proportional height of the action list relative to the terminal window (0.1 - 1.0).
+		-- When all results exceed this height, the list scrolls.
+		height = 0.4,
+
+		-- Background colour for the highlighted/selected row.
+		-- Leave empty to use the terminal selection colour (colours.selection).
+		highlight_colour = "#00DDEE20",
+	},
+
+	-- ========================================================================
 	-- POPUP DEFAULTS
 	-- ========================================================================
 
@@ -583,9 +626,17 @@ END = {
 			command = "tit",
 			args = "",
 			cwd = "",
-			cols = 70,
+			cols = 80,
 			rows = 30,
 			modal = "t",
+		},
+		cake = {
+			command = "cake",
+			args = "",
+			cwd = "",
+			cols = 80,
+			rows = 30,
+			modal = "c",
 		},
 	--	btop = {
 	--		command = "htop",
