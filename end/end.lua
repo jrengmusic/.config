@@ -430,7 +430,7 @@ END = {
 
 		-- Prefix key for modal pane commands.
 		-- Press this key first, then press a pane action key within the timeout.
-		prefix = "`",
+		prefix = "tab",
 
 		-- Prefix key timeout in milliseconds (100 - 5000).
 		-- How long to wait for a pane action key after pressing prefix.
