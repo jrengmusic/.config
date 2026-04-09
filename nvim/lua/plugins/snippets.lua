@@ -10,15 +10,6 @@ return {
   setup = function()
     local luasnip = require('luasnip')
     
-    -- Debug: Check luasnip availability
-    vim.defer_fn(function()
-      if luasnip then
-        vim.cmd('echomsg "LuaSnip available: ' .. tostring(luasnip) .. '"')
-      else
-        vim.cmd('echomsg "LuaSnip not available"')
-      end
-    end, 100)
-    
     -- Load friendly-snippets collection with delay
     vim.defer_fn(function()
       local ok, err = pcall(function()
