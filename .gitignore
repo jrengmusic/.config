@@ -12,8 +12,6 @@
 !cake/**
 !claude/
 !claude/**
-!end/
-!end/**
 !git/
 !git/**
 !hammerspoon/
@@ -41,7 +39,4 @@
 
 # ── Excluded from whitelisted directories ────────────────────────────────
 .DS_Store
-end/state.xml
-end/conpty/
-gh/hosts.yml
 nvim/lazy-lock.json

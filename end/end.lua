@@ -50,6 +50,17 @@ END = {
 	},
 
 	-- ========================================================================
+	-- NEXUS
+	-- ========================================================================
+	--
+	-- Enable the Nexus background daemon.
+	-- When true, sessions survive window close. Relaunch reconnects.
+	-- When false, sessions die with the window (no daemon).
+	--
+
+	nexus = true,
+
+	-- ========================================================================
 	-- FONT
 	-- ========================================================================
 
@@ -430,7 +441,7 @@ END = {
 
 		-- Prefix key for modal pane commands.
 		-- Press this key first, then press a pane action key within the timeout.
-		prefix = "tab",
+		prefix = "`",
 
 		-- Prefix key timeout in milliseconds (100 - 5000).
 		-- How long to wait for a pane action key after pressing prefix.
