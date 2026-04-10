@@ -91,6 +91,7 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         tmux
         cmake
         ninja
+        btop
     )
 else
     PACKAGES=(
@@ -110,6 +111,7 @@ else
         tmux
         cmake
         ninja
+        btop
     )
 fi
 

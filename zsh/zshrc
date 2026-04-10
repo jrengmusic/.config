@@ -36,6 +36,7 @@ alias dev='cd ~/Documents/Poems/dev'
 alias modules='cd ~/Documents/Poems/inf/___modules___/'
 
 if [[ $OPERATING_SYSTEM == "windows" ]]; then
+  unsetopt CASE_GLOB
   command -v eza &>/dev/null && alias ls='eza -a --ignore-glob=".*"'
 else
   command -v eza &>/dev/null && alias ls='eza'

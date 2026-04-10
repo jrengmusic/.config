@@ -521,6 +521,7 @@ The following should be installed via winget or manually:
   winget install GoLang.Go
   winget install oven-sh.Bun
   winget install Git.Git
+  winget install aristocratos.btop4win    # x64-only, runs under emulation on ARM64
   winget install Microsoft.VisualStudio.2022.Community
     (with "Desktop development with C++" workload)
 

@@ -57,6 +57,7 @@ Install these manually before running the setup script:
 2. **Visual Studio 2022+** — with "Desktop development with C++" workload (provides vcvarsall.bat, MSVC linker, headers)
 3. **LLVM** — `winget install LLVM.LLVM` (provides clang-cl compiler + clangd LSP)
 4. **Neovim** — `winget install Neovim.Neovim`
+5. **btop4win** — `winget install aristocratos.btop4win` (x64-only, runs under emulation on ARM64)
 
 Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, zoxide, oh-my-posh) is installed by the setup script.
 
@@ -161,23 +162,10 @@ Downloaded directly to `~/.local/bin/`:
 
 ### 5b. ~/.local/bin Symlinks
 
-All tool binaries are symlinked into `~/.local/bin/` — the single directory on system PATH:
+Only tools whose source directory is NOT already in PATH are symlinked into `~/.local/bin/`. MSYS2 binaries in `/usr/bin` and `${MINGW_DIR}/bin` are already on PATH — symlinking them causes DLL load failures.
 
 | symlink | source |
 |---|---|
-| `zsh` | `/usr/bin/zsh.exe` |
-| `git-lfs` | `/mingw64/bin/git-lfs.exe` |
-| `go` | `/mingw64/bin/go.exe` |
-| `node` | `/mingw64/bin/node.exe` |
-| `npm` | `/mingw64/bin/npm` |
-| `cmake` | `/mingw64/bin/cmake.exe` |
-| `gcc` | `/mingw64/bin/gcc.exe` |
-| `ninja` | `/mingw64/bin/ninja.exe` |
-| `eza` | `/mingw64/bin/eza.exe` |
-| `fzf` | `/mingw64/bin/fzf.exe` |
-| `bat` | `/mingw64/bin/bat.exe` |
-| `python` | `/mingw64/bin/python.exe` |
-| `python3` | `/mingw64/bin/python3.exe` |
 | `bun` | `~/.bun/bin/bun.exe` |
 | `carol` | `~/.carol/bin/carol` |
 
@@ -356,6 +344,9 @@ The DAW hasn't started within the 3-second delay. Either increase the delay in `
 
 ### vsdbg / cppvsdbg won't work
 Microsoft's vsdbg debugger is licensed exclusively for VS Code. It validates the client and rejects nvim. Use codelldb with DWARF symbols instead.
+
+### `ls *.bat` doesn't find .bat files
+Zsh's `CASE_GLOB` is ON by default — glob matching is case-sensitive. On NTFS, filenames are case-preserving (e.g., stored as `FOO.BAT`), so `*.bat` won't match. The zshrc sets `unsetopt CASE_GLOB` in the Windows block to match NTFS case-insensitive behavior. macOS keeps case-sensitive globbing (HFS+ can be case-sensitive).
 
 ### Symlinks fail with "Permission denied"
 Ensure `MSYS=winsymlinks:nativestrict` is set as a Windows user environment variable. May also need Developer Mode enabled in Windows Settings > For developers.
