@@ -45,20 +45,18 @@ END = {
 	-- "false" — Force CPU rendering. No GPU used.
 	--
 
-	gpu = {
-		acceleration = "auto",
-	},
+	gpu = "auto",
 
 	-- ========================================================================
 	-- NEXUS
 	-- ========================================================================
 	--
 	-- Enable the Nexus background daemon.
-	-- When true, sessions survive window close. Relaunch reconnects.
-	-- When false, sessions die with the window (no daemon).
+	-- When "true", sessions survive window close. Relaunch reconnects.
+	-- When "false", sessions die with the window (no daemon).
 	--
 
-	nexus = true,
+	daemon = "true",
 
 	-- ========================================================================
 	-- FONT
@@ -73,11 +71,11 @@ END = {
 		size = 12.0,
 
 		-- Combine certain character sequences into symbols (e.g. -> becomes an arrow).
-		ligatures = true,
+		ligatures = "true",
 
 		-- Make text appear bolder.
 		-- Useful for thin fonts that are hard to read at small sizes.
-		embolden = true,
+		embolden = "true",
 
 		-- Line height multiplier applied to terminal cell height (0.5 - 3.0).
 		-- 1.0 = no adjustment. Values above 1.0 increase spacing, below decrease it.
@@ -102,15 +100,15 @@ END = {
 		char = "█",
 
 		-- Enable cursor blinking.
-		blink = true,
+		blink = "true",
 
 		-- Blink interval in milliseconds (100 - 5000).
 		-- Full cycle = 2x this value (on for interval, off for interval).
 		blink_interval = 500.0,
 
 		-- Lock the cursor to your configured shape and colour. Programs cannot change it.
-		-- When true, programs cannot change cursor shape or colour.
-		force = false,
+		-- When "true", programs cannot change cursor shape or colour.
+		force = "false",
 	},
 
 	-- ========================================================================
@@ -252,19 +250,19 @@ END = {
 		blur_radius = 32.0,
 
 		-- Keep window above all other windows.
-		always_on_top = false,
+		always_on_top = "false",
 
 		-- Show native window buttons (close / minimise / maximise).
-		buttons = false,
+		buttons = "false",
 
 		-- Force DWM visual effects on Windows 11 virtual machines.
-		-- When true, injects the ForceEffectMode registry key to enable
+		-- When "true", injects the ForceEffectMode registry key to enable
 		-- rounded window corners that DWM normally disables inside VMs.
 		-- Only takes effect on Windows 11 running on a software renderer (VM).
 		-- Requires elevated privileges (Run as Administrator).
 		-- Reload config and restart END to apply.
 		-- No effect on macOS, Linux, or physical Windows machines.
-		force_dwm = true,
+		force_dwm = "true",
 
 		-- Zoom multiplier (1.0 - 4.0).
 		-- Scales the terminal grid and font proportionally.
@@ -331,19 +329,19 @@ END = {
 
 	shell = {
 		-- Shell program name or absolute path.
-		program = "zsh",
+		program = "C:\\msys64\\usr\\bin\\zsh.exe",
 
 		-- Arguments passed to the shell program.
 		args = "-l",
 
 		-- Enable automatic shell integration.
-		-- When true, END creates shell hook scripts in ~/.config/end/
+		-- When "true", END creates shell hook scripts in ~/.config/end/
 		-- and injects them on shell startup. This enables:
 		--   - Clickable file links in command output
 		--   - Output block detection for the Open File feature
 		-- Supported shells: zsh, bash, fish.
-		-- Set to false to disable and remove integration scripts.
-		integration = true,
+		-- Set to "false" to disable and remove integration scripts.
+		integration = "true",
 	},
 
 	-- ========================================================================
@@ -370,9 +368,9 @@ END = {
 		drop_multifiles = "space",
 
 		-- Wrap dropped file paths in quotes so spaces and special characters work correctly.
-		-- true: paths with special characters are quoted for the active shell.
-		-- false: paths are pasted raw (for TUI apps that handle paths directly).
-		drop_quoted = true,
+		-- "true": paths with special characters are quoted for the active shell.
+		-- "false": paths are pasted raw (for TUI apps that handle paths directly).
+		drop_quoted = "true",
 	},
 
 	-- ========================================================================
@@ -398,40 +396,40 @@ END = {
 
 	keys = {
 		-- Copy selection to clipboard.
-		copy = "cmd+c",
+		copy = "ctrl+c",
 
 		-- Paste from clipboard.
-		paste = "cmd+v",
+		paste = "ctrl+v",
 
 		-- Quit application.
-		quit = "cmd+q",
+		quit = "ctrl+q",
 
 		-- Close active pane, then tab, then window.
-		close_tab = "cmd+w",
+		close_tab = "ctrl+w",
 
 		-- Reload configuration file.
-		reload = "cmd+r",
+		reload = "ctrl+r",
 
 		-- Increase zoom level.
-		zoom_in = "cmd+=",
+		zoom_in = "ctrl+=",
 
 		-- Decrease zoom level.
-		zoom_out = "cmd+-",
+		zoom_out = "ctrl+-",
 
 		-- Reset zoom to 1.0.
-		zoom_reset = "cmd+0",
+		zoom_reset = "ctrl+0",
 
 		-- Open a new window.
-		new_window = "cmd+n",
+		new_window = "ctrl+n",
 
 		-- Open a new tab.
-		new_tab = "cmd+t",
+		new_tab = "ctrl+t",
 
 		-- Switch to previous tab.
-		prev_tab = "cmd+[",
+		prev_tab = "ctrl+[",
 
 		-- Switch to next tab.
-		next_tab = "cmd+]",
+		next_tab = "ctrl+]",
 
 		-- Split pane horizontally (left/right). Prefix-mode key.
 		split_horizontal = "\\",
@@ -525,8 +523,8 @@ END = {
 
 	action_list = {
 		-- Close the action list after running an action.
-		-- When false, the list stays open after execution.
-		close_on_run = true,
+		-- When "false", the list stays open after execution.
+		close_on_run = "true",
 
 		-- Font family for action name labels.
 		name_font_family = "Display",
@@ -649,13 +647,13 @@ END = {
 			rows = 30,
 			modal = "c",
 		},
-	--	btop = {
-	--		command = "htop",
-	--		cwd = "~",
-	--		cols = 80,
-	--		rows = 24,
-	--		modal = "p",
-	--		global = "cmd+shift+p",
-	--     },
+		--	btop = {
+		--		command = "htop",
+		--		cwd = "~",
+		--		cols = 80,
+		--		rows = 24,
+		--		modal = "p",
+		--		global = "cmd+shift+p",
+		--     },
 	},
 }

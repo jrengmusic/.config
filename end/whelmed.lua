@@ -186,9 +186,9 @@ WHELMED = {
     -- Vim-style keyboard navigation within the document.
     --
 
-    scroll_down   = "%%scroll_down%%",    -- scroll down one step
-    scroll_up     = "%%scroll_up%%",      -- scroll up one step
-    scroll_top    = "%%scroll_top%%",     -- jump to top (gg)
-    scroll_bottom = "%%scroll_bottom%%",  -- jump to bottom (G)
-    scroll_step   = %%scroll_step%%,      -- pixels per scroll step
+    scroll_down   = "j",    -- scroll down one step
+    scroll_up     = "k",      -- scroll up one step
+    scroll_top    = "gg",     -- jump to top (gg)
+    scroll_bottom = "G",  -- jump to bottom (G)
+    scroll_step   = 50.0,      -- pixels per scroll step
 }

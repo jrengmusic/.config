@@ -85,6 +85,7 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         bat
         fd
         ripgrep
+        jq
         zsh-syntax-highlighting
         oh-my-posh
         zoxide
@@ -105,6 +106,7 @@ else
         bat
         fd
         ripgrep
+        jq
         zsh-syntax-highlighting
         oh-my-posh
         zoxide

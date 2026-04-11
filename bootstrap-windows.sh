@@ -233,6 +233,7 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-python-pipx"  # Mason uses pipx to install cmake-language-server
     "${PKG_PREFIX}-fd"           # snacks.nvim file finder (find is disabled on Windows by snacks)
     "${PKG_PREFIX}-ripgrep"      # snacks.nvim grep search (<leader>fg)
+    "${PKG_PREFIX}-jq"           # JSON processor (used by carol for settings.json merge)
 )
 
 for pkg in "${PACMAN_PKGS[@]}"; do

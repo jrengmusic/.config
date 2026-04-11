@@ -59,7 +59,7 @@ Install these manually before running the setup script:
 4. **Neovim** — `winget install Neovim.Neovim`
 5. **btop4win** — `winget install aristocratos.btop4win` (x64-only, runs under emulation on ARM64)
 
-Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, zoxide, oh-my-posh) is installed by the setup script.
+Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, jq, zoxide, oh-my-posh) is installed by the setup script.
 
 > **ARM64 note:** `uname -m` always returns `x86_64` in every MSYS2 environment — the MSYS2 runtime is an x64 binary running under Windows x64 emulation ([msys2-runtime#171](https://github.com/msys2/msys2-runtime/issues/171)). `PROCESSOR_ARCHITECTURE` is also unreliable: Windows reports `AMD64` for x64 bash processes even on ARM64 hardware ([MSYS2-packages#4960](https://github.com/msys2/MSYS2-packages/issues/4960)).
 >
@@ -143,7 +143,7 @@ Via `pacman` (prefix is `mingw-w64-x86_64-` on x64, `mingw-w64-clang-aarch64-` o
 - `<prefix>-nodejs` (includes npm)
 - `<prefix>-python`, `<prefix>-python-pip`, `<prefix>-python-pipx`
 - `<prefix>-eza`, `<prefix>-fzf`, `<prefix>-bat`, `<prefix>-gcc`
-- `<prefix>-fd`, `<prefix>-ripgrep`
+- `<prefix>-fd`, `<prefix>-ripgrep`, `<prefix>-jq`
 
 ### 4b. Bun
 
