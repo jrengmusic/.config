@@ -7,7 +7,7 @@ else
   OPERATING_SYSTEM="macos-intel"
 fi
 
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/go/bin:$HOME/.local/bin:$PATH"
 
 # Package manager
 if [[ $OPERATING_SYSTEM == "macos-arm" ]]; then
