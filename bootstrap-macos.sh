@@ -127,6 +127,19 @@ for pkg in "${PACKAGES[@]}"; do
 done
 
 # ============================================================================
+# 2b. goreleaser (via go install)
+# ============================================================================
+step "2b. goreleaser"
+
+if command -v goreleaser &>/dev/null; then
+    info "goreleaser already installed"
+else
+    warn "Installing goreleaser via go install..."
+    GOBIN="$HOME/.local/bin" go install github.com/goreleaser/goreleaser/v2@latest
+    info "goreleaser installed"
+fi
+
+# ============================================================================
 # 3. bun
 # ============================================================================
 step "3. bun"

@@ -56,7 +56,7 @@ END = {
 	-- When "false", sessions die with the window (no daemon).
 	--
 
-	daemon = "true",
+	daemon = "false",
 
 	-- ========================================================================
 	-- FONT
@@ -84,6 +84,13 @@ END = {
 		-- Cell width multiplier applied to terminal cell width (0.5 - 3.0).
 		-- 1.0 = no adjustment. Values above 1.0 widen cells, below narrow them.
 		cell_width = 1.0,
+
+		-- Whether font size follows the Windows desktop scale.
+		-- "true"  — font size scales with the desktop scale (system default behaviour).
+		-- "false" — font stays at its configured point size in physical pixels
+		--           regardless of the desktop scale slider (12pt always looks 12pt).
+		-- Windows only. No effect on macOS or Linux.
+		desktop_scale = "false",
 	},
 
 	-- ========================================================================
@@ -264,9 +271,10 @@ END = {
 		-- No effect on macOS, Linux, or physical Windows machines.
 		force_dwm = "true",
 
-		-- Zoom multiplier (1.0 - 4.0).
-		-- Scales the terminal grid and font proportionally.
-		zoom = 1.0,
+		-- Show a confirmation dialog when quitting (Ctrl+Q / Cmd+Q).
+		-- When "true", a dialog asks before quitting.
+		-- When "false", standalone quits immediately; nexus keeps the daemon alive.
+		close_confirmation = "true",
 	},
 
 	-- ========================================================================
@@ -408,7 +416,7 @@ END = {
 		close_tab = "ctrl+w",
 
 		-- Reload configuration file.
-		reload = "ctrl+r",
+		reload = "ctrl+/",
 
 		-- Increase zoom level.
 		zoom_in = "ctrl+=",
@@ -549,11 +557,11 @@ END = {
 		shortcut_colour = "#00C8D8",
 
 		-- Proportional width of the action list relative to the terminal window (0.1 - 1.0).
-		width = 0.3,
+		width = 0.6,
 
 		-- Maximum proportional height of the action list relative to the terminal window (0.1 - 1.0).
 		-- When all results exceed this height, the list scrolls.
-		height = 0.4,
+		height = 0.6,
 
 		-- Background colour for the highlighted/selected row.
 		-- Leave empty to use the terminal selection colour (colours.selection).
@@ -647,13 +655,13 @@ END = {
 			rows = 30,
 			modal = "c",
 		},
-		--	btop = {
-		--		command = "htop",
-		--		cwd = "~",
-		--		cols = 80,
-		--		rows = 24,
-		--		modal = "p",
-		--		global = "cmd+shift+p",
-		--     },
+		btop = {
+			command = "btop",
+			args = "",
+			cwd = "",
+			cols = 100,
+			rows = 40,
+			modal = "q",
+		},
 	},
 }

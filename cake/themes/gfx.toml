@@ -1,5 +1,5 @@
 name = "GFX"
-description = "TIT default theme - reference for all other themes"
+description = "GFX default theme - reference for all other themes"
 
 [palette]
 # Backgrounds
@@ -13,7 +13,6 @@ labelTextColor = "#8CC9D9"            # dolphin
 dimmedTextColor = "#33535B"           # mediterranea
 accentTextColor = "#01C2D2"           # caribbeanBlue
 highlightTextColor = "#D1D5DA"        # off-white
-terminalTextColor = "#999999"         # neutral gray
 
 # Special Text
 cwdTextColor = "#67DFEF"              # poseidonJr
@@ -26,45 +25,9 @@ separatorColor = "#1B2A31"            # dark
 # Confirmation Dialog
 confirmationDialogBackground = "#112130"  # trappedDarkness
 
-# Conflict Resolver - Borders
-conflictPaneUnfocusedBorder = "#2C4144"
-conflictPaneFocusedBorder = "#8CC9D9"
-
-# Conflict Resolver - Selection
-conflictSelectionForeground = "#090D12"  # bunker
-conflictSelectionBackground = "#7EB8C5"  # brighter muted teal
-
-# Conflict Resolver - Pane Headers
-conflictPaneTitleColor = "#8CC9D9"       # dolphin
-
-# Status Colors
-statusClean = "#01C2D2"               # caribbeanBlue
-statusDirty = "#FC704C"               # preciousPersimmon
-
-# Timeline Colors
-timelineSynchronized = "#01C2D2"      # caribbeanBlue
-timelineLocalAhead = "#00C8D8"        # blueBikini
-timelineLocalBehind = "#F2AB53"       # safflower
-
-# Operation Colors
-operationReady = "#4ECB71"            # emerald green
-operationNotRepo = "#FC704C"          # preciousPersimmon
-operationTimeTravel = "#F2AB53"       # safflower
-operationConflicted = "#FC704C"       # preciousPersimmon
-operationMerging = "#00C8D8"          # blueBikini
-operationRebasing = "#00C8D8"         # blueBikini
-operationDirtyOp = "#FC704C"          # preciousPersimmon
-
 # UI Elements / Buttons
 menuSelectionBackground = "#7EB8C5"   # brighter muted teal
 buttonSelectedTextColor = "#0D1418"   # dark text
-
-# Animation
-spinnerColor = "#00FFFF"              # electric cyan
-
-# Diff Colors
-diffAddedLineColor = "#5A9C7A"        # muted green
-diffRemovedLineColor = "#B07070"      # muted red
 
 # Console Output Colors
 outputStdoutColor = "#999999"         # neutral gray
@@ -73,3 +36,4 @@ outputStatusColor = "#01C2D2"         # caribbeanBlue
 outputWarningColor = "#F2AB53"        # safflower
 outputDebugColor = "#33535B"          # mediterranea
 outputInfoColor = "#01C2D2"           # caribbeanBlue
+spinnerColor = "#FC704C"              # preciousPersimmon

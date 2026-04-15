@@ -301,6 +301,19 @@ else
 fi
 
 # ============================================================================
+# 4e. goreleaser (via go install — not in MSYS2 repos)
+# ============================================================================
+step "4e. goreleaser"
+
+if command -v goreleaser &>/dev/null; then
+    info "goreleaser already installed"
+else
+    warn "Installing goreleaser via go install..."
+    GOBIN="$WINDOWS_HOME/.local/bin" go install github.com/goreleaser/goreleaser/v2@latest
+    info "goreleaser installed"
+fi
+
+# ============================================================================
 # 5. Download standalone tools (oh-my-posh, zoxide)
 # ============================================================================
 step "5. Standalone tools"
