@@ -389,7 +389,6 @@ link_bin() {
         warn "Skipping symlink for $name: source not found at $src"
         return
     fi
-    # Symlink without extension (for zsh/bash)
     # Remove stale regular-file copies that ln -sf would silently produce
     # when MSYS=winsymlinks:nativestrict was not active in a previous run.
     if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
@@ -398,17 +397,6 @@ link_bin() {
         [[ -e "$dst" && ! -L "$dst" ]] && rm -f "$dst"
         ln -sf "$src" "$dst"
         info "Symlinked: $name → $src"
-    fi
-    # Symlink with .exe extension (for Windows-native callers)
-    if [[ "$src" == *.exe ]]; then
-        local dst_exe="$WINDOWS_HOME/.local/bin/$name.exe"
-        if [[ -L "$dst_exe" && "$(readlink "$dst_exe")" == "$src" ]]; then
-            info "Already symlinked: $name.exe"
-        else
-            [[ -e "$dst_exe" && ! -L "$dst_exe" ]] && rm -f "$dst_exe"
-            ln -sf "$src" "$dst_exe"
-            info "Symlinked: $name.exe → $src"
-        fi
     fi
 }
 
@@ -459,7 +447,7 @@ echo "  - DAP adapter: codelldb on macOS, whatdbg on Windows"
 echo "  - whatdbg reads PDB symbols via dbgeng.dll (supports DAW plugin attach)"
 
 # ============================================================================
-# 10. Carol (carolcode wrapper)
+# 10. Carol
 # ============================================================================
 step "10. Carol"
 
