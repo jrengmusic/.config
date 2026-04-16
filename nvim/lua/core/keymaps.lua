@@ -253,6 +253,54 @@ function M.setupDap()
   local function buildScript() return vim.fn.stdpath('config') .. (is_windows and '\\scripts\\build-debug.bat' or '/scripts/build-debug.sh') end
   local function cleanScript() return toMsys(vim.fn.stdpath('config') .. '/scripts/clean-build.sh') end
 
+  local DAP_TERMINATE_GRACE_MS = 200
+  local BUILD_GUARD_LISTENER_KEY = 'build_guard'
+
+  local function terminateDap()
+    dap.terminate()
+    dapui.close()
+    local projectType = dapConfig.detectProjectType()
+    if projectType == 'plugin' then
+      local function killDaw(daw)
+        if is_windows then
+          vim.fn.jobstart({ 'taskkill', '/F', '/IM', daw })
+        else
+          vim.fn.jobstart({ 'killall', daw })
+        end
+      end
+      local config = dapConfig.loadDawConfig(function(cfg)
+        if cfg and cfg.daw then killDaw(cfg.daw) end
+      end)
+      if config and config.daw then
+        killDaw(config.daw)
+      end
+    end
+    return projectType
+  end
+
+  local function killDapThen(continuation)
+    if dap.session() == nil then
+      continuation()
+    else
+      dap.listeners.after.terminate[BUILD_GUARD_LISTENER_KEY] = function()
+        dap.listeners.after.terminate[BUILD_GUARD_LISTENER_KEY] = nil
+        vim.defer_fn(continuation, DAP_TERMINATE_GRACE_MS)
+      end
+      terminateDap()
+    end
+  end
+
+  local function bindAbort(term_buf, term_win, job_id, onAbort)
+    vim.keymap.set('t', '<Esc>', function()
+      onAbort()
+      vim.fn.jobstop(job_id)
+      if vim.api.nvim_win_is_valid(term_win) then
+        vim.api.nvim_win_close(term_win, true)
+      end
+      vim.notify('Aborted', vim.log.levels.WARN)
+    end, { buffer = term_buf, nowait = true })
+  end
+
   -- Build functions (extracted for reuse)
   local function runBuildOnly()
     vim.cmd('silent! wa')
@@ -297,17 +345,30 @@ function M.setupDap()
         end, 500)
       end
 
+      local isAborted = false
+      local job_id
       if is_windows then
-        vim.fn.jobstart({script, root, scheme, format}, {term = true, on_exit = function(_, exit_code)
-          on_build_exit(exit_code)
+        job_id = vim.fn.jobstart({script, root, scheme, format}, {term = true, on_exit = function(_, exit_code)
+          if isAborted then
+            -- skip: abort handler already closed window and notified
+          else
+            on_build_exit(exit_code)
+          end
         end})
       else
-        vim.fn.termopen({script, root, scheme, format})
+        job_id = vim.fn.termopen({script, root, scheme, format})
         vim.api.nvim_create_autocmd('TermClose', {
           buffer = term_buf, once = true,
-          callback = function() on_build_exit(vim.v.event.status) end,
+          callback = function()
+            if isAborted then
+              -- skip: abort handler already closed window and notified
+            else
+              on_build_exit(vim.v.event.status)
+            end
+          end,
         })
       end
+      bindAbort(term_buf, term_win, job_id, function() isAborted = true end)
     end
     
     if projectType == 'standalone' then
@@ -348,11 +409,21 @@ function M.setupDap()
         end
       end)
     end
-    if is_windows then
-      vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = closeTerminal})
-    else
-      vim.fn.termopen({script, root}, {on_exit = closeTerminal})
+    local isAborted = false
+    local job_id
+    local function onExit(_, exit_code)
+      if isAborted then
+        -- skip: abort handler already closed window and notified
+      else
+        closeTerminal(_, exit_code)
+      end
     end
+    if is_windows then
+      job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = onExit})
+    else
+      job_id = vim.fn.termopen({script, root}, {on_exit = onExit})
+    end
+    bindAbort(buf, win, job_id, function() isAborted = true end)
     vim.cmd('startinsert')
   end
 
@@ -400,28 +471,7 @@ function M.setupDap()
 
   -- Terminate + close DAW/App (auto-detects project type)
   vim.keymap.set('n', '<leader>dt', function()
-    dap.terminate()
-    dapui.close()
-    
-    local projectType = dapConfig.detectProjectType()
-    
-    if projectType == 'plugin' then
-      -- For plugins: also kill the DAW process
-      local function killDaw(daw)
-        if is_windows then
-          vim.fn.jobstart({ 'taskkill', '/F', '/IM', daw })
-        else
-          vim.fn.jobstart({ 'killall', daw })
-        end
-      end
-      local config = dapConfig.loadDawConfig(function(cfg)
-        if cfg and cfg.daw then killDaw(cfg.daw) end
-      end)
-      if config and config.daw then
-        killDaw(config.daw)
-      end
-    elseif projectType == 'standalone' then
-      -- For standalone: just terminate (no DAW to kill)
+    if terminateDap() == 'standalone' then
       vim.notify('Standalone app terminated')
     end
   end, { desc = 'DAP: Terminate + close DAW/App' })
@@ -430,7 +480,7 @@ function M.setupDap()
   vim.keymap.set('v', '<leader>de', dapui.eval, { desc = 'DAP: Evaluate selection' })
 
   -- Build group keymaps
-  vim.keymap.set('n', '<leader>br', function()
+  vim.keymap.set('n', '<leader>br', function() killDapThen(function()
     -- Auto-save all buffers before building
     vim.cmd('silent! wa')
     
@@ -466,15 +516,30 @@ function M.setupDap()
           end, { buffer = term_buf, nowait = true })
         end
       end
+      local isAborted = false
+      local job_id
       if is_windows then
-        vim.fn.jobstart(args, {term = true, on_exit = function(_, exit_code) on_exit(exit_code) end})
+        job_id = vim.fn.jobstart(args, {term = true, on_exit = function(_, exit_code)
+          if isAborted then
+            -- skip: abort handler already closed window and notified
+          else
+            on_exit(exit_code)
+          end
+        end})
       else
-        vim.fn.termopen(args)
+        job_id = vim.fn.termopen(args)
         vim.api.nvim_create_autocmd('TermClose', {
           buffer = term_buf, once = true,
-          callback = function() on_exit(vim.v.event.status) end,
+          callback = function()
+            if isAborted then
+              -- skip: abort handler already closed window and notified
+            else
+              on_exit(vim.v.event.status)
+            end
+          end,
         })
       end
+      bindAbort(term_buf, term_win, job_id, function() isAborted = true end)
       vim.cmd('startinsert')
     end
 
@@ -525,46 +590,57 @@ function M.setupDap()
     else
       vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
     end
-  end, { desc = 'DAP: Build and run' })
+  end) end, { desc = 'DAP: Build and run' })
 
-  vim.keymap.set('n', '<leader>bb', runBuildOnly, { desc = 'DAP: Build only' })
+  vim.keymap.set('n', '<leader>bb', function() killDapThen(runBuildOnly) end, { desc = 'DAP: Build only' })
 
-  vim.keymap.set('n', '<leader>bc', function()
+  vim.keymap.set('n', '<leader>bc', function() killDapThen(function()
     local root = vim.fn.getcwd()
     local script = cleanScript()
     vim.cmd('botright 20split')
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_set_current_buf(buf)
+    local win = vim.api.nvim_get_current_win()
+    local isAborted = false
+    local job_id
     if is_windows then
-      vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = function(_, exit_code)
-        if exit_code == 0 then
-          vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
-          runBuildOnly()
+      job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = function(_, exit_code)
+        if isAborted then
+          -- skip: abort handler already closed window and notified
         else
-          vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
-        end
-      end})
-    else
-      vim.fn.termopen({script, root})
-      local term_buf = vim.api.nvim_get_current_buf()
-      vim.api.nvim_create_autocmd('TermClose', {
-        buffer = term_buf,
-        once = true,
-        callback = function()
-          local exit_code = vim.v.event.status
           if exit_code == 0 then
             vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
             runBuildOnly()
           else
             vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
           end
+        end
+      end})
+    else
+      job_id = vim.fn.termopen({script, root})
+      vim.api.nvim_create_autocmd('TermClose', {
+        buffer = buf,
+        once = true,
+        callback = function()
+          if isAborted then
+            -- skip: abort handler already closed window and notified
+          else
+            local exit_code = vim.v.event.status
+            if exit_code == 0 then
+              vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
+              runBuildOnly()
+            else
+              vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+            end
+          end
         end,
       })
     end
+    bindAbort(buf, win, job_id, function() isAborted = true end)
     vim.cmd('startinsert')
-  end, { desc = 'DAP: Clean build' })
+  end) end, { desc = 'DAP: Clean build' })
 
-  vim.keymap.set('n', '<leader>bk', runCleanOnly, { desc = 'DAP: Clean' })
+  vim.keymap.set('n', '<leader>bk', function() killDapThen(runCleanOnly) end, { desc = 'DAP: Clean' })
 end
 
 -- Surround: use mini.surround defaults
