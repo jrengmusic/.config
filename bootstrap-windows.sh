@@ -511,6 +511,26 @@ else
     info "Symlinked settings.json → $SETTINGS_SRC"
 fi
 
+# Seed ~/.claude/settings.local.json with the per-machine carol marketplace
+# entry if absent. Claude Code deep-merges local into user settings at read
+# time, so extraKnownMarketplaces lives here (absolute path differs per OS).
+SETTINGS_LOCAL="$WINDOWS_HOME/.claude/settings.local.json"
+if [[ ! -e "$SETTINGS_LOCAL" ]]; then
+    cat > "$SETTINGS_LOCAL" <<EOF
+{
+  "extraKnownMarketplaces": {
+    "carol-marketplace": {
+      "source": {
+        "source": "directory",
+        "path": "$WINDOWS_HOME/.carol"
+      }
+    }
+  }
+}
+EOF
+    info "Seeded settings.local.json with carol-marketplace → $WINDOWS_HOME/.carol"
+fi
+
 # Project CLAUDE.md — symlink CAROL.md as project-level instructions
 CAROL_MD_SRC="$WINDOWS_HOME/.carol/CAROL.md"
 CAROL_MD_DST="$WINDOWS_HOME/.config/CLAUDE.md"
