@@ -53,8 +53,13 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     eval "$(/opt/homebrew/bin/brew shellenv)"
+    # Prevent silent hangs: skip auto-update on every invocation and skip
+    # post-install cleanup. Run `brew update` manually when desired.
+    export HOMEBREW_NO_AUTO_UPDATE=1
+    export HOMEBREW_NO_INSTALL_CLEANUP=1
+    export HOMEBREW_NO_ENV_HINTS=1
     PKG_INSTALL="brew install"
-    PKG_CHECK="brew list"
+    PKG_CHECK="brew list --formula"
 else
     if command -v port &>/dev/null; then
         info "MacPorts already installed"
@@ -118,9 +123,11 @@ else
 fi
 
 for pkg in "${PACKAGES[@]}"; do
+    printf "  checking %s... " "$pkg"
     if $PKG_CHECK "$pkg" &>/dev/null; then
-        info "Already installed: $pkg"
+        echo "installed"
     else
+        echo "missing"
         warn "Installing: $pkg"
         $PKG_INSTALL "$pkg"
     fi
