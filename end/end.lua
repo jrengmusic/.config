@@ -271,10 +271,19 @@ END = {
 		-- No effect on macOS, Linux, or physical Windows machines.
 		force_dwm = "true",
 
-		-- Show a confirmation dialog when quitting (Ctrl+Q / Cmd+Q).
-		-- When "true", a dialog asks before quitting.
-		-- When "false", standalone quits immediately; nexus keeps the daemon alive.
-		close_confirmation = "true",
+		-- Persist window size across instances to ~/.config/end/window.state.
+		-- When "true", every quit writes the current window size; new instances
+		-- (with no session to restore) load it as their initial size.
+		-- When "false", the file is neither read nor written; new instances
+		-- fall back to window.width and window.height above.
+		-- Restored sessions always use their own persisted window size and
+		-- ignore window.state regardless of this setting.
+		save_size = "true",
+
+		-- Show a confirmation dialog when Ctrl+Q is pressed.
+		-- When "true", a Yes/No dialog asks before quitting (or saving the session
+		-- in daemon mode).  When "false", Ctrl+Q quits immediately with no prompt.
+		confirmation_on_exit = "true",
 	},
 
 	-- ========================================================================
@@ -537,11 +546,17 @@ END = {
 		-- Font family for action name labels.
 		name_font_family = "Display",
 
+		-- Action-list action-name font style (Regular, Bold, Book, Medium).
+		name_font_style = "Bold",
+
 		-- Font size for action name labels in points (6 - 72).
 		name_font_size = 13.0,
 
 		-- Font family for keyboard shortcut labels. Should be monospace.
-		shortcut_font_family = "Display Mono Bold",
+		shortcut_font_family = "Display Mono",
+
+		-- Action-list shortcut font style (Regular, Bold).
+		shortcut_font_style = "Bold",
 
 		-- Font size for keyboard shortcut labels in points (6 - 72).
 		shortcut_font_size = 12.0,
@@ -557,11 +572,11 @@ END = {
 		shortcut_colour = "#00C8D8",
 
 		-- Proportional width of the action list relative to the terminal window (0.1 - 1.0).
-		width = 0.6,
+		width = 0.3,
 
 		-- Maximum proportional height of the action list relative to the terminal window (0.1 - 1.0).
 		-- When all results exceed this height, the list scrolls.
-		height = 0.6,
+		height = 0.3,
 
 		-- Background colour for the highlighted/selected row.
 		-- Leave empty to use the terminal selection colour (colours.selection).
