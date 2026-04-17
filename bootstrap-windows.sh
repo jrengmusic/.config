@@ -499,6 +499,18 @@ else
     info "Symlinked CLAUDE.md → $CLAUDE_MD_SRC"
 fi
 
+# Global settings.json — symlink from config repo to ~/.claude/
+# Portable keys only; machine-specific extraKnownMarketplaces stays in settings.local.json.
+SETTINGS_SRC="$WINDOWS_HOME/.config/claude/settings.json"
+SETTINGS_DST="$WINDOWS_HOME/.claude/settings.json"
+if [[ -L "$SETTINGS_DST" && "$(readlink "$SETTINGS_DST")" == "$SETTINGS_SRC" ]]; then
+    info "settings.json symlink already correct"
+else
+    [[ -e "$SETTINGS_DST" && ! -L "$SETTINGS_DST" ]] && rm -f "$SETTINGS_DST"
+    ln -sf "$SETTINGS_SRC" "$SETTINGS_DST"
+    info "Symlinked settings.json → $SETTINGS_SRC"
+fi
+
 # Project CLAUDE.md — symlink CAROL.md as project-level instructions
 CAROL_MD_SRC="$WINDOWS_HOME/.carol/CAROL.md"
 CAROL_MD_DST="$WINDOWS_HOME/.config/CLAUDE.md"

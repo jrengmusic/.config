@@ -33,21 +33,15 @@ function M.setup()
       }
     end
   else
-    -- macOS: codelldb (LLDB-based, reads DWARF natively)
-    local mason_data = vim.fn.stdpath('data') .. '/mason/packages/codelldb'
-    local codelldbPath = mason_data .. '/extension/adapter/codelldb'
-    local liblldbPath  = mason_data .. '/extension/lldb/lib/liblldb.dylib'
+    -- macOS: whatdbg (standalone adapter, same binary as Windows, no .exe)
+    local whatdbgPath = vim.fn.expand('~/.local/bin/whatdbg')
 
-    if vim.fn.executable(codelldbPath) ~= 1 then
-      vim.notify('codelldb not found. Run :Mason and install it.', vim.log.levels.WARN)
-      return false
+    if vim.fn.executable(whatdbgPath) == 1 then
+      dap.adapters.whatdbg = {
+        type = 'executable',
+        command = whatdbgPath,
+      }
     end
-
-    dap.adapters.codelldb = {
-      type = 'executable',
-      command = codelldbPath,
-      args = { '--liblldb', liblldbPath },
-    }
   end
 
   return true

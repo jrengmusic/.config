@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm /Users/jreng/.claude/settings.json)",
+      "Bash(ln -s /Users/jreng/.config/claude/settings.json /Users/jreng/.claude/settings.json)",
+      "Read(//Users/jreng/.claude/**)"
+    ]
+  }
+}
