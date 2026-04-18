@@ -49,52 +49,30 @@ function M.setup()
   -- Auto open/close DAP UI
   dap.listeners.before.attach.dapui_config = function()
     dapui.open()
-    if is_mac then
-      local projectType = dapConfig.detectProjectType()
-      if projectType == 'plugin' then
-        local config = dapConfig.loadDawConfig()
-        if config and config.daw then
-          hs_call(string.format("require('debug-layout').setupDebugLayout('%s')", config.daw))
-        end
-      end
-    end
   end
 
   dap.listeners.before.launch.dapui_config = function()
     dapui.open()
-    if is_mac then
-      local projectType = dapConfig.detectProjectType()
-      if projectType == 'plugin' then
-        local config = dapConfig.loadDawConfig()
-        if config and config.daw then
-          hs_call(string.format("require('debug-layout').setupDebugLayout('%s')", config.daw))
-        end
-      end
-    end
   end
 
   dap.listeners.before.event_terminated.dapui_config = function()
     dapui.close()
-    hs_call("require('debug-layout').restoreNormalLayout()")
   end
 
   dap.listeners.before.event_exited.dapui_config = function()
     dapui.close()
-    hs_call("require('debug-layout').restoreNormalLayout()")
   end
 
   -- Covers adapters (e.g. whatdbg/dbgeng on Windows) that close the transport
   -- without emitting event_terminated or event_exited.
   dap.listeners.before.disconnect.dapui_config = function()
     dapui.close()
-    hs_call("require('debug-layout').restoreNormalLayout()")
   end
 
   -- Fires on the outgoing terminate request (e.g. STOP button, dap.terminate()).
   -- Guarantees dapui closes even when the adapter never responds with events.
   dap.listeners.after.terminate.dapui_config = function()
     dapui.close()
-    hs_call("require('debug-layout').restoreNormalLayout()")
   end
 
   -- Focus nvim pane when breakpoint hit (macOS only — Hammerspoon not on Windows)

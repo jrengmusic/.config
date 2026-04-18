@@ -16,7 +16,11 @@
     ]
   },
   "enabledPlugins": {},
-  "effortLevel": "medium",
   "awaySummaryEnabled": false,
-  "showTurnDuration": false
+  "showTurnDuration": false,
+  "effortLevel": "xhigh",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.carol/bin/carol-statusline.sh"
+  }
 }
