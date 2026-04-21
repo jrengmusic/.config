@@ -40,6 +40,10 @@ Audio software — DAW plugins (VST3, AU, AAX) built with C++ and JUCE framework
 - Multi-agent framework for cognitive amplification
 - `~/.carol/`
 
+### CAROLINE — CAROL Interface Native Environment
+- Native C++/JUCE interface for CAROL, C++17/JUCE
+- `~/Documents/Poems/dev/caroline/`
+
 ## Experience
 - C++ (JUCE, real-time audio, plugin architecture)
 - Cross-platform development: macOS (Intel + ARM) and Windows (MSYS2/zsh, MSVC, clang-cl)
