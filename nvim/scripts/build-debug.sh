@@ -31,9 +31,12 @@ if [ "$NEEDS_CONFIG" -eq 1 ] || [ ! -f "$BUILD_DIR/build.ninja" ]; then
 fi
 
 # Find target name for this format
-# Note: JUCE uses "_App" for standalone, not "_Standalone"
+# juce_add_plugin Standalone → NAME_Standalone; juce_add_gui_app → bare target NAME
 if [ "$FORMAT" = "Standalone" ]; then
-    TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_App: phony" | cut -d: -f1 | head -1)
+    TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_Standalone: phony" | cut -d: -f1 | head -1)
+    if [ -z "$TARGET" ]; then
+        TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "^[A-Z][A-Za-z0-9_]*: phony" | grep -v -E "_(VST3|AU|AAX|AUv3|Unity|VST|Standalone|All): phony" | cut -d: -f1 | head -1)
+    fi
 else
     TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_${FORMAT}: phony" | cut -d: -f1 | head -1)
 fi
