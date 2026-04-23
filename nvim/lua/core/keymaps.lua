@@ -325,7 +325,7 @@ function M.setupDap()
 
       local function on_build_exit(exit_code)
         vim.defer_fn(function()
-          vim.cmd('LspRestart')
+          vim.cmd('lsp restart')
           if exit_code == 0 then
             if vim.api.nvim_win_is_valid(term_win) then
               vim.api.nvim_win_close(term_win, true)
