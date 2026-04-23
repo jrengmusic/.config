@@ -333,7 +333,7 @@ function M.setupDap()
             vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
           else
             -- Keep terminal open for reading, switch to normal mode
-            vim.api.nvim_buf_set_option(term_buf, 'modifiable', false)
+            vim.bo[term_buf].modifiable = false
             vim.cmd('stopinsert')
             vim.notify('Build failed (exit ' .. exit_code .. ') — press q to close', vim.log.levels.WARN)
             vim.keymap.set('n', 'q', function()
@@ -506,7 +506,7 @@ function M.setupDap()
           end
           onSuccess()
         else
-          vim.api.nvim_buf_set_option(term_buf, 'modifiable', false)
+          vim.bo[term_buf].modifiable = false
           vim.cmd('stopinsert')
           vim.notify('Build failed (exit ' .. exit_code .. ') — press q to close', vim.log.levels.ERROR)
           vim.keymap.set('n', 'q', function()
