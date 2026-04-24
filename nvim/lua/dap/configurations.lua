@@ -30,12 +30,14 @@ function M.detectProjectType()
     local content = table.concat(vim.fn.readfile(cmakeFile), '\n')
     
     -- Check for JUCE plugin markers
-    if content:match('juce_add_plugin') or content:match('PLUGIN_') or content:match('VST3') or content:match('AudioUnit') then
+    if content:match('juce_add_plugin') or content:match('configure_plugin') or
+       content:match('PLUGIN_') or content:match('VST3') or content:match('AudioUnit') then
       return 'plugin'
     end
-    
+
     -- Check for JUCE standalone app markers
-    if content:match('juce_add_console_app') or content:match('juce_add_gui_app') then
+    if content:match('juce_add_console_app') or content:match('juce_add_gui_app') or
+       content:match('configure_app') then
       return 'standalone'
     end
   end

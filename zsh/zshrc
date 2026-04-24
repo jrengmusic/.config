@@ -151,6 +151,9 @@ ZSH_HIGHLIGHT_STYLES[bracket-level-3]="fg=#808080"             # delimiter gray
 ZSH_HIGHLIGHT_STYLES[bracket-level-4]="fg=#808080"             # delimiter gray
 ZSH_HIGHLIGHT_STYLES[bracket-level-5]="fg=#808080"             # delimiter gray
 ZSH_HIGHLIGHT_STYLES[cursor-matchingbracket]="fg=#ffffff,bg=#4080ff,bold" # matching paren
+# PACE wraptool (AAX codesigning)
+export PATH="/Applications/PACEAntiPiracy/Eden/Fusion/Versions/5/bin:$PATH"
+
 # cmake (macos-intel: official download, no pkg manager)
 if [[ $OPERATING_SYSTEM == "macos-intel" ]]; then
   export PATH="$HOME/Library/cmake-4.2.0-macos-universal/CMake.app/Contents/bin:$PATH"
