@@ -318,6 +318,7 @@ function M.setupDap()
         end
       end
 
+      local source_buf = vim.api.nvim_get_current_buf()
       vim.cmd('botright 15split')
       local term_buf = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_set_current_buf(term_buf)
@@ -328,6 +329,12 @@ function M.setupDap()
           if exit_code == 0 then
             if vim.api.nvim_win_is_valid(term_win) then
               vim.api.nvim_win_close(term_win, true)
+            end
+            for _, win in ipairs(vim.api.nvim_list_wins()) do
+              if vim.api.nvim_win_get_buf(win) == source_buf then
+                vim.api.nvim_set_current_win(win)
+                break
+              end
             end
             vim.cmd('lsp restart')
             vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
