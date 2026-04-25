@@ -336,7 +336,9 @@ function M.setupDap()
                 break
               end
             end
-            vim.cmd('lsp restart')
+            if #vim.lsp.get_clients({ bufnr = 0 }) > 0 then
+              vim.cmd('lsp restart')
+            end
             vim.notify('Build succeeded, LSP restarted', vim.log.levels.INFO)
           else
             -- Keep terminal open for reading, switch to normal mode
