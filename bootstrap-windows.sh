@@ -235,7 +235,6 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-fd"           # snacks.nvim file finder (find is disabled on Windows by snacks)
     "${PKG_PREFIX}-ripgrep"      # snacks.nvim grep search (<leader>fg)
     "${PKG_PREFIX}-jq"           # JSON processor (used by carol for settings.json merge)
-    "${PKG_PREFIX}-chafa"
 )
 
 for pkg in "${PACMAN_PKGS[@]}"; do

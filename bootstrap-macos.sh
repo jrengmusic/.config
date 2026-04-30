@@ -98,7 +98,6 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         cmake
         ninja
         btop
-        chafa
     )
 else
     PACKAGES=(
@@ -120,7 +119,6 @@ else
         cmake
         ninja
         btop
-        chafa
     )
 fi
 
