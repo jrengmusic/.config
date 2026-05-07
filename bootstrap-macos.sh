@@ -221,6 +221,23 @@ else
     warn "carol binary not found at $CAROL_TARGET"
 fi
 
+# carol subcommand symlinks (machine, oracle, surgeon)
+for cmd in machine oracle surgeon; do
+    CAROL_CMD_TARGET="$HOME/.carol/bin/$cmd"
+    CAROL_CMD_LINK="$HOME/.local/bin/$cmd"
+    if [[ -f "$CAROL_CMD_TARGET" ]]; then
+        if [[ -L "$CAROL_CMD_LINK" && "$(readlink "$CAROL_CMD_LINK")" == "$CAROL_CMD_TARGET" ]]; then
+            info "$cmd symlink already correct"
+        else
+            [[ -e "$CAROL_CMD_LINK" && ! -L "$CAROL_CMD_LINK" ]] && rm -f "$CAROL_CMD_LINK"
+            ln -sf "$CAROL_CMD_TARGET" "$CAROL_CMD_LINK"
+            info "Symlinked $cmd → $CAROL_CMD_TARGET"
+        fi
+    else
+        warn "carol $cmd not found at $CAROL_CMD_TARGET"
+    fi
+done
+
 # ============================================================================
 # 7. Claude Code
 # ============================================================================

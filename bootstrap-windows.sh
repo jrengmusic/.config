@@ -471,6 +471,19 @@ else
     info "Symlinked carol → $CAROL_TARGET"
 fi
 
+# carol subcommand symlinks (machine, oracle, surgeon)
+for cmd in machine oracle surgeon; do
+    CAROL_CMD_TARGET="$WINDOWS_HOME/.carol/bin/$cmd"
+    CAROL_CMD_LINK="$WINDOWS_HOME/.local/bin/$cmd"
+    if [[ -L "$CAROL_CMD_LINK" && "$(readlink "$CAROL_CMD_LINK")" == "$CAROL_CMD_TARGET" ]]; then
+        info "$cmd symlink already correct"
+    else
+        [[ -e "$CAROL_CMD_LINK" && ! -L "$CAROL_CMD_LINK" ]] && rm -f "$CAROL_CMD_LINK"
+        ln -sf "$CAROL_CMD_TARGET" "$CAROL_CMD_LINK"
+        info "Symlinked $cmd → $CAROL_CMD_TARGET"
+    fi
+done
+
 # ============================================================================
 # 11. Claude Code (via npm — native installer does not work on Windows/MSYS2)
 # ============================================================================
