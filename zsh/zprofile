@@ -22,7 +22,6 @@ if [[ $OPERATING_SYSTEM == "windows" ]]; then
   export XDG_CONFIG_HOME="$HOME/.config"
   export PATH="/c/Program Files/Go/bin:$PATH"
   export PATH="/c/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin:$PATH"
-  export PATH="/c/Program Files (x86)/PACEAntiPiracy/Eden/Fusion/Versions/5:$PATH"
 fi
 
 # nvm (mac only)
