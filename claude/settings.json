@@ -23,5 +23,6 @@
   "enabledPlugins": {},
   "effortLevel": "high",
   "awaySummaryEnabled": false,
-  "showTurnDuration": false
+  "showTurnDuration": false,
+  "promptSuggestionEnabled": false
 }

@@ -4,7 +4,7 @@ local M = {}
 
 local SOURCE_EXTENSIONS = {
   'cpp', 'cc', 'c', 'mm', 'm', 'h', 'hpp', 'hxx',
-  'xml', 'svg', 'json', 'txt', 'md', 'cmake', 'html',
+  'xml', 'svg', 'json', 'txt', 'md', 'cmake', 'html', 'lua',
 }
 
 local EXCLUDE_EXTENSIONS = {
@@ -15,11 +15,20 @@ local EXCLUDE_EXTENSIONS = {
   'o', 'obj', 'a', 'so', 'dylib', 'lib', 'dll',
 }
 
+-- Searches upward from cwd for CMakeLists.txt to find the project root.
+-- Falls back to cwd when none is found (e.g. nvim started outside the project).
+local function get_project_root()
+  local markers = vim.fs.find('CMakeLists.txt', {
+    upward = true,
+    path   = vim.fn.getcwd(),
+    limit  = 1,
+  })
+  return #markers > 0 and vim.fn.fnamemodify(markers[1], ':h') or vim.fn.getcwd()
+end
+
 local function find_compile_db()
-  local cwd = vim.fn.getcwd()
-  -- STRICT: Only check Ninja build location - SSOT principle
-  local path = 'Builds/Ninja/compile_commands.json'
-  local full = cwd .. '/' .. path
+  local root = get_project_root()
+  local full = root .. '/Builds/Ninja/compile_commands.json'
   if vim.fn.filereadable(full) == 1 then
     return full
   end
@@ -35,14 +44,11 @@ local function parse_compile_db(compile_db)
 end
 
 local function get_project_name()
-  local cwd = vim.fn.getcwd()
-  return vim.fn.fnamemodify(cwd, ':t')
+  return vim.fn.fnamemodify(get_project_root(), ':t')
 end
 
 local function get_project_dir()
-  local cwd = vim.fn.getcwd()
-  local name = get_project_name()
-  return cwd .. '/.' .. name
+  return get_project_root() .. '/.' .. get_project_name()
 end
 
 local function is_symlink_tree_stale()
@@ -57,7 +63,7 @@ local function is_symlink_tree_stale()
 
   if db_mtime > tree_mtime then return true end
 
-  local source_dir = vim.fn.getcwd() .. '/Source'
+  local source_dir = get_project_root() .. '/Source'
   if vim.fn.isdirectory(source_dir) == 1 then
     local source_mtime = vim.fn.getftime(source_dir)
     if source_mtime > tree_mtime then return true end
@@ -100,8 +106,7 @@ local function classify_file(file)
 end
 
 local function scan_source_dir()
-  local cwd = vim.fn.getcwd()
-  local source_dir = cwd .. '/Source'
+  local source_dir = get_project_root() .. '/Source'
   local files = {}
 
   if vim.fn.isdirectory(source_dir) ~= 1 then
@@ -148,7 +153,7 @@ local function scan_module_dir(module_path)
 end
 
 local function generate_symlink_tree()
-  local cwd = vim.fn.getcwd()
+  local cwd = get_project_root()
   local project_dir = get_project_dir()
   local compile_db = find_compile_db()
 
@@ -270,7 +275,7 @@ function M.files()
   -- SSOT: Use EXACT same logic as generate_symlink_tree()
   local seen = {}
   local items = {}
-  local cwd = vim.fn.getcwd()
+  local cwd = get_project_root()
   local seen_modules = {}
   local source_root = cwd .. '/Source'
 
@@ -398,11 +403,24 @@ function M.files()
         { item.display, 'Normal' },
       }
     end,
+    actions = {
+      confirm = function(picker, item)
+        picker:close()
+        vim.schedule(function()
+          vim.cmd('only')
+          require('lsp.header-source').ensureCppHeaderLayout(item.file)
+        end)
+      end,
+    },
+    win = {
+      input = { keys = { ['<CR>'] = { 'confirm', mode = { 'i', 'n' } } } },
+      list  = { keys = { ['<CR>'] = 'confirm' } },
+    },
   })
 end
 
 local function find_symlink_for_file(real_file)
-  local cwd = vim.fn.getcwd()
+  local cwd = get_project_root()
   local project_dir = get_project_dir()
   local source_root = cwd .. '/Source'
 
@@ -458,7 +476,7 @@ function M.open_explorer()
     on_close = function()
       pcall(function()
         local Tree = require('snacks.explorer.tree')
-        Tree:close_all()
+        Tree:close_all(project_dir)
       end)
     end,
   })
@@ -467,7 +485,7 @@ function M.open_explorer()
     vim.schedule(function()
       pcall(function()
         local Actions = require('snacks.explorer.actions')
-        Actions.update(picker, { target = symlink_path })
+        Actions.update(picker, { target = symlink_path, refresh = true })
       end)
     end)
   end
@@ -481,94 +499,132 @@ function M.regenerate()
   end
 end
 
-function M.grep()
-  local Snacks = require('snacks')
+-- Returns the list of project directories (source root + one root per JUCE module)
+-- derived from compile_commands.json. Each entry is a top-level dir; rg recurses
+-- into it, so subdirs must NOT be listed separately to avoid duplicate results.
+-- Returns nil when no compile db is found.
+local function get_dirs()
   local compile_db = find_compile_db()
-
-  if compile_db == nil then
-    Snacks.picker.grep()
-    return
-  end
+  if compile_db == nil then return nil end
 
   local data = parse_compile_db(compile_db)
-  if data == nil then
-    Snacks.picker.grep()
-    return
+  if data == nil then return nil end
+
+  local dirs = {}
+  local seen_dirs = {}
+
+  -- Source root covers all source files recursively
+  local source_root = get_project_root() .. '/Source'
+  if vim.fn.isdirectory(source_root) == 1 then
+    seen_dirs[source_root] = true
+    table.insert(dirs, source_root)
   end
 
-  -- SSOT: Use EXACT same logic as M.files() for directory discovery
-  local seen_dirs = {}
-  local dirs = {}
-  local cwd = vim.fn.getcwd()
-  local seen_modules = {}
-  local source_root = cwd .. '/Source'
-
-  -- First pass: collect directories from compile_commands.json
+  -- One module_root per JUCE module (rg recurses into it)
   for _, entry in ipairs(data) do
     local file = entry.file
-    if file ~= nil then
-      local skip = file:find('/Builds/') ~= nil
-      if not skip then
-        local group, submodule = classify_file(file)
-
-        if group == 'Sources' then
-          local dir = vim.fn.fnamemodify(file, ':h')
-          if seen_dirs[dir] == nil then
-            seen_dirs[dir] = true
-            table.insert(dirs, dir)
-          end
-        elseif group == 'JUCE Modules' and submodule ~= nil then
-          local idx = file:find('/' .. submodule .. '/')
-          if idx ~= nil then
-            local module_root = file:sub(1, idx + #submodule)
-            if seen_modules[submodule] == nil then
-              seen_modules[submodule] = module_root
-              -- Add module root directory
-              if seen_dirs[module_root] == nil then
-                seen_dirs[module_root] = true
-                table.insert(dirs, module_root)
-              end
-            end
-          end
-          -- Also add the file's directory
-          local dir = vim.fn.fnamemodify(file, ':h')
-          if seen_dirs[dir] == nil then
-            seen_dirs[dir] = true
-            table.insert(dirs, dir)
+    if file ~= nil and not file:find('/Builds/') then
+      local group, submodule = classify_file(file)
+      if group == 'JUCE Modules' and submodule ~= nil then
+        local idx = file:find('/' .. submodule .. '/')
+        if idx ~= nil then
+          local module_root = file:sub(1, idx + #submodule)
+          if seen_dirs[module_root] == nil then
+            seen_dirs[module_root] = true
+            table.insert(dirs, module_root)
           end
         end
       end
     end
   end
 
-  -- Second pass: scan ALL directories from discovered modules
-  for submodule, module_root in pairs(seen_modules) do
-    local module_files = scan_module_dir(module_root)
-    for _, f in ipairs(module_files) do
-      local dir = vim.fn.fnamemodify(f.path, ':h')
-      if seen_dirs[dir] == nil then
-        seen_dirs[dir] = true
-        table.insert(dirs, dir)
-      end
-    end
-  end
+  return #dirs > 0 and dirs or nil
+end
 
-  -- Third pass: scan ALL Source directories
-  local source_files = scan_source_dir()
-  for _, file in ipairs(source_files) do
-    local dir = vim.fn.fnamemodify(file, ':h')
-    if seen_dirs[dir] == nil then
-      seen_dirs[dir] = true
-      table.insert(dirs, dir)
-    end
-  end
-
-  if #dirs == 0 then
+function M.grep()
+  local Snacks = require('snacks')
+  local dirs = get_dirs()
+  if dirs == nil then
     Snacks.picker.grep()
     return
   end
-
   Snacks.picker.grep({ dirs = dirs })
+end
+
+function M.replace()
+  local Snacks = require('snacks')
+  local dirs = get_dirs()
+  local replacement = ''
+
+  local function apply(picker)
+    local search   = picker.input.filter.search
+    -- Explicit Tab-selection takes priority; fall back to all visible items.
+    local selected = picker:selected()
+    if #selected == 0 then selected = picker:items() end
+    if #selected == 0 then return end
+    picker:close()
+
+    local file_lines = {}
+    for _, item in ipairs(selected) do
+      -- grep items carry pos = { lnum, col }, not a lnum field
+      if item.file and item.pos and item.pos[1] then
+        if not file_lines[item.file] then file_lines[item.file] = {} end
+        file_lines[item.file][item.pos[1]] = true
+      end
+    end
+
+    local escaped_s = vim.fn.escape(search,      '/\\')
+    local escaped_r = vim.fn.escape(replacement, '/\\&~')
+    local file_count = 0
+
+    for file, lnums in pairs(file_lines) do
+      local buf = vim.fn.bufadd(file)
+      vim.fn.bufload(buf)
+      vim.api.nvim_buf_call(buf, function()
+        for lnum in pairs(lnums) do
+          pcall(vim.cmd, lnum .. 's/\\V' .. escaped_s .. '/' .. escaped_r .. '/gI')
+        end
+        vim.cmd('update')
+      end)
+      file_count = file_count + 1
+    end
+
+    vim.notify('Replaced "' .. search .. '" → "' .. replacement .. '" in ' .. file_count .. ' file(s)', vim.log.levels.INFO)
+  end
+
+  local picker_opts = {
+    title  = 'Replace',
+    search = vim.fn.expand('<cword>'),
+    live   = false,
+    -- Intercept every pattern update: capture typed text as replacement,
+    -- then zero out pattern so the fuzzy matcher never filters the list.
+    filter = {
+      transform = function(_, filter)
+        replacement = filter.pattern or ''
+        filter.pattern = ''
+      end,
+    },
+    -- Select all items once the initial find completes so the default
+    -- is replace-all; Tab deselects individual occurrences before Enter.
+    on_show = function(p)
+      local function do_select_all()
+        if not p.closed then p.list:select_all() end
+      end
+      if p.matcher.task:running() then
+        p.matcher.task:on('done', vim.schedule_wrap(do_select_all))
+      else
+        vim.schedule(do_select_all)
+      end
+    end,
+    actions = { apply_replace = apply },
+    win = {
+      input = { keys = { ['<CR>'] = { 'apply_replace', mode = { 'i', 'n' } } } },
+      list  = { keys = { ['<CR>'] = 'apply_replace' } },
+    },
+  }
+
+  if dirs ~= nil then picker_opts.dirs = dirs end
+  Snacks.picker.grep(picker_opts)
 end
 
 return M

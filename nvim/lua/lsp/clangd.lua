@@ -48,13 +48,18 @@ local M = {}
 
   local server_names = vim.tbl_keys(servers)
 
+  -- Apply per-server config (cmd, capabilities, settings) via vim.lsp.config.
+  -- mason-lspconfig v2 dropped handlers; automatic_enable calls vim.lsp.enable()
+  -- which reads from vim.lsp.config. Config must be set before enable fires.
+  for name, cfg in pairs(servers) do
+    vim.lsp.config(name, vim.tbl_deep_extend('force', cfg, { capabilities = capabilities }))
+  end
+
   -- mason-tool-installer: deduplicated list of LSPs + standalone tools
   local tools = { 'stylua', 'prettier' }
   vim.list_extend(tools, server_names)
   require('mason-tool-installer').setup({ ensure_installed = tools })
 
-  -- handlers removed: mason-lspconfig dropped handlers support.
-  -- It now uses automatic_enable which calls vim.lsp.enable() for installed servers.
   require('mason-lspconfig').setup({
     ensure_installed = server_names,
   })
