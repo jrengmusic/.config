@@ -93,8 +93,16 @@ function M.setup()
   vim.keymap.set('n', '<leader>x', '<C-w>q', { desc = 'Close window' })
 
   -- Jump list navigation
-  vim.keymap.set('n', '<leader>[', '<C-o>', { desc = 'Jump back' })
-  vim.keymap.set('n', '<leader>]', '<C-i>', { desc = 'Jump forward' })
+  vim.keymap.set('n', '<leader>[', function()
+    vim.cmd('normal! ' .. vim.api.nvim_replace_termcodes('<C-o>', true, false, true))
+    vim.cmd('only')
+    require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+  end, { desc = 'Jump back (sync split)' })
+  vim.keymap.set('n', '<leader>]', function()
+    vim.cmd('normal! ' .. vim.api.nvim_replace_termcodes('<C-i>', true, false, true))
+    vim.cmd('only')
+    require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+  end, { desc = 'Jump forward (sync split)' })
 
   -- Paste on new line (bypasses format-on-escape issue)
   vim.keymap.set('n', '<leader>p', ':pu<CR>', { desc = 'Paste below on new line' })
