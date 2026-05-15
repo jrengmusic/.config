@@ -18,8 +18,6 @@ function M.detectProjectType()
     if ok and config then
       if config.format then
         return 'plugin'  -- Has format field (VST3/AU/etc) = plugin
-      elseif config.buildScheme then
-        return 'standalone'  -- Only has buildScheme = standalone
       end
     end
   end
@@ -75,10 +73,6 @@ end
 
 local function getConfigFilePath()
   return vim.fn.getcwd() .. '/.nvim-dap-config'
-end
-
-local function getStandaloneConfigFilePath()
-  return vim.fn.getcwd() .. '/.nvim-standalone-config'
 end
 
 -- Load .nvim-dap-config as Lua table
@@ -138,20 +132,13 @@ function M.loadDawConfig(callback)
     M.showDawFormatDialog(callback)
     return nil
   end
-  
-  -- Missing buildScheme field → show dialog immediately
-  if not config.buildScheme or config.buildScheme == '' then
-    vim.notify('DAP config missing buildScheme. Reconfiguring...')
-    M.showDawFormatDialog(callback)
-    return nil
-  end
-  
+
   return config
 end
 
 -- Save .nvim-dap-config as Lua table (self-documented)
 -- Only fails if write fails (disk full, permissions) - beyond our control
-function M.saveDawConfig(format, daw, dawPath, buildScheme)
+function M.saveDawConfig(format, daw, dawPath)
   local configFile = getConfigFilePath()
   local content = string.format(
     '-- DAP Debug Configuration\n' ..
@@ -160,12 +147,10 @@ function M.saveDawConfig(format, daw, dawPath, buildScheme)
     '  format = "%s",        -- Plugin format (VST3, AU, VST, AAX)\n' ..
     '  daw = "%s",           -- DAW name (for display/killall)\n' ..
     '  dawPath = "%s",       -- Absolute path to DAW executable\n' ..
-    '  buildScheme = "%s",   -- Build scheme (Debug, Release)\n' ..
     '}',
     format,
     daw,
-    dawPath,
-    buildScheme
+    dawPath
   )
   
   local ok, err = pcall(vim.fn.writefile, vim.split(content, '\n'), configFile)
@@ -191,93 +176,84 @@ function M.showDawFormatDialog(callback)
       return
     end
 
-    -- Select build scheme
-    local schemes = { 'Debug', 'Release' }
-    vim.ui.select(schemes, { prompt = 'Select build scheme:' }, function(buildScheme)
-      if not buildScheme then
-        vim.notify('DAP config cancelled')
-        return
-      end
-
-      -- Find DAW executables (OS-specific)
-      local apps = {}
-      if is_windows then
-        -- Use vim.fn.glob — works natively in nvim without shell dependency
-        local patterns = {
-          'C:/Program Files/*/*.exe',
-          'C:/Program Files/*/*/*.exe',
-          'C:/Program Files (x86)/*/*.exe',
-          'C:/Program Files (x86)/*/*/*.exe',
-        }
-        for _, pattern in ipairs(patterns) do
-          local matches = vim.fn.glob(pattern, false, true)
-          for _, path in ipairs(matches) do
-            path = path:gsub('\\', '/')
-            table.insert(apps, { text = path, file = path })
-          end
-        end
-      else
-        local handle = io.popen('find "/Applications" -maxdepth 2 -name "*.app" -type d 2>/dev/null')
-        if handle then
-          for line in handle:lines() do
-            table.insert(apps, { text = line, file = line })
-          end
-          handle:close()
+    -- Find DAW executables (OS-specific)
+    local apps = {}
+    if is_windows then
+      -- Use vim.fn.glob — works natively in nvim without shell dependency
+      local patterns = {
+        'C:/Program Files/*/*.exe',
+        'C:/Program Files/*/*/*.exe',
+        'C:/Program Files (x86)/*/*.exe',
+        'C:/Program Files (x86)/*/*/*.exe',
+      }
+      for _, pattern in ipairs(patterns) do
+        local matches = vim.fn.glob(pattern, false, true)
+        for _, path in ipairs(matches) do
+          path = path:gsub('\\', '/')
+          table.insert(apps, { text = path, file = path })
         end
       end
-
-      if #apps == 0 then
-        vim.notify('No applications found')
-        return
+    else
+      local handle = io.popen('find "/Applications" -maxdepth 2 -name "*.app" -type d 2>/dev/null')
+      if handle then
+        for line in handle:lines() do
+          table.insert(apps, { text = line, file = line })
+        end
+        handle:close()
       end
+    end
 
-      Snacks.picker({
-        items = apps,
-        prompt = 'Select DAW Application: ',
-        format = 'file',
-        confirm = function(picker, item)
-          if not item or not item.file then
-            vim.notify('DAP config cancelled: No DAW selected')
-            picker:close()
-            return
-          end
+    if #apps == 0 then
+      vim.notify('No applications found')
+      return
+    end
 
-          local dawPath = item.file
-
-          -- macOS: unwrap .app bundle to executable
-          if not is_windows and dawPath:match('%.app/?$') then
-            local appName = vim.fn.fnamemodify(dawPath, ':t:r')
-            dawPath = dawPath:gsub('/$', '') .. '/Contents/MacOS/' .. appName
-          end
-
-          -- Verify path exists
-          if vim.fn.filereadable(dawPath) ~= 1 then
-            vim.notify('DAW executable not found: ' .. dawPath .. '. Try again.')
-            picker:close()
-            vim.defer_fn(function() M.showDawFormatDialog(callback) end, 100)
-            return
-          end
-
-          -- Extract DAW name from path
-          local daw = vim.fn.fnamemodify(dawPath, ':t')
-
-          -- Save config
-          local ok = M.saveDawConfig(format, daw, dawPath, buildScheme)
-          if not ok then
-            picker:close()
-            return
-          end
-
-          vim.notify(string.format('DAP config saved: %s + %s (%s)', format, daw, buildScheme))
-
-          if callback then
-            callback({ format = format, daw = daw, dawPath = dawPath, buildScheme = buildScheme })
-          end
-
+    Snacks.picker({
+      items = apps,
+      prompt = 'Select DAW Application: ',
+      format = 'file',
+      confirm = function(picker, item)
+        if not item or not item.file then
+          vim.notify('DAP config cancelled: No DAW selected')
           picker:close()
-        end,
-      })
-    end)
+          return
+        end
+
+        local dawPath = item.file
+
+        -- macOS: unwrap .app bundle to executable
+        if not is_windows and dawPath:match('%.app/?$') then
+          local appName = vim.fn.fnamemodify(dawPath, ':t:r')
+          dawPath = dawPath:gsub('/$', '') .. '/Contents/MacOS/' .. appName
+        end
+
+        -- Verify path exists
+        if vim.fn.filereadable(dawPath) ~= 1 then
+          vim.notify('DAW executable not found: ' .. dawPath .. '. Try again.')
+          picker:close()
+          vim.defer_fn(function() M.showDawFormatDialog(callback) end, 100)
+          return
+        end
+
+        -- Extract DAW name from path
+        local daw = vim.fn.fnamemodify(dawPath, ':t')
+
+        -- Save config
+        local ok = M.saveDawConfig(format, daw, dawPath)
+        if not ok then
+          picker:close()
+          return
+        end
+
+        vim.notify(string.format('DAP config saved: %s + %s', format, daw))
+
+        if callback then
+          callback({ format = format, daw = daw, dawPath = dawPath })
+        end
+
+        picker:close()
+      end,
+    })
   end)
 end
 
@@ -525,77 +501,6 @@ function M.getConfigNameForFormat(format)
     AAX = 'Attach to DAW (AAX)',
   }
   return mapping[format]
-end
-
--- ============================================================================
--- STANDALONE CONFIG MANAGEMENT
--- ============================================================================
-
-function M.loadStandaloneConfig(callback)
-  local configFile = getStandaloneConfigFilePath()
-  
-  if vim.fn.filereadable(configFile) ~= 1 then
-    M.showStandaloneSchemeDialog(callback)
-    return nil
-  end
-  
-  
-  local ok, config = pcall(dofile, configFile)
-  if not ok then
-    vim.notify('Standalone config corrupted. Reconfiguring...')
-    vim.fn.delete(configFile)
-    M.showStandaloneSchemeDialog(callback)
-    return nil
-  end
-  
-  if not config or not config.buildScheme or config.buildScheme == '' then
-    vim.notify('Standalone config missing buildScheme. Reconfiguring...')
-    M.showStandaloneSchemeDialog(callback)
-    return nil
-  end
-  
-  return config
-end
-
-function M.saveStandaloneConfig(buildScheme)
-  local configFile = getStandaloneConfigFilePath()
-  local content = string.format(
-    '-- Standalone Build Configuration\n' ..
-    'return {\n' ..
-    '  buildScheme = "%s",\n' ..
-    '}',
-    buildScheme
-  )
-  
-  local ok = pcall(vim.fn.writefile, vim.split(content, '\n'), configFile)
-  if not ok then
-    vim.notify('Failed to write standalone config')
-    return false
-  end
-  
-  return true
-end
-
-function M.showStandaloneSchemeDialog(callback)
-  local schemes = { 'Debug', 'Release' }
-  
-  vim.ui.select(schemes, { prompt = 'Select build scheme:' }, function(buildScheme)
-    if not buildScheme then
-      vim.notify('Standalone config cancelled')
-      return
-    end
-    
-    local ok = M.saveStandaloneConfig(buildScheme)
-    if not ok then
-      return
-    end
-    
-    vim.notify('Standalone config saved: ' .. buildScheme)
-    
-    if callback then
-      callback({ buildScheme = buildScheme })
-    end
-  end)
 end
 
 return M
