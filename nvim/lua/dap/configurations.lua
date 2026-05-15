@@ -327,15 +327,15 @@ function M.setup()
         -- JUCE standalone apps are in *_App_artefacts/Debug|Release/*.app or *.exe
         local patterns = {
           -- macOS
-          root .. '/Builds/Ninja/Debug/*App_artefacts*/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*App_artefacts*/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Debug/*artefacts*/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/*App_artefacts*/Debug/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/*App_artefacts*/Release/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/*.app/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/Debug/*App_artefacts*/*.exe',
-          root .. '/Builds/Ninja/Release/*App_artefacts*/*.exe',
-          root .. '/Builds/Ninja/Debug/*artefacts*/*.exe',
-          root .. '/Builds/Ninja/Release/*artefacts*/*.exe',
+          root .. '/Builds/Ninja/Debug/*App_artefacts*/Debug/*.exe',
+          root .. '/Builds/Ninja/Release/*App_artefacts*/Release/*.exe',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/*.exe',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/*.exe',
         }
         
         local found = nil
@@ -377,8 +377,8 @@ function M.setup()
         -- Mac: attach mode, program is the plugin binary
         local root = vim.fn.getcwd()
         local patterns = {
-          root .. '/Builds/Ninja/Debug/*artefacts*/VST3/*.vst3/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/VST3/*.vst3/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/VST3/*.vst3/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/VST3/*.vst3/Contents/MacOS/*',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
@@ -398,8 +398,8 @@ function M.setup()
         local root = vim.fn.getcwd()
         local patterns = {
           -- macOS only (no AU on Windows)
-          root .. '/Builds/Ninja/Debug/*artefacts*/AU/*.component/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/AU/*.component/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/AU/*.component/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/AU/*.component/Contents/MacOS/*',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
@@ -421,11 +421,11 @@ function M.setup()
         local root = vim.fn.getcwd()
         local patterns = {
           -- macOS
-          root .. '/Builds/Ninja/Debug/*artefacts*/VST/*.vst/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/VST/*.vst/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/VST/*.vst/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/VST/*.vst/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/Debug/*artefacts*/VST/*.dll',
-          root .. '/Builds/Ninja/Release/*artefacts*/VST/*.dll',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/VST/*.dll',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/VST/*.dll',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
@@ -447,11 +447,11 @@ function M.setup()
         local root = vim.fn.getcwd()
         local patterns = {
           -- macOS
-          root .. '/Builds/Ninja/Debug/*artefacts*/AAX/*.aaxplugin/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/AAX/*.aaxplugin/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/AAX/*.aaxplugin/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/AAX/*.aaxplugin/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/Debug/*artefacts*/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
-          root .. '/Builds/Ninja/Release/*artefacts*/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
+          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
+          root .. '/Builds/Ninja/Release/*artefacts*/Release/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
