@@ -10,7 +10,7 @@ export TERM=dumb
 ROOT="$1"
 SCHEME="${2:-Debug}"
 FORMAT="${3:-VST3}"
-BUILD_DIR="$ROOT/Builds/Ninja"
+BUILD_DIR="$ROOT/Builds/Ninja/$SCHEME"
 
 NO_NOTARIZE=0
 for arg in "$@"; do
@@ -19,38 +19,15 @@ for arg in "$@"; do
     esac
 done
 
-JAM_NOTARIZE_VAL="ON"
-[ "$NO_NOTARIZE" -eq 1 ] && JAM_NOTARIZE_VAL="OFF"
-
 # Check if reconfiguration is needed
-NEEDS_CONFIG=0
-if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
-    NEEDS_CONFIG=1
-else
-    # Check cached build type
-    CACHED_TYPE=$(grep -E "^CMAKE_BUILD_TYPE:" "$BUILD_DIR/CMakeCache.txt" | cut -d= -f2 || true)
-    if [ "$CACHED_TYPE" != "$SCHEME" ]; then
-        echo "Build type changed: $CACHED_TYPE -> $SCHEME"
-        NEEDS_CONFIG=1
-    fi
-    # Check cached notarize flag
-    CACHED_NOTARIZE=$(grep -E "^JAM_NOTARIZE:" "$BUILD_DIR/CMakeCache.txt" | cut -d= -f2 || true)
-    if [ -n "$CACHED_NOTARIZE" ] && [ "$CACHED_NOTARIZE" != "$JAM_NOTARIZE_VAL" ]; then
-        echo "JAM_NOTARIZE changed: $CACHED_NOTARIZE -> $JAM_NOTARIZE_VAL"
-        NEEDS_CONFIG=1
-    fi
-fi
-
-if [ "$NEEDS_CONFIG" -eq 1 ] || [ ! -f "$BUILD_DIR/build.ninja" ]; then
-    echo "Configuring CMake ($SCHEME, JAM_NOTARIZE=$JAM_NOTARIZE_VAL)..."
-    mkdir -p "$ROOT/Builds"
-    # Build only native architecture for fast iteration (not universal binary)
+if [ ! -f "$BUILD_DIR/CMakeCache.txt" ] || [ ! -f "$BUILD_DIR/build.ninja" ]; then
+    echo "Configuring CMake ($SCHEME)..."
+    mkdir -p "$BUILD_DIR"
     NATIVE_ARCH=$(uname -m)
     cmake -S "$ROOT" -B "$BUILD_DIR" -G Ninja \
         -DCMAKE_BUILD_TYPE="$SCHEME" \
         -DCMAKE_OSX_ARCHITECTURES="$NATIVE_ARCH" \
-        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-        -DJAM_NOTARIZE="$JAM_NOTARIZE_VAL" 2>&1 | cat
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>&1 | cat
 fi
 
 # Find target name for this format
@@ -74,7 +51,7 @@ fi
 echo "=========================================="
 echo "Building $TARGET ($SCHEME)..."
 echo "=========================================="
-cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" 2>&1 | cat
+JAM_NOTARIZE=$( [ "$NO_NOTARIZE" -eq 1 ] && echo OFF || echo ON ) cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" 2>&1 | cat
 
 echo "=========================================="
 echo "Copying $FORMAT to system directory..."
