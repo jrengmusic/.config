@@ -334,6 +334,20 @@ function M.setupDap()
           if vim.api.nvim_win_is_valid(term_win) then
             vim.api.nvim_win_close(term_win, true)
           end
+          require('core.cmake-picker').syncClangd()
+          vim.schedule(function()
+            for _, client in ipairs(vim.lsp.get_clients()) do
+              local bufs = vim.lsp.get_buffers_by_client_id(client.id)
+              client:stop()
+              for _, buf in ipairs(bufs) do
+                if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
+                  vim.defer_fn(function()
+                    vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+                  end, 500)
+                end
+              end
+            end
+          end)
           onSuccess()
         else
           vim.bo[term_buf].modifiable = false

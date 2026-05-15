@@ -28,11 +28,11 @@ end
 
 local function find_compile_db()
   local root = get_project_root()
-  local full = root .. '/Builds/Ninja/compile_commands.json'
-  if vim.fn.filereadable(full) == 1 then
-    return full
-  end
-  return nil
+  local markers = vim.fs.find('compile_commands.json', {
+    path  = root .. '/Builds/Ninja',
+    limit = 1,
+  })
+  return #markers > 0 and markers[1] or nil
 end
 
 local function parse_compile_db(compile_db)
@@ -267,6 +267,8 @@ function M.files()
     return
   end
 
+  local clangd_synced = M.syncClangd()
+
   -- SSOT: Use EXACT same logic as generate_symlink_tree()
   local seen = {}
   local items = {}
@@ -407,6 +409,19 @@ function M.files()
         picker:close()
         vim.schedule(function()
           vim.cmd('only')
+          if clangd_synced then
+            for _, client in ipairs(vim.lsp.get_clients()) do
+              local bufs = vim.lsp.get_buffers_by_client_id(client.id)
+              client:stop()
+              for _, buf in ipairs(bufs) do
+                if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
+                  vim.defer_fn(function()
+                    vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+                  end, 500)
+                end
+              end
+            end
+          end
           require('lsp.header-source').ensureCppHeaderLayout(item.file)
         end)
       end,
@@ -490,9 +505,80 @@ function M.open_explorer()
   end
 end
 
+function M.syncClangd()
+  local compile_db = find_compile_db()
+  if compile_db == nil then return false end
+
+  local data = parse_compile_db(compile_db)
+  if data == nil then
+    vim.notify('syncClangd: parse failed', vim.log.levels.WARN)
+    return false
+  end
+
+  -- Extract all compiler flags from the first source entry.
+  -- Exclude: compiler binary, -o <path>, -c, and the source file itself.
+  -- Two-token flags (e.g. -arch arm64) are included as two separate entries.
+  local flags = {}
+  local seen = {}
+  for _, entry in ipairs(data) do
+    local cmd = entry.command or ''
+    local src = entry.file or ''
+    local tokens = vim.split(cmd, '%s+', { trimempty = true })
+    local i = 2 -- skip compiler binary (token 1)
+    while i <= #tokens do
+      local t = tokens[i]
+      if t == '-o' then
+        i = i + 2
+      elseif t == '-c' then
+        i = i + 1
+      elseif t == src then
+        i = i + 1
+      elseif t:sub(1, 1) == '-' then
+        local next = tokens[i + 1]
+        local has_arg = next ~= nil
+          and next:sub(1, 1) ~= '-'
+          and not t:find('=', 1, true)
+          and next ~= src
+        local key = has_arg and (t .. ' ' .. next) or t
+        if seen[key] == nil then
+          seen[key] = true
+          table.insert(flags, t)
+          if has_arg then table.insert(flags, next) end
+        end
+        i = i + (has_arg and 2 or 1)
+      else
+        i = i + 1
+      end
+    end
+    break -- one representative entry is sufficient
+  end
+
+  local root = get_project_root()
+  local clangd_path = root .. '/.clangd'
+  local db_dir = vim.fn.fnamemodify(compile_db, ':h')
+
+  local lines = {
+    'CompileFlags:',
+    '  CompilationDatabase: ' .. db_dir,
+    '  Add:',
+  }
+  for _, flag in ipairs(flags) do
+    table.insert(lines, '    - ' .. flag)
+  end
+  vim.list_extend(lines, {
+    'Diagnostics:',
+    '  MissingIncludes: None',
+    '  UnusedIncludes: None',
+  })
+
+  vim.fn.writefile(lines, clangd_path)
+  return true
+end
+
 function M.regenerate()
   if generate_symlink_tree() then
-    vim.notify('Regenerated project tree', vim.log.levels.INFO)
+    M.syncClangd()
+    vim.notify('Regenerated project tree + synced .clangd', vim.log.levels.INFO)
   else
     vim.notify('Failed to regenerate - no compile_commands.json', vim.log.levels.ERROR)
   end

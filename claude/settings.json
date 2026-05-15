@@ -15,14 +15,14 @@
       "Bash(git checkout --*)"
     ]
   },
-  "model": "claude-opus-4-6[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
   },
   "enabledPlugins": {},
-  "effortLevel": "high",
+  "effortLevel": "medium",
+  "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "showTurnDuration": false,
-  "promptSuggestionEnabled": false
+  "model": "claude-opus-4-6[1m]"
 }

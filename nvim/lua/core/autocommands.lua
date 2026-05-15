@@ -2,6 +2,17 @@
 local M = {}
 
 function M.setup()
+  -- Auto-sync .clangd from compile_commands.json on startup
+  vim.api.nvim_create_autocmd('VimEnter', {
+    once = true,
+    callback = function()
+      vim.schedule(function()
+        require('core.cmake-picker').syncClangd()
+      end)
+    end,
+    desc = 'Sync .clangd from compile_commands.json on startup',
+  })
+
   -- Filetype overrides
   vim.filetype.add({
     extension = {
