@@ -411,7 +411,7 @@ function M.files()
           vim.cmd('only')
           if clangd_synced then
             for _, client in ipairs(vim.lsp.get_clients()) do
-              local bufs = vim.lsp.get_buffers_by_client_id(client.id)
+              local bufs = vim.tbl_keys(client.attached_buffers)
               client:stop()
               for _, buf in ipairs(bufs) do
                 if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then

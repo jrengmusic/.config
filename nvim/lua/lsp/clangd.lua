@@ -4,7 +4,7 @@ local M = {}
   function M.setup(capabilities)
     local servers = {
     clangd = {
-      root_dir = function() return vim.fn.getcwd() end,
+      root_markers = { '.clangd', '.git' },
       cmd = (function()
         local is_windows = vim.fn.has('win32') == 1
         local clangd_bin = is_windows
@@ -15,6 +15,7 @@ local M = {}
           or '--query-driver=/usr/bin/c++,/usr/bin/clang++'
         return {
           clangd_bin,
+          '--background-index',
           '--header-insertion=never',
           '--clang-tidy',
           '--completion-style=detailed',

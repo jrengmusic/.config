@@ -270,8 +270,8 @@ M.setup = function()
   hi('@operator', { fg = '#b0b0b0' })
 
   -- LSP semantic tokens
-  hi('@lsp.type.class', { fg = colors.class })
-  hi('@lsp.type.struct', { fg = colors.type })
+  hi('@lsp.type.class', { fg = colors.class_system })
+  hi('@lsp.type.struct', { fg = colors.class_system })
   hi('@lsp.type.enum', { fg = colors.type })
   hi('@lsp.type.interface', { fg = colors.class_system })
   hi('@lsp.type.function', { fg = colors.func })
@@ -290,9 +290,23 @@ M.setup = function()
   -- Preprocessor: entire line lime
   hi('@preproc', { fg = colors.preprocessor })
   hi('@define', { fg = colors.preprocessor })
-  hi('@lsp.type.dependent', { fg = colors.preprocessor })
+
+  -- Template-dependent types: use type color, not preprocessor
+  hi('@lsp.type.dependent', { fg = colors.type })
+
+  -- Missing clangd semantic token types
+  hi('@lsp.type.namespace', { fg = colors.type })
+  hi('@lsp.type.enumMember', { fg = colors.constant })
+  hi('@lsp.type.typeParameter', { fg = colors.type })
+  hi('@lsp.type.concept', { fg = colors.type })
 
 
+
+  -- auto, override and other keyword-like LSP tokens → bold blue
+  hi('@lsp.type.keyword', { fg = colors.keyword, gui = 'bold' })
+  hi('@lsp.type.modifier', { fg = colors.keyword, gui = 'bold' })       -- override, final, virtual specifiers
+  hi('@lsp.typemod.class.deduced', { fg = colors.keyword, gui = 'bold' }) -- auto (deduced class type)
+  hi('@keyword.modifier', { fg = colors.keyword, gui = 'bold' })
 
   -- C++ primitive types as keywords (void, int, float, etc.)
   hi('@type.builtin', { fg = colors.keyword, gui = 'bold' })

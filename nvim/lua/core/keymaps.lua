@@ -94,14 +94,18 @@ function M.setup()
 
   -- Jump list navigation
   vim.keymap.set('n', '<leader>[', function()
-    vim.cmd('normal! ' .. vim.api.nvim_replace_termcodes('<C-o>', true, false, true))
-    vim.cmd('only')
-    require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<C-o>', true, false, true), 'n', false)
+    vim.schedule(function()
+      vim.cmd('only')
+      require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+    end)
   end, { desc = 'Jump back (sync split)' })
   vim.keymap.set('n', '<leader>]', function()
-    vim.cmd('normal! ' .. vim.api.nvim_replace_termcodes('<C-i>', true, false, true))
-    vim.cmd('only')
-    require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<C-i>', true, false, true), 'n', false)
+    vim.schedule(function()
+      vim.cmd('only')
+      require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+    end)
   end, { desc = 'Jump forward (sync split)' })
 
   -- Paste on new line (bypasses format-on-escape issue)
@@ -337,7 +341,7 @@ function M.setupDap()
           require('core.cmake-picker').syncClangd()
           vim.schedule(function()
             for _, client in ipairs(vim.lsp.get_clients()) do
-              local bufs = vim.lsp.get_buffers_by_client_id(client.id)
+              local bufs = vim.tbl_keys(client.attached_buffers)
               client:stop()
               for _, buf in ipairs(bufs) do
                 if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
