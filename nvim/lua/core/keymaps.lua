@@ -35,6 +35,24 @@ local function smart_quit()
   -- choice == 3 or 0 (cancelled): do nothing
 end
 
+-- Fire split sync once on the next BufEnter, but only if the file actually changed.
+-- Used by all picker/navigation keymaps so opening a file always syncs the split layout.
+local function splitSyncOnce()
+  local fileBefore = vim.fn.expand('%:p')
+  vim.api.nvim_create_autocmd('BufEnter', {
+    group = vim.api.nvim_create_augroup('split_sync_once', { clear = true }),
+    once = true,
+    callback = function()
+      local fileAfter = vim.fn.expand('%:p')
+      if fileAfter ~= fileBefore and fileAfter ~= '' then
+        vim.schedule(function()
+          require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+        end)
+      end
+    end,
+  })
+end
+
 function M.setup()
   -- ============================================================================
   -- GENERAL
@@ -154,17 +172,17 @@ function M.setup()
   vim.keymap.set('n', '<leader>fx', function() require('core.cmake-picker').open_explorer() end, { desc = 'Project explorer (cmake)' })
   vim.keymap.set('n', '<leader>fg', function() require('core.cmake-picker').grep() end, { desc = 'Find by grep (cmake)' })
   vim.keymap.set('n', '<leader>fr', function() require('core.cmake-picker').replace() end, { desc = 'Project replace (cmake)' })
-  vim.keymap.set('n', '<leader>fb', function() Snacks.picker.buffers() end, { desc = 'Find buffers' })
-  vim.keymap.set('n', '<leader>fh', function() Snacks.picker.help() end, { desc = 'Find help' })
+  vim.keymap.set('n', '<leader>fb', function() splitSyncOnce(); Snacks.picker.buffers() end, { desc = 'Find buffers' })
+  vim.keymap.set('n', '<leader>fh', function() splitSyncOnce(); Snacks.picker.help() end, { desc = 'Find help' })
   vim.keymap.set('n', '<leader>\\', function() Snacks.explorer.reveal() end, { desc = 'File explorer' })
   vim.keymap.set('n', '<leader>fk', function() Snacks.picker.keymaps() end, { desc = 'Find keymaps' })
-  vim.keymap.set('n', '<leader>fw', function() Snacks.picker.grep_word() end, { desc = 'Find current word' })
-  vim.keymap.set('n', '<leader>fd', function() Snacks.picker.diagnostics() end, { desc = 'Find diagnostics' })
-  vim.keymap.set('n', '<leader>fR', function() Snacks.picker.resume() end, { desc = 'Find resume' })
-  vim.keymap.set('n', '<leader>f.', function() Snacks.picker.recent() end, { desc = 'Find recent files' })
+  vim.keymap.set('n', '<leader>fw', function() splitSyncOnce(); Snacks.picker.grep_word() end, { desc = 'Find current word' })
+  vim.keymap.set('n', '<leader>fd', function() splitSyncOnce(); Snacks.picker.diagnostics() end, { desc = 'Find diagnostics' })
+  vim.keymap.set('n', '<leader>fR', function() splitSyncOnce(); Snacks.picker.resume() end, { desc = 'Find resume' })
+  vim.keymap.set('n', '<leader>f.', function() splitSyncOnce(); Snacks.picker.recent() end, { desc = 'Find recent files' })
   vim.keymap.set('n', '<leader>/', function() Snacks.picker.lines() end, { desc = 'Search in buffer' })
-  vim.keymap.set('n', '<leader>f/', function() Snacks.picker.grep_buffers() end, { desc = 'Find in open files' })
-  vim.keymap.set('n', '<leader>fn', function() Snacks.picker.files({ cwd = vim.fn.stdpath('config') }) end, { desc = 'Find neovim files' })
+  vim.keymap.set('n', '<leader>f/', function() splitSyncOnce(); Snacks.picker.grep_buffers() end, { desc = 'Find in open files' })
+  vim.keymap.set('n', '<leader>fn', function() splitSyncOnce(); Snacks.picker.files({ cwd = vim.fn.stdpath('config') }) end, { desc = 'Find neovim files' })
 
   -- ============================================================================
   -- LSP
@@ -220,12 +238,12 @@ function M.setupLsp(event)
 
   -- General LSP
   map('gd', function() require('lsp.header-source').smartDefinitionJump() end, 'Go to definition')
-  map('gr', function() Snacks.picker.lsp_references() end, 'Go to references')
-  map('gI', function() Snacks.picker.lsp_implementations() end, 'Go to implementation')
-  map('gD', vim.lsp.buf.declaration, 'Go to declaration')
+  map('gr', function() splitSyncOnce(); Snacks.picker.lsp_references() end, 'Go to references')
+  map('gI', function() splitSyncOnce(); Snacks.picker.lsp_implementations() end, 'Go to implementation')
+  map('gD', function() splitSyncOnce(); vim.lsp.buf.declaration() end, 'Go to declaration')
   map('K', vim.lsp.buf.hover, 'Hover documentation')
-  map('<leader>ds', function() Snacks.picker.lsp_symbols() end, 'Document symbols')
-  map('<leader>ws', function() Snacks.picker.lsp_workspace_symbols() end, 'Workspace symbols')
+  map('<leader>ds', function() splitSyncOnce(); Snacks.picker.lsp_symbols() end, 'Document symbols')
+  map('<leader>ws', function() splitSyncOnce(); Snacks.picker.lsp_workspace_symbols() end, 'Workspace symbols')
   map('<leader>rn', vim.lsp.buf.rename, 'Rename symbol')
   map('<leader>ca', vim.lsp.buf.code_action, 'Code action', { 'n', 'x' })
 

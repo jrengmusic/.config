@@ -301,99 +301,33 @@ end
 -- ============================================================================
 
 function M.smartDefinitionJump()
-  local current = vim.fn.expand('%:p')
-  local winCount = #vim.api.nvim_tabpage_list_wins(0)
-
-  -- Get adjacent pane info
-  local adjacentBuf = nil
-  local adjacentWin = nil
-  if winCount >= 2 then
-    local currentWin = vim.api.nvim_get_current_win()
-    local wins = vim.api.nvim_tabpage_list_wins(0)
-    for _, win in ipairs(wins) do
-      if win ~= currentWin then
-        adjacentWin = win
-        adjacentBuf = vim.api.nvim_win_get_buf(win)
-        break
-      end
-    end
-  end
-
-  -- Handler for LSP definition lookup
-  local function handleDefinition(items)
-    if not items or #items == 0 then
-      vim.notify('No definition found', vim.log.levels.WARN)
-      return
-    end
-
-    local item = items[1]
-    local defFile = item.filename or vim.api.nvim_buf_get_name(item.bufnr)
-    local defLine = item.lnum
-    local defCol = (item.col or 1) - 1
-
-    if winCount < 2 then
-      -- Single pane: just jump
-      vim.cmd('buffer ' .. vim.fn.bufadd(defFile))
-      if defLine then
-        vim.api.nvim_win_set_cursor(0, { defLine, defCol })
-      end
-    else
-      -- Two panes: navigate to adjacent, ensure pair is visible
-      local adjacentFile = adjacentBuf and vim.api.nvim_buf_get_name(adjacentBuf) or nil
-
-      -- Check if definition is already in adjacent pane
-      if adjacentFile == defFile then
-        -- Definition already visible in adjacent pane, just go there
-        vim.api.nvim_set_current_win(adjacentWin)
-        if defLine then
-          vim.api.nvim_win_set_cursor(0, { defLine, defCol })
-        end
-      else
-        -- Definition not visible in adjacent pane
-        -- For C++: ensure pair is open first, then show definition
-        if isCpp(current) or isHeader(current) then
-          local allFiles = getAllCorrespondingFiles(current)
-          if #allFiles > 0 then
-            local paired = allFiles[1]
-            -- Open pair in adjacent pane
-            vim.api.nvim_set_current_win(adjacentWin)
-            vim.cmd('buffer ' .. vim.fn.bufadd(paired))
-            -- Check if definition is in the pair
-            if vim.fn.fnamemodify(defFile, ':p') == vim.fn.fnamemodify(paired, ':p') then
-              if defLine then
-                vim.api.nvim_win_set_cursor(0, { defLine, defCol })
-              end
-            else
-              -- Definition is elsewhere, open it
-              vim.cmd('buffer ' .. vim.fn.bufadd(defFile))
-              if defLine then
-                vim.api.nvim_win_set_cursor(0, { defLine, defCol })
-              end
-            end
-          else
-            -- No pair found, just open definition in adjacent
-            vim.api.nvim_set_current_win(adjacentWin)
-            vim.cmd('buffer ' .. vim.fn.bufadd(defFile))
-            if defLine then
-              vim.api.nvim_win_set_cursor(0, { defLine, defCol })
-            end
-          end
-        else
-          -- Not C++: just open definition in adjacent pane
-          vim.api.nvim_set_current_win(adjacentWin)
-          vim.cmd('buffer ' .. vim.fn.bufadd(defFile))
-          if defLine then
-            vim.api.nvim_win_set_cursor(0, { defLine, defCol })
-          end
-        end
-      end
-    end
-  end
-
-  -- Query LSP for definition
   vim.lsp.buf.definition({
     on_list = function(options)
-      handleDefinition(options.items)
+      if not options.items or #options.items == 0 then
+        vim.notify('No definition found', vim.log.levels.WARN)
+        return
+      end
+
+      local item = options.items[1]
+      local defFile = item.filename or vim.api.nvim_buf_get_name(item.bufnr)
+      local defLine = item.lnum
+      local defCol = (item.col or 1) - 1
+
+      vim.cmd('only')
+      M.ensureCppHeaderLayout(defFile)
+
+      -- Position cursor at definition in whichever window now has defFile
+      local defFileFull = vim.fn.fnamemodify(defFile, ':p')
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        local bufname = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win))
+        if vim.fn.fnamemodify(bufname, ':p') == defFileFull then
+          vim.api.nvim_set_current_win(win)
+          if defLine then
+            vim.api.nvim_win_set_cursor(win, { defLine, defCol })
+          end
+          break
+        end
+      end
     end,
   })
 end
