@@ -485,9 +485,27 @@ function M.open_explorer()
     Tree:open(symlink_path)
   end
 
+  -- Persistent split sync while explorer is open: fires on every file navigation,
+  -- cleared when the explorer closes.
+  local _es_group = vim.api.nvim_create_augroup('explorer_split_sync', { clear = true })
+  local _es_prev = vim.fn.expand('%:p')
+  vim.api.nvim_create_autocmd('BufEnter', {
+    group = _es_group,
+    callback = function()
+      local cur = vim.fn.expand('%:p')
+      if cur ~= _es_prev and cur ~= '' then
+        _es_prev = cur
+        vim.schedule(function()
+          require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
+        end)
+      end
+    end,
+  })
+
   local picker = require('snacks').picker.explorer({
     cwd = project_dir,
     on_close = function()
+      vim.api.nvim_clear_autocmds({ group = 'explorer_split_sync' })
       pcall(function()
         local Tree = require('snacks.explorer.tree')
         Tree:close_all(project_dir)
