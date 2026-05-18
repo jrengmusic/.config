@@ -29,7 +29,5 @@ return {
     },
     'theHamsta/nvim-dap-virtual-text',
   },
-  snippets = {
-    'rafamadriz/friendly-snippets',
-  },
+  snippets = {},
 }

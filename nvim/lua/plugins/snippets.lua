@@ -10,12 +10,6 @@ return {
   setup = function()
     local luasnip = require('luasnip')
     
-    -- Load friendly-snippets collection with delay
-    vim.defer_fn(function()
-      local ok, err = pcall(function()
-        return require('luasnip.loaders.from_vscode').lazy_load()
-      end)
-    end, 200)
     
     -- Add custom snippets after friendly ones are loaded
     local cpp_snippets = {
@@ -228,7 +222,7 @@ return {
       luasnip.snippet('nam', {
         luasnip.text_node('namespace '),
         luasnip.insert_node(1, 'name'),
-        luasnip.text_node({'', '{'}),
+        luasnip.text_node({'', '{', ''}),
         luasnip.text_node({'/*____________________________________________________________________________*/', ''}),
         luasnip.text_node({'\t'}),
         luasnip.insert_node(2, '// namespace content'),
@@ -331,29 +325,13 @@ return {
         luasnip.insert_node(1, 'something'),
         luasnip.text_node({'', '#endif // JUCE_WINDOWS'}),
       }),
-
-      -- Test snippet
-      luasnip.snippet('test', {
-        luasnip.text_node('TEST SNIPPET WORKING!'),
-      }),
     }
 
-    -- Override friendly-snippets namespace with custom nam
     vim.defer_fn(function()
       luasnip.add_snippets('cpp', cpp_snippets)
       luasnip.add_snippets('objcpp', cpp_snippets)
       luasnip.add_snippets('objc', cpp_snippets)
       
-      -- Remove friendly-snippets namespace
-      local all_snippets = luasnip.get_snippets('cpp')
-      if all_snippets then
-        for i, snip in ipairs(all_snippets) do
-          if snip.trigger == 'namespace' then
-            table.remove(all_snippets, i)
-            break
-          end
-        end
-      end
     end, 300)
     
     vim.keymap.set('i', '<C-l>', function() luasnip.jump(1) end, { silent = true })
