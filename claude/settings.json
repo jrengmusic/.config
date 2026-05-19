@@ -15,6 +15,7 @@
       "Bash(git checkout --*)"
     ]
   },
+  "model": "claude-opus-4-6[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
@@ -23,6 +24,5 @@
   "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
-  "showTurnDuration": false,
-  "model": "claude-opus-4-6[1m]"
+  "showTurnDuration": false
 }

@@ -42,6 +42,7 @@ Opens at top (horizontal split, 15 lines):
 |-----|------|--------|
 | `<leader>rw` | n/v | Replace word/selection (exact match) |
 | `<leader>rc` | n/v | Replace word/selection (contains) |
+| `<leader>rg` | n | Project replace (grep, cmake) |
 | `<leader>rn` | n | Rename symbol (LSP) |
 
 ## Splits (`<leader>s` group)
@@ -75,7 +76,7 @@ Opens at top (horizontal split, 15 lines):
 | `<leader>fk` | Find keymaps |
 | `<leader>fw` | Find current word |
 | `<leader>fd` | Find diagnostics |
-| `<leader>fr` | Resume last find |
+| `<leader>fR` | Resume last find |
 | `<leader>f.` | Find recent files |
 | `<leader>f/` | Find in open files |
 | `<leader>fn` | Find neovim config files |
