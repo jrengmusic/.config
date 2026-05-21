@@ -375,15 +375,18 @@ function M.files()
     if a.module == b.module then
       return a.display < b.display
     end
-    -- Order: CMake > Source > User modules > JUCE modules > Others
+    -- Order: CMake > Source > jam* > kuassa* > iq* > User modules > JUCE modules
     local MODULE_PRIORITY = {
       CMake = 1,
       Source = 2,
     }
     local function priority(mod)
       if MODULE_PRIORITY[mod] then return MODULE_PRIORITY[mod] end
-      if mod:match('^juce_') then return 4 end
-      return 3  -- User modules
+      if mod:match('^jam_') then return 3 end
+      if mod:match('^kuassa_') then return 4 end
+      if mod:match('^iq_') then return 5 end
+      if mod:match('^juce_') then return 7 end
+      return 6  -- Other user modules
     end
     local pa, pb = priority(a.module), priority(b.module)
     if pa ~= pb then return pa < pb end
@@ -639,6 +642,24 @@ local function get_dirs()
         end
       end
     end
+  end
+
+  -- Sort module dirs: jam* first, other user modules next, juce_* last
+  if #dirs > 1 then
+    local source = table.remove(dirs, 1)
+    table.sort(dirs, function(a, b)
+      local function dir_priority(d)
+        if d:find('/jam_') then return 1 end
+        if d:find('/kuassa_') then return 2 end
+        if d:find('/iq_') then return 3 end
+        if d:find('/juce_') then return 5 end
+        return 4  -- Other user modules
+      end
+      local pa, pb = dir_priority(a), dir_priority(b)
+      if pa ~= pb then return pa < pb end
+      return a < b
+    end)
+    table.insert(dirs, 1, source)
   end
 
   return #dirs > 0 and dirs or nil
