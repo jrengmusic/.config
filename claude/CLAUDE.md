@@ -16,25 +16,24 @@ Audio software — DAW plugins (VST3, AU, AAX) built with C++ and JUCE framework
 ## Projects (authored, developed, and maintained by ARCHITECT)
 
 ### END — Ephemeral Nexus Display
-- GPU-accelerated terminal emulator, C++17/JUCE
+- GPU-accelerated terminal emulator, C++17/JUCE + JAM
 - `~/Documents/Poems/dev/end/`
 
 ### TIT — Terminal Interface for git
-- State-aware git TUI with zero-surprise guarantee, Go/bubbletea/lipgloss
+- State-aware git TUI with zero-surprise guarantee, C++17/JUCE + JAM
 - `~/Documents/Poems/dev/tit/`
 
 ### CAKE — CMake Project Manager TUI
-- Context-aware cmake operations (generate/build/clean/open IDE), Go/bubbletea/lipgloss
+- Context-aware cmake operations (generate/build/clean/open IDE), C++17/JUCE + JAM
 - `~/Documents/Poems/dev/cake/`
 
 ### WHATDBG — DAP Debug Adapter
-- Windows dbgeng-based debug adapter for neovim, C++/JUCE (juce_core + jreng_core)
+- Windows dbgeng-based debug adapter for neovim, C++17/JUCE + JAM
 - `~/Documents/Poems/dev/whatdbg/`
 
 ### Kuassa — Audio Plugin Framework
-- Shared framework libraries and plugin projects, C++17/JUCE
+- Shared framework libraries and plugin projects, C++17/JUCE + KANJUT
 - `~/Documents/Poems/kuassa/`
-- Shares jreng_opengl module with END (fork relationship)
 
 ### CAROL — Cognitive Amplification Role Orchestration with LLM agents
 - Multi-agent framework for cognitive amplification
@@ -43,6 +42,14 @@ Audio software — DAW plugins (VST3, AU, AAX) built with C++ and JUCE framework
 ### CAROLINE — CAROL Interface Native Environment
 - Native C++/JUCE interface for CAROL, C++17/JUCE
 - `~/Documents/Poems/dev/caroline/`
+
+## Frameworks (authored, developed, and maintained by ARCHITECT)
+
+Three independent frameworks under `~/Documents/Poems/`. Completely decoupled — no project mixes frameworks, no cross-framework module sharing.
+
+- **JAM** — JRENG Architectural Modules (main framework) — `~/Documents/Poems/dev/jam/`
+- **KANJUT** v2.0 — `~/Documents/Poems/kuassa/___lib___/`
+- **CIUM** v1.0 — `~/Documents/Poems/iqala/___cium___/`
 
 ## Experience
 - C++ (JUCE, real-time audio, plugin architecture)
@@ -54,7 +61,7 @@ Audio software — DAW plugins (VST3, AU, AAX) built with C++ and JUCE framework
 - LLM agent orchestration: multi-agent workflows, role separation, cognitive load distribution
 
 ## Stack
-- C++17, JUCE, CMake + Ninja
+- C++17, JUCE, JAM / KANJUT / CIUM frameworks, CMake + Ninja
 - Neovim (Lua config), zsh, tmux, END
 - macOS (Xcode clang) + Windows (MSVC + clang-cl via MSYS2)
 - Git, GitHub
