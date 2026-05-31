@@ -675,6 +675,30 @@ function M.grep()
   Snacks.picker.grep({ dirs = dirs })
 end
 
+function M.replace_grep()
+  local Snacks = require('snacks')
+  local dirs = get_dirs()
+
+  local function open_replace(picker)
+    local search = picker.input.filter.search
+    picker:close()
+    vim.schedule(function() M.replace(search) end)
+  end
+
+  local picker_opts = {
+    title   = 'Grep (then Replace)',
+    live    = true,
+    actions = { open_replace = open_replace },
+    win = {
+      input = { keys = { ['<CR>'] = { 'open_replace', mode = { 'i', 'n' } } } },
+      list  = { keys = { ['<CR>'] = 'open_replace' } },
+    },
+  }
+
+  if dirs ~= nil then picker_opts.dirs = dirs end
+  Snacks.picker.grep(picker_opts)
+end
+
 function M.replace(search)
   local Snacks = require('snacks')
   local dirs = get_dirs()
@@ -718,7 +742,7 @@ function M.replace(search)
 
   local picker_opts = {
     title  = 'Replace',
-    search = search or vim.fn.expand('<cword>'),
+    search = search ~= nil and search or vim.fn.expand('<cword>'),
     live   = false,
     -- Intercept every pattern update: capture typed text as replacement,
     -- then zero out pattern so the fuzzy matcher never filters the list.

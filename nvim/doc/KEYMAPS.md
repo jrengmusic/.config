@@ -40,6 +40,7 @@ Opens at top (horizontal split, 15 lines):
 
 | Key | Mode | Action |
 |-----|------|--------|
+| `<leader>fr` | n | Project grep+replace — type search term manually (cmake) |
 | `<leader>rw` | n/v | Replace word/selection (exact match) |
 | `<leader>rc` | n/v | Replace word/selection (contains) |
 | `<leader>rg` | n/v | Project replace (grep, cmake) |
