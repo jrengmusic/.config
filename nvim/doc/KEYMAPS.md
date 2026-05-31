@@ -42,7 +42,7 @@ Opens at top (horizontal split, 15 lines):
 |-----|------|--------|
 | `<leader>rw` | n/v | Replace word/selection (exact match) |
 | `<leader>rc` | n/v | Replace word/selection (contains) |
-| `<leader>rg` | n | Project replace (grep, cmake) |
+| `<leader>rg` | n/v | Project replace (grep, cmake) |
 | `<leader>rn` | n | Rename symbol (LSP) |
 
 ## Splits (`<leader>s` group)

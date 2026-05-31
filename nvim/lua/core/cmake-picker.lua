@@ -675,7 +675,7 @@ function M.grep()
   Snacks.picker.grep({ dirs = dirs })
 end
 
-function M.replace()
+function M.replace(search)
   local Snacks = require('snacks')
   local dirs = get_dirs()
   local replacement = ''
@@ -718,7 +718,7 @@ function M.replace()
 
   local picker_opts = {
     title  = 'Replace',
-    search = vim.fn.expand('<cword>'),
+    search = search or vim.fn.expand('<cword>'),
     live   = false,
     -- Intercept every pattern update: capture typed text as replacement,
     -- then zero out pattern so the fuzzy matcher never filters the list.
