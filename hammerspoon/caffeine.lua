@@ -26,3 +26,5 @@ function caffeineOff()
     hs.caffeinate.set("displayIdle", false)
     setCaffeineDisplay(hs.caffeinate.get("displayIdle"))
 end
+
+caffeineOn()

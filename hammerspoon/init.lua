@@ -51,7 +51,6 @@ function applicationWatcherCallback(appName, eventType, appObject)
 				caffeineOn()
 				hotkeys:exit()
 			elseif eventType == hs.application.watcher.deactivated then
-				caffeineOff()
 				hotkeys:enter()
 			end
 		end
