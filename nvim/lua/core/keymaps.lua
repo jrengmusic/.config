@@ -80,6 +80,7 @@ function M.setup()
   vim.keymap.set('n', '<C-c>', smart_quit, { desc = 'Quit with save/discard prompt' })
   vim.keymap.set('n', '<leader>tt', function() require('core.tui').tit() end, { desc = 'Open TIT (git TUI)' })
   vim.keymap.set('n', '<leader>tc', function() require('core.tui').cake() end, { desc = 'Open Cake TUI' })
+  vim.keymap.set('n', '<leader>bd', function() require('core.doxygen').build() end, { desc = 'Build doxygen docs' })
   vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
   vim.keymap.set('n', '<leader>tx', function()
     for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -359,6 +360,7 @@ function M.setupDap()
             vim.api.nvim_win_close(term_win, true)
           end
           require('core.cmake-picker').syncClangd()
+          require('core.doxygen').build_incremental(root)
           vim.schedule(function()
             for _, client in ipairs(vim.lsp.get_clients()) do
               local bufs = vim.tbl_keys(client.attached_buffers)
