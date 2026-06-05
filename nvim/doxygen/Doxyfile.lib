@@ -1,0 +1,45 @@
+# Doxyfile.lib — JRENG framework library template
+# Generated per-lib by doxygen.lua — do not run directly.
+# Ground of truth: JUCE/docs/doxygen/Doxyfile (inherited via @INCLUDE).
+# Run from: {lib}/docs/   (OUTPUT_DIRECTORY blank → cwd)
+# Output:   {lib}/docs/html/  {lib}/docs/xml/  {lib}/docs/tagfile.xml
+#           {lib}/DOCS.html   (root redirect, written by build-doxygen.sh)
+#
+# Substitution markers:
+#   __JUCE_DOXYFILE__  __PROJECT_NAME__  __PROJECT_BRIEF__
+#   __INPUT__          __TAGFILES__      __DOT_MAX_NODES__
+
+@INCLUDE = __JUCE_DOXYFILE__
+
+#---------------------------------------------------------------------------
+# Per-lib overrides
+#---------------------------------------------------------------------------
+
+PROJECT_NAME           = "__PROJECT_NAME__"
+PROJECT_BRIEF          = "__PROJECT_BRIEF__"
+PROJECT_ICON           =
+OUTPUT_DIRECTORY       =
+EXTRACT_PRIVATE        = YES
+INPUT                  = __INPUT__
+STRIP_FROM_PATH        = __INPUT__
+FILE_PATTERNS          = *.h *.cpp *.mm
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */Builds/*          \
+                         */JuceLibraryCode/* \
+                         */.git/*            \
+                         */doxygen/*         \
+                         */docs/*            \
+                         */.DS_Store         \
+                         */freetype/*
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_HEADER            =
+HTML_FOOTER            =
+HTML_EXTRA_STYLESHEET  =
+HTML_EXTRA_FILES       =
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
+GENERATE_LATEX         = NO
+GENERATE_TAGFILE       = tagfile.xml
+TAGFILES               = __TAGFILES__
+DOT_GRAPH_MAX_NODES    = __DOT_MAX_NODES__
