@@ -9,10 +9,10 @@ function M.setup()
   vim.env.PATH = '/opt/homebrew/bin:/opt/local/bin:' .. vim.env.PATH
 
   if vim.fn.has('win32') == 1 then
-    stylePath = 'C:\\Users\\jreng\\Documents\\Poems\\kuassa\\___lib___\\JUCE.clang-format'
+    stylePath = 'C:\\Users\\jreng\\Documents\\Poems\\dev\\JUCE.clang-format'
     clangFormatBin = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\Llvm\\x64\\bin\\clang-format.exe'
   else
-    stylePath = '/Users/jreng/Documents/Poems/kuassa/___lib___/JUCE.clang-format'
+    stylePath = '/Users/jreng/Documents/Poems/dev/JUCE.clang-format'
     clangFormatBin = 'clang-format'
 
     if vim.fn.executable('clang-format') == 1 then
