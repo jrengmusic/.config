@@ -527,9 +527,9 @@ function M.setupDap()
   map('<F12>', dap.step_out, 'Step out')
 
   -- Leader-d prefix
-  map('<leader>db', dap.toggle_breakpoint, 'Toggle breakpoint')
-  map('<leader>dB', function() dap.set_breakpoint(vim.fn.input('Condition: ')) end, 'Conditional breakpoint')
-  map('<leader>dl', function() dap.set_breakpoint(nil, nil, vim.fn.input('Log message: ')) end, 'Log point')
+  map('<leader>db', function() splitSyncOnce(); dap.toggle_breakpoint() end, 'Toggle breakpoint')
+  map('<leader>dB', function() splitSyncOnce(); dap.set_breakpoint(vim.fn.input('Condition: ')) end, 'Conditional breakpoint')
+  map('<leader>dl', function() splitSyncOnce(); dap.set_breakpoint(nil, nil, vim.fn.input('Log message: ')) end, 'Log point')
   map('<leader>dc', dap.continue, 'Continue')
   map('<leader>di', dap.step_into, 'Step into')
   map('<leader>do', dap.step_over, 'Step over')
@@ -614,25 +614,18 @@ end
 
 -- Mini.pairs keymaps
 function M.setupMiniPairs()
-  -- Tab to jump out of brackets/quotes
-  vim.keymap.set('i', '<Tab>', function()
-    local col = vim.api.nvim_win_get_cursor(0)[2]
-    local char = vim.api.nvim_get_current_line():sub(col + 1, col + 1)
-
-    if char:match('[%)%]%}%"\'`]') then
-      return '<Right>'
-    else
-      return '<Tab>'
-    end
-  end, { expr = true, noremap = true })
-
-  -- Semicolon to jump out of () or {} and add ;
+  -- Semicolon to jump out of () or {} (nested) and add ;
   vim.keymap.set('i', ';', function()
     local col = vim.api.nvim_win_get_cursor(0)[2]
-    local char = vim.api.nvim_get_current_line():sub(col + 1, col + 1)
-
-    if char == ')' or char == '}' then
-      return '<Right>;'
+    local line = vim.api.nvim_get_current_line()
+    local count = 0
+    local pos = col + 1
+    while line:sub(pos, pos):match('[%)%}]') do
+      count = count + 1
+      pos = pos + 1
+    end
+    if count > 0 then
+      return string.rep('<Right>', count) .. ';'
     else
       return ';'
     end

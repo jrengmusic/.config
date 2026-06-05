@@ -8,6 +8,11 @@ return {
 
     cmp.setup({
       completion = { completeopt = 'menu,menuone,noinsert' },
+      snippet = {
+        expand = function(args)
+          luasnip.lsp_expand(args.body)
+        end,
+      },
       mapping = cmp.mapping.preset.insert({
         ['<C-n>'] = cmp.mapping.select_next_item(),
         ['<C-p>'] = cmp.mapping.select_prev_item(),
@@ -20,11 +25,17 @@ return {
           elseif cmp.visible() then
             cmp.select_next_item()
           else
-            -- Jump out of brackets/quotes
             local col = vim.api.nvim_win_get_cursor(0)[2]
-            local char = vim.api.nvim_get_current_line():sub(col + 1, col + 1)
-            if char:match('[%)%]%}%"\'%>`]') then
-              vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Right>', true, false, true), 'n', false)
+            local line = vim.api.nvim_get_current_line()
+            local count = 0
+            local pos = col + 1
+            while line:sub(pos, pos):match('[%)%]%}%"\'%>`]') do
+              count = count + 1
+              pos = pos + 1
+            end
+            if count > 0 then
+              local right = vim.api.nvim_replace_termcodes('<Right>', true, false, true)
+              vim.api.nvim_feedkeys(string.rep(right, count), 'n', false)
             else
               fallback()
             end
