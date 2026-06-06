@@ -29,7 +29,6 @@ require('lazy').setup({
   plug { repo = 'hrsh7th/nvim-cmp', module = 'plugins.completion' },
   plug { repo = 'tpope/vim-sleuth', module = 'plugins.sleuth' },
   plug { repo = 'lewis6991/gitsigns.nvim', module = 'plugins.gitsigns' },
-  plug { repo = 'brenoprata10/nvim-highlight-colors', module = 'plugins.highlight-colors' },
   plug { repo = 'nvim-lualine/lualine.nvim', module = 'plugins.ui' },
   plug { repo = 'folke/which-key.nvim', module = 'plugins.which-key' },
   plug { repo = 'nvim-tree/nvim-web-devicons', module = 'plugins.web-devicons' },
@@ -48,6 +47,8 @@ require('lazy').setup({
 -- ============================================================================
 -- COLORSCHEME
 -- ============================================================================
+
+require('highlight-colours').setup({ render = 'background', enable_named_colors = true, enable_tailwind = false })
 
 vim.cmd('colorscheme gfx')
 
