@@ -2,6 +2,8 @@
 -- Project-aware picker that groups files by module (like IDE navigators)
 local M = {}
 
+local _grep_fixed = true
+
 local SOURCE_EXTENSIONS = {
   'cpp', 'cc', 'c', 'mm', 'm', 'h', 'hpp', 'hxx',
   'xml', 'svg', 'json', 'txt', 'md', 'cmake', 'html', 'lua',
@@ -665,17 +667,32 @@ local function get_dirs()
   return #dirs > 0 and dirs or nil
 end
 
-function M.grep()
+function M.grep(seed_search)
   local Snacks = require('snacks')
   local dirs = get_dirs()
-  if dirs == nil then
-    Snacks.picker.grep()
-    return
+
+  local function toggle_fixed(picker)
+    local cur = picker.input.filter.search
+    picker:close()
+    _grep_fixed = not _grep_fixed
+    vim.schedule(function() M.grep(cur) end)
   end
-  Snacks.picker.grep({ dirs = dirs })
+
+  local opts = {
+    title   = 'Grep' .. (_grep_fixed and ' [-F]' or ''),
+    actions = { toggle_fixed = toggle_fixed },
+    win = {
+      input = { keys = { ['<C-f>'] = { 'toggle_fixed', mode = { 'i', 'n' } } } },
+      list  = { keys = { ['<C-f>'] = 'toggle_fixed' } },
+    },
+  }
+  if seed_search ~= nil then opts.search = seed_search end
+  if _grep_fixed       then opts.args   = { '-F' }     end
+  if dirs ~= nil       then opts.dirs   = dirs          end
+  Snacks.picker.grep(opts)
 end
 
-function M.replace_grep()
+function M.replace_grep(seed_search)
   local Snacks = require('snacks')
   local dirs = get_dirs()
 
@@ -685,27 +702,41 @@ function M.replace_grep()
     vim.schedule(function() M.replace(search) end)
   end
 
+  local function toggle_fixed(picker)
+    local cur = picker.input.filter.search
+    picker:close()
+    _grep_fixed = not _grep_fixed
+    vim.schedule(function() M.replace_grep(cur) end)
+  end
+
   local picker_opts = {
-    title   = 'Grep (then Replace)',
+    title   = 'Grep (then Replace)' .. (_grep_fixed and ' [-F]' or ''),
     live    = true,
-    actions = { open_replace = open_replace },
+    actions = { open_replace = open_replace, toggle_fixed = toggle_fixed },
     win = {
-      input = { keys = { ['<CR>'] = { 'open_replace', mode = { 'i', 'n' } } } },
-      list  = { keys = { ['<CR>'] = 'open_replace' } },
+      input = { keys = {
+        ['<CR>']  = { 'open_replace', mode = { 'i', 'n' } },
+        ['<C-f>'] = { 'toggle_fixed', mode = { 'i', 'n' } },
+      }},
+      list  = { keys = {
+        ['<CR>']  = 'open_replace',
+        ['<C-f>'] = 'toggle_fixed',
+      }},
     },
   }
 
-  if dirs ~= nil then picker_opts.dirs = dirs end
+  if seed_search ~= nil then picker_opts.search = seed_search end
+  if _grep_fixed         then picker_opts.args   = { '-F' }   end
+  if dirs ~= nil         then picker_opts.dirs   = dirs        end
   Snacks.picker.grep(picker_opts)
 end
 
 function M.replace(search)
   local Snacks = require('snacks')
   local dirs = get_dirs()
-  local replacement = ''
-
   local function apply(picker)
-    local search   = picker.input.filter.search
+    local search      = picker.input.filter.search
+    local replacement = vim.trim(picker.input.win:text())
     -- Explicit Tab-selection takes priority; fall back to all visible items.
     local selected = picker:selected()
     if #selected == 0 then selected = picker:items() end
@@ -740,15 +771,20 @@ function M.replace(search)
     vim.notify('Replaced "' .. search .. '" → "' .. replacement .. '" in ' .. file_count .. ' file(s)', vim.log.levels.INFO)
   end
 
+  local function toggle_fixed(picker)
+    local cur = picker.input.filter.search
+    picker:close()
+    _grep_fixed = not _grep_fixed
+    vim.schedule(function() M.replace(cur) end)
+  end
+
   local picker_opts = {
-    title  = 'Replace',
+    title  = 'Replace' .. (_grep_fixed and ' [-F]' or ''),
     search = search ~= nil and search or vim.fn.expand('<cword>'),
     live   = false,
-    -- Intercept every pattern update: capture typed text as replacement,
-    -- then zero out pattern so the fuzzy matcher never filters the list.
+    -- Zero out pattern so the fuzzy matcher never filters the grep results.
     filter = {
       transform = function(_, filter)
-        replacement = filter.pattern or ''
         filter.pattern = ''
       end,
     },
@@ -764,14 +800,21 @@ function M.replace(search)
         vim.schedule(do_select_all)
       end
     end,
-    actions = { apply_replace = apply },
+    actions = { apply_replace = apply, toggle_fixed = toggle_fixed },
     win = {
-      input = { keys = { ['<CR>'] = { 'apply_replace', mode = { 'i', 'n' } } } },
-      list  = { keys = { ['<CR>'] = 'apply_replace' } },
+      input = { keys = {
+        ['<CR>']  = { 'apply_replace', mode = { 'i', 'n' } },
+        ['<C-f>'] = { 'toggle_fixed',  mode = { 'i', 'n' } },
+      }},
+      list  = { keys = {
+        ['<CR>']  = 'apply_replace',
+        ['<C-f>'] = 'toggle_fixed',
+      }},
     },
   }
 
-  if dirs ~= nil then picker_opts.dirs = dirs end
+  if _grep_fixed then picker_opts.args = { '-F' } end
+  if dirs ~= nil then picker_opts.dirs = dirs      end
   Snacks.picker.grep(picker_opts)
 end
 
