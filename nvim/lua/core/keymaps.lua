@@ -368,7 +368,10 @@ function M.setupDap()
               for _, buf in ipairs(bufs) do
                 if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
                   vim.defer_fn(function()
+                    local saved = vim.api.nvim_get_current_buf()
+                    vim.api.nvim_set_current_buf(buf)
                     vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+                    vim.api.nvim_set_current_buf(saved)
                   end, 500)
                 end
               end
