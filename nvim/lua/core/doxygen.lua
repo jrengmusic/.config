@@ -15,7 +15,8 @@ local TEMPLATE_LIB  = vim.fn.stdpath('config') .. (is_windows and '\\doxygen\\Do
 local TEMPLATE_JUCE = vim.fn.stdpath('config') .. (is_windows and '\\doxygen\\Doxyfile.juce' or '/doxygen/Doxyfile.juce')
 
 -- Fixed machine paths
-local JUCE_ROOT     = '/Users/jreng/Documents/Poems/JUCE'
+local HOME          = vim.fn.expand('~'):gsub('\\', '/')
+local JUCE_ROOT     = HOME .. '/Documents/Poems/JUCE'
 local JUCE_MODULES  = JUCE_ROOT .. '/modules'
 local JUCE_DOXY_DIR = JUCE_ROOT .. '/docs/doxygen'
 local JUCE_DOXYFILE = JUCE_DOXY_DIR .. '/Doxyfile'
