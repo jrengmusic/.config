@@ -289,6 +289,21 @@ function M.setupDap()
 
   local DAP_TERMINATE_GRACE_MS = 200
   local BUILD_GUARD_LISTENER_KEY = 'build_guard'
+  local STANDALONE_PID_LISTENER_KEY = 'standalone_pid_capture'
+
+  local standalonePid = nil
+
+  dap.listeners.after.launch[STANDALONE_PID_LISTENER_KEY] = function(session, _)
+    if dapConfig.detectProjectType() == 'standalone' then
+      local program = session.config and session.config.program
+      if program then
+        vim.defer_fn(function()
+          local result = vim.fn.system('pgrep -f "' .. program .. '"')
+          standalonePid = tonumber(vim.trim(result))
+        end, 500)
+      end
+    end
+  end
 
   local function terminateDap()
     dap.terminate()
@@ -307,6 +322,15 @@ function M.setupDap()
       end)
       if config and config.daw then
         killDaw(config.daw)
+      end
+    elseif projectType == 'standalone' and standalonePid then
+      local pid = standalonePid
+      standalonePid = nil
+      if is_windows then
+        vim.fn.jobstart({ 'taskkill', '/F', '/PID', tostring(pid) })
+      else
+        vim.fn.jobstart({ 'kill', '-9', tostring(pid) })
+        vim.fn.system({ '/usr/bin/lsappinfo', 'kill', '-force', tostring(pid) })
       end
     end
     return projectType
