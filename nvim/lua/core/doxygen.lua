@@ -43,13 +43,13 @@ local function detect_lib_root(root)
   f:close()
 
   if content:find('JAM_ROOT') then
-    return vim.fn.fnamemodify(root .. '/../jam', ':p'):gsub('/$', '')
+    return vim.fn.fnamemodify(root .. '/../jam', ':p'):gsub('[/\\]$', '')
   end
   if vim.loop.fs_stat(root .. '/../___cium___/doxygen/Doxyfile') then
-    return vim.fn.fnamemodify(root .. '/../___cium___', ':p'):gsub('/$', '')
+    return vim.fn.fnamemodify(root .. '/../___cium___', ':p'):gsub('[/\\]$', '')
   end
   if content:find('FRAMEWORK_MODULES_PATH') then
-    return vim.fn.fnamemodify(root .. '/../___lib___', ':p'):gsub('/$', '')
+    return vim.fn.fnamemodify(root .. '/../___lib___', ':p'):gsub('[/\\]$', '')
   end
   return nil
 end

@@ -43,8 +43,18 @@ function M.formatBuffer()
       local output_lines = {}
       vim.fn.jobstart({ clangFormatBin, '--style=file:' .. stylePath, tmpfile }, {
         on_stdout = function(_, data)
-          for _, line in ipairs(data) do
-            table.insert(output_lines, line)
+          if #data == 0 then return end
+          -- Stitch chunk boundary: last element of previous chunk is a partial line;
+          -- first element of this chunk continues it.
+          if #output_lines > 0 then
+            output_lines[#output_lines] = output_lines[#output_lines] .. data[1]
+            for i = 2, #data do
+              table.insert(output_lines, data[i])
+            end
+          else
+            for _, line in ipairs(data) do
+              table.insert(output_lines, line)
+            end
           end
         end,
         on_exit = function(_, exit_code)
@@ -52,6 +62,10 @@ function M.formatBuffer()
             -- jobstart appends a trailing empty string; drop it
             if output_lines[#output_lines] == '' then
               table.remove(output_lines)
+            end
+            -- Strip embedded CR bytes (Windows pipe may produce CRLF)
+            for i, line in ipairs(output_lines) do
+              output_lines[i] = line:gsub('\r', '')
             end
             if vim.bo.modifiable then
               vim.api.nvim_buf_set_lines(0, 0, -1, false, output_lines)
