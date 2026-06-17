@@ -298,8 +298,19 @@ function M.setupDap()
       local program = session.config and session.config.program
       if program then
         vim.defer_fn(function()
-          local result = vim.fn.system('pgrep -f "' .. program .. '"')
-          standalonePid = tonumber(vim.trim(result))
+          if is_windows then
+            local result = vim.fn.system({
+              'powershell', '-NoProfile', '-Command',
+              string.format(
+                "Get-CimInstance Win32_Process -Filter \"ExecutablePath='%s'\" | Select-Object -ExpandProperty ProcessId",
+                program
+              ),
+            })
+            standalonePid = tonumber(vim.trim(result))
+          else
+            local result = vim.fn.system('pgrep -f "' .. program .. '"')
+            standalonePid = tonumber(vim.trim(result))
+          end
         end, 500)
       end
     end
