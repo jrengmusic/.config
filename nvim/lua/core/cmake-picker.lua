@@ -17,6 +17,8 @@ local EXCLUDE_EXTENSIONS = {
   'o', 'obj', 'a', 'so', 'dylib', 'lib', 'dll',
 }
 
+local EXCLUDE_DIRS = { 'docs' }
+
 -- Searches upward from cwd for CMakeLists.txt to find the project root.
 -- Falls back to cwd when none is found (e.g. nvim started outside the project).
 local function get_project_root()
@@ -94,6 +96,13 @@ local function is_excluded_ext(file)
   return false
 end
 
+local function is_excluded_dir(name)
+  for _, d in ipairs(EXCLUDE_DIRS) do
+    if name == d then return true end
+  end
+  return false
+end
+
 local function classify_file(file)
   if file:find('/Source/') then
     return 'Sources', 'Source'
@@ -120,7 +129,7 @@ local function scan_source_dir()
     for _, entry in ipairs(entries) do
       local path = dir .. '/' .. entry
       if vim.fn.isdirectory(path) == 1 then
-        scan(path)
+        if not is_excluded_dir(entry) then scan(path) end
       elseif is_source_ext(path) and not is_excluded_ext(path) then
         table.insert(files, path)
       end
@@ -143,7 +152,7 @@ local function scan_module_dir(module_path)
       local path = dir .. '/' .. entry
       local rel = rel_prefix == '' and entry or (rel_prefix .. '/' .. entry)
       if vim.fn.isdirectory(path) == 1 then
-        scan(path, rel)
+        if not is_excluded_dir(entry) then scan(path, rel) end
       elseif is_source_ext(path) and not is_excluded_ext(path) then
         table.insert(files, { path = path, rel = rel })
       end
@@ -687,7 +696,7 @@ function M.grep(seed_search)
     },
   }
   if seed_search ~= nil then opts.search = seed_search end
-  if _grep_fixed       then opts.args   = { '-F' }     end
+  opts.args = _grep_fixed and { '--glob', '!**/docs/**', '-F' } or { '--glob', '!**/docs/**' }
   if dirs ~= nil       then opts.dirs   = dirs          end
   Snacks.picker.grep(opts)
 end
@@ -726,7 +735,7 @@ function M.replace_grep(seed_search)
   }
 
   if seed_search ~= nil then picker_opts.search = seed_search end
-  if _grep_fixed         then picker_opts.args   = { '-F' }   end
+  picker_opts.args = _grep_fixed and { '--glob', '!**/docs/**', '-F' } or { '--glob', '!**/docs/**' }
   if dirs ~= nil         then picker_opts.dirs   = dirs        end
   Snacks.picker.grep(picker_opts)
 end
@@ -813,7 +822,7 @@ function M.replace(search)
     },
   }
 
-  if _grep_fixed then picker_opts.args = { '-F' } end
+  picker_opts.args = _grep_fixed and { '--glob', '!**/docs/**', '-F' } or { '--glob', '!**/docs/**' }
   if dirs ~= nil then picker_opts.dirs = dirs      end
   Snacks.picker.grep(picker_opts)
 end

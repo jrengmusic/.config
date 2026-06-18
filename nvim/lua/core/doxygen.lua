@@ -101,10 +101,10 @@ local function make_lib_doxyfile_for(lib_root)
   return make_lib_doxyfile(lib_root, tail, tail)
 end
 
--- Ensures project/doxygen/ exists and Doxyfile symlink points to lib's Doxyfile.project.
--- Returns project doxygen dir path, or nil on failure.
+-- Ensures project/docs/ exists and Doxyfile symlink points to lib's Doxyfile.project.
+-- Returns project docs dir path, or nil on failure.
 local function ensure_project_symlink(root, lib_root)
-  local proj_doxy = root .. '/doxygen'
+  local proj_doxy = root .. '/docs'
   vim.fn.mkdir(proj_doxy, 'p')
 
   local symlink = proj_doxy .. '/Doxyfile'
@@ -245,7 +245,7 @@ function M.build_incremental(root)
   local proj_doxy  = ensure_project_symlink(root, lib_root)
   local juce_stale = is_stale(JUCE_MODULES, JUCE_ROOT .. '/docs/xml/index.xml')
   local lib_stale  = is_stale(lib_root,     lib_root  .. '/docs/xml/index.xml')
-  local proj_stale = proj_doxy and is_stale(root .. '/Source', root .. '/doxygen/xml/index.xml')
+  local proj_stale = proj_doxy and is_stale(root .. '/Source', root .. '/docs/xml/index.xml')
 
   if not juce_stale and not lib_stale and not proj_stale then return end
 

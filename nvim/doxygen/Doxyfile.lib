@@ -30,7 +30,9 @@ EXCLUDE_PATTERNS       = */Builds/*          \
                          */doxygen/*         \
                          */docs/*            \
                          */.DS_Store         \
-                         */freetype/*
+                         */freetype/*        \
+                         */___SDK___/*       \
+                         */automation/*
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_HEADER            =
@@ -40,6 +42,7 @@ HTML_EXTRA_FILES       =
 GENERATE_XML           = YES
 XML_OUTPUT             = xml
 GENERATE_LATEX         = NO
+USE_MATHJAX            = YES
 GENERATE_TAGFILE       = tagfile.xml
 TAGFILES               = __TAGFILES__
 DOT_GRAPH_MAX_NODES    = __DOT_MAX_NODES__
