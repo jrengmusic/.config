@@ -32,6 +32,7 @@ EXCLUDE_PATTERNS       = */Builds/*          \
                          */.DS_Store         \
                          */freetype/*        \
                          */___SDK___/*       \
+                         */codebase-for-dummies/* \
                          */automation/*
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
