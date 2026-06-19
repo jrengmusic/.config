@@ -7,6 +7,7 @@ local _grep_fixed = true
 local SOURCE_EXTENSIONS = {
   'cpp', 'cc', 'c', 'mm', 'm', 'h', 'hpp', 'hxx',
   'xml', 'svg', 'json', 'txt', 'md', 'cmake', 'html', 'lua',
+  'frag', 'vert',
 }
 
 local EXCLUDE_EXTENSIONS = {
@@ -18,6 +19,10 @@ local EXCLUDE_EXTENSIONS = {
 }
 
 local EXCLUDE_DIRS = { 'docs' }
+
+-- Framework module name prefixes, ordered by pick priority.
+-- Used by classify_file (path → module name) and by sort priorities.
+local FRAMEWORK_PREFIXES = { 'jam', 'kuassa', 'iq', 'juce' }
 
 -- Searches upward from cwd for CMakeLists.txt to find the project root.
 -- Falls back to cwd when none is found (e.g. nvim started outside the project).
@@ -104,16 +109,16 @@ local function is_excluded_dir(name)
 end
 
 local function classify_file(file)
+  for _, prefix in ipairs(FRAMEWORK_PREFIXES) do
+    local module = file:match('/(' .. prefix .. '_[^/]+)/')
+    if module then
+      return 'User Modules', module
+    end
+  end
   if file:find('/Source/') then
     return 'Sources', 'Source'
-  else
-    -- Auto-detect any module pattern: /module_name/
-    local module = file:match('/([^/]+_[^/]+)/')
-    if module then
-      return 'JUCE Modules', module
-    end
-    return 'Other', nil
   end
+  return 'Other', nil
 end
 
 local function scan_source_dir()
@@ -180,7 +185,7 @@ local function generate_symlink_tree()
   vim.fn.delete(project_dir, 'rf')
   vim.fn.mkdir(project_dir, 'p')
   vim.fn.mkdir(project_dir .. '/1 Source', 'p')
-  vim.fn.mkdir(project_dir .. '/2 JUCE Modules', 'p')
+  vim.fn.mkdir(project_dir .. '/2 User Modules', 'p')
 
   local seen = {}
   local seen_modules = {}
@@ -209,7 +214,7 @@ local function generate_symlink_tree()
           if vim.fn.filereadable(symlink) ~= 1 then
             vim.fn.system({ 'ln', '-sf', file, symlink })
           end
-        elseif group == 'JUCE Modules' and submodule ~= nil then
+        elseif group == 'User Modules' and submodule ~= nil then
           local idx = file:find('/' .. submodule .. '/')
           if idx ~= nil then
             local module_root = file:sub(1, idx + #submodule)
@@ -230,9 +235,9 @@ local function generate_symlink_tree()
         local subdir = vim.fn.fnamemodify(f.rel, ':h')
         local target_dir
         if subdir ~= '.' and subdir ~= '' then
-          target_dir = project_dir .. '/2 JUCE Modules/' .. submodule .. '/' .. subdir
+          target_dir = project_dir .. '/2 User Modules/' .. submodule .. '/' .. subdir
         else
-          target_dir = project_dir .. '/2 JUCE Modules/' .. submodule
+          target_dir = project_dir .. '/2 User Modules/' .. submodule
         end
         vim.fn.mkdir(target_dir, 'p')
         local basename = vim.fn.fnamemodify(f.path, ':t')
@@ -308,7 +313,7 @@ function M.files()
                 module = 'Source',
                 display = display,
               })
-            elseif group == 'JUCE Modules' and submodule ~= nil then
+            elseif group == 'User Modules' and submodule ~= nil then
               local idx = file:find('/' .. submodule .. '/')
               if idx ~= nil then
                 local module_root = file:sub(1, idx + #submodule)
@@ -386,18 +391,17 @@ function M.files()
     if a.module == b.module then
       return a.display < b.display
     end
-    -- Order: CMake > Source > jam* > kuassa* > iq* > User modules > JUCE modules
+    -- Order: project (CMake/Source) > jam > lib > cium > juce > other
     local MODULE_PRIORITY = {
       CMake = 1,
       Source = 2,
     }
     local function priority(mod)
       if MODULE_PRIORITY[mod] then return MODULE_PRIORITY[mod] end
-      if mod:match('^jam_') then return 3 end
-      if mod:match('^kuassa_') then return 4 end
-      if mod:match('^iq_') then return 5 end
-      if mod:match('^juce_') then return 7 end
-      return 6  -- Other user modules
+      for i, prefix in ipairs(FRAMEWORK_PREFIXES) do
+        if mod:match('^' .. prefix .. '_') then return i + 2 end
+      end
+      return #FRAMEWORK_PREFIXES + 3
     end
     local pa, pb = priority(a.module), priority(b.module)
     if pa ~= pb then return pa < pb end
@@ -466,12 +470,12 @@ local function find_symlink_for_file(real_file)
     if vim.fn.filereadable(symlink) == 1 then
       return symlink
     end
-  elseif group == 'JUCE Modules' and submodule ~= nil then
+  elseif group == 'User Modules' and submodule ~= nil then
     local idx = real_file:find('/' .. submodule .. '/')
     if idx ~= nil then
       local module_root = real_file:sub(1, idx + #submodule)
       local rel = real_file:sub(idx + #submodule + 2)
-      local symlink = project_dir .. '/2 JUCE Modules/' .. submodule .. '/' .. rel
+      local symlink = project_dir .. '/2 User Modules/' .. submodule .. '/' .. rel
       if vim.fn.filereadable(symlink) == 1 then
         return symlink
       end
@@ -616,7 +620,7 @@ function M.regenerate()
   end
 end
 
--- Returns the list of project directories (source root + one root per JUCE module)
+-- Returns the list of project directories (source root + one root per User Module)
 -- derived from compile_commands.json. Each entry is a top-level dir; rg recurses
 -- into it, so subdirs must NOT be listed separately to avoid duplicate results.
 -- Returns nil when no compile db is found.
@@ -637,12 +641,12 @@ local function get_dirs()
     table.insert(dirs, source_root)
   end
 
-  -- One module_root per JUCE module (rg recurses into it)
+  -- One module_root per User Module (rg recurses into it)
   for _, entry in ipairs(data) do
     local file = entry.file
     if file ~= nil and not file:find('/Builds/') then
       local group, submodule = classify_file(file)
-      if group == 'JUCE Modules' and submodule ~= nil then
+      if group == 'User Modules' and submodule ~= nil then
         local idx = file:find('/' .. submodule .. '/')
         if idx ~= nil then
           local module_root = file:sub(1, idx + #submodule)
@@ -655,16 +659,15 @@ local function get_dirs()
     end
   end
 
-  -- Sort module dirs: jam* first, other user modules next, juce_* last
+  -- Sort module dirs: jam first, then lib, cium, juce, other
   if #dirs > 1 then
     local source = table.remove(dirs, 1)
     table.sort(dirs, function(a, b)
       local function dir_priority(d)
-        if d:find('/jam_') then return 1 end
-        if d:find('/kuassa_') then return 2 end
-        if d:find('/iq_') then return 3 end
-        if d:find('/juce_') then return 5 end
-        return 4  -- Other user modules
+        for i, prefix in ipairs(FRAMEWORK_PREFIXES) do
+          if d:find('/' .. prefix .. '_') then return i end
+        end
+        return #FRAMEWORK_PREFIXES + 1
       end
       local pa, pb = dir_priority(a), dir_priority(b)
       if pa ~= pb then return pa < pb end
