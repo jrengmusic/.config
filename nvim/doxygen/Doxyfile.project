@@ -1,0 +1,101 @@
+# Doxyfile.project — JRENG consuming project template
+# Generated per-project by doxygen.lua — do not run directly.
+# Run from: {project}/docs/   (OUTPUT_DIRECTORY blank → cwd)
+# Output:   {project}/docs/xml/  (agents only)
+#
+# Substitution markers: INPUT, TAGFILES
+
+#---------------------------------------------------------------------------
+# Project
+#---------------------------------------------------------------------------
+
+PROJECT_NAME           = "Project"
+OUTPUT_DIRECTORY       =
+
+#---------------------------------------------------------------------------
+# Build
+#---------------------------------------------------------------------------
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+RESOLVE_UNNAMED_PARAMS = YES
+JAVADOC_AUTOBRIEF      = YES
+BUILTIN_STL_SUPPORT    = YES
+GROUP_NESTED_COMPOUNDS = YES
+ALPHABETICAL_INDEX     = YES
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+#---------------------------------------------------------------------------
+# Input
+#---------------------------------------------------------------------------
+
+INPUT                  = __INPUT__
+RECURSIVE              = YES
+STRIP_FROM_PATH        = __INPUT__
+FILE_PATTERNS          = *.h *.cpp *.mm
+EXCLUDE_SYMLINKS       = YES
+EXCLUDE_PATTERNS       = */Builds/*          \
+                         */JuceLibraryCode/* \
+                         */.git/*            \
+                         */docs/*            \
+                         */.DS_Store
+
+#---------------------------------------------------------------------------
+# Output — XML only (agents)
+#---------------------------------------------------------------------------
+
+GENERATE_HTML          = NO
+GENERATE_XML           = YES
+GENERATE_LATEX         = NO
+GENERATE_TAGFILE       = tagfile.xml
+
+#---------------------------------------------------------------------------
+# Preprocessing
+#---------------------------------------------------------------------------
+
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+SKIP_FUNCTION_MACROS   = YES
+PREDEFINED             = WIN32=1                                        \
+                         JUCE_WIN32=1                                   \
+                         JUCE_MAC=1                                     \
+                         JUCE_IOS=1                                     \
+                         JUCE_ANDROID=1                                 \
+                         JUCE_LINUX=1                                   \
+                         DOXYGEN=1                                      \
+                         JUCE_COMPILER_SUPPORTS_NOEXCEPT=1              \
+                         JUCE_COMPILER_SUPPORTS_NULLPTR=1               \
+                         JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS=1        \
+                         JUCE_COMPILER_SUPPORTS_INITIALIZER_LISTS=1     \
+                         JUCE_COMPILER_SUPPORTS_VARIADIC_TEMPLATES=1    \
+                         JUCE_COMPILER_SUPPORTS_OVERRIDE_AND_FINAL=1    \
+                         JUCE_COMPILER_SUPPORTS_LAMBDAS=1               \
+                         JUCE_HAS_CONSTEXPR=1                           \
+                         JUCE_CONSTEXPR=constexpr                       \
+                         JUCE_IGNORE_MSVC(warnings)=                    \
+                         JUCE_BEGIN_IGNORE_WARNINGS_MSVC(warnings)=     \
+                         JUCE_END_IGNORE_WARNINGS_MSVC=                 \
+                         JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE(...)=      \
+                         JUCE_END_IGNORE_WARNINGS_GCC_LIKE=
+
+#---------------------------------------------------------------------------
+# Graphs
+#---------------------------------------------------------------------------
+
+HAVE_DOT               = NO
+
+#---------------------------------------------------------------------------
+# Cross-references
+#---------------------------------------------------------------------------
+
+TAGFILES               = __TAGFILES__
+
+#---------------------------------------------------------------------------
+# Misc
+#---------------------------------------------------------------------------
+
+USE_MATHJAX            = YES
+QUIET                  = YES
+WARNINGS               = YES

@@ -3,14 +3,15 @@ set -eo pipefail
 exec < /dev/null
 export TERM=dumb
 
-# build-doxygen.sh  JUCE_DOXYFILE  JUCE_RUN_DIR  JUCE_ROOT  LIB_DOXYFILE  LIB_ROOT  [PROJ_DOXY]
+# build-doxygen.sh  JUCE_DOXYFILE  JUCE_RUN_DIR  JUCE_ROOT  LIB_DOXYFILE  LIB_ROOT  [PROJ_DOXYFILE  PROJ_DIR]
 #
-# JUCE_DOXYFILE : pre-substituted temp file (Doxyfile.juce wrapper)
-# JUCE_RUN_DIR  : cd here before running doxygen (JUCE/docs/doxygen/ — assets resolve correctly)
-# JUCE_ROOT     : root where DOCS.html is written
-# LIB_DOXYFILE  : pre-substituted temp file (Doxyfile.lib with markers expanded)
-# LIB_ROOT      : lib root — cd {LIB_ROOT}/docs, write {LIB_ROOT}/DOCS.html
-# PROJ_DOXY     : project doxygen/ dir (XML only, optional)
+# JUCE_DOXYFILE  : pre-substituted temp file (Doxyfile.juce wrapper)
+# JUCE_RUN_DIR   : cd here before running doxygen (JUCE/docs/doxygen/ — assets resolve correctly)
+# JUCE_ROOT      : root where DOCS.html is written
+# LIB_DOXYFILE   : pre-substituted temp file (Doxyfile.lib with markers expanded)
+# LIB_ROOT       : lib root — cd {LIB_ROOT}/docs, write {LIB_ROOT}/DOCS.html
+# PROJ_DOXYFILE  : pre-substituted temp file (Doxyfile.project with markers expanded)
+# PROJ_DIR       : project docs/ dir — cd here before running doxygen (XML only, optional)
 # Pass empty string for any arg to skip that build.
 
 JUCE_DOXYFILE="$1"
@@ -18,7 +19,8 @@ JUCE_RUN_DIR="$2"
 JUCE_ROOT="$3"
 LIB_DOXYFILE="$4"
 LIB_ROOT="$5"
-PROJ_DOXY="$6"
+PROJ_DOXYFILE="$6"
+PROJ_DIR="$7"
 
 DOCS_HTML='<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=docs/html/index.html"></head></html>'
 
@@ -41,11 +43,10 @@ if [ -n "$LIB_DOXYFILE" ] && [ -n "$LIB_ROOT" ]; then
     echo "Library docs: done"
 fi
 
-if [ -n "$PROJ_DOXY" ]; then
+if [ -n "$PROJ_DOXYFILE" ] && [ -n "$PROJ_DIR" ]; then
     echo "=========================================="
     echo "Building project docs..."
     echo "=========================================="
-    cd "$PROJ_DOXY"
-    doxygen Doxyfile
+    cd "$PROJ_DIR" && doxygen "$PROJ_DOXYFILE"
     echo "Project docs: done"
 fi
