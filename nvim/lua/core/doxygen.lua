@@ -15,6 +15,41 @@ local TEMPLATE_LIB      = vim.fn.stdpath('config') .. (is_windows and '\\doxygen
 local TEMPLATE_JUCE     = vim.fn.stdpath('config') .. (is_windows and '\\doxygen\\Doxyfile.juce'        or '/doxygen/Doxyfile.juce')
 local TEMPLATE_PROJECT  = vim.fn.stdpath('config') .. (is_windows and '\\doxygen\\Doxyfile.project'     or '/doxygen/Doxyfile.project')
 
+-- Patterns excluded from all lib doxygen builds.
+-- COMMON_LIB_EXCLUDES : build artifacts and meta dirs
+-- VENDOR_DIR_NAMES    : known third-party embedded dirs (any lib, any depth)
+local COMMON_LIB_EXCLUDES = {
+  '*/Builds/*',
+  '*/JuceLibraryCode/*',
+  '*/.git/*',
+  '*/doxygen/*',
+  '*/docs/*',
+  '*/.DS_Store',
+  '*/codebase-for-dummies/*',
+  '*/automation/*',
+}
+
+local VENDOR_DIR_NAMES = {
+  '___sdk___',
+  '___SDK___',
+  'freetype',
+  'vma',
+  'glm',
+  'moltenVK',
+  'vulkan',
+  'spv',
+}
+
+-- Formats combined exclude list as a Doxygen multiline value string.
+-- Caller substitutes the result into __EXCLUDE_PATTERNS__.
+local EXCLUDE_PATTERNS_PAD = string.rep(' ', 25)
+local function format_exclude_patterns()
+  local all = {}
+  for _, p in ipairs(COMMON_LIB_EXCLUDES) do all[#all + 1] = p end
+  for _, n in ipairs(VENDOR_DIR_NAMES)    do all[#all + 1] = '*/' .. n .. '/*' end
+  return table.concat(all, ' \\\n' .. EXCLUDE_PATTERNS_PAD)
+end
+
 -- Fixed machine paths
 local HOME          = vim.fn.expand('~'):gsub('\\', '/')
 local JUCE_ROOT     = HOME .. '/Documents/Poems/JUCE'
@@ -83,7 +118,8 @@ local function make_lib_doxyfile(lib_root, name, brief)
   content = content:gsub('__PROJECT_BRIEF__', brief)
   content = content:gsub('__INPUT__',         lib_root)
   content = content:gsub('__TAGFILES__',      '../../../JUCE/docs/tagfile.xml=../../../../JUCE/docs/html')
-  content = content:gsub('__DOT_MAX_NODES__', '100')
+  content = content:gsub('__DOT_MAX_NODES__',    '100')
+  content = content:gsub('__EXCLUDE_PATTERNS__', format_exclude_patterns())
 
   local tmp = vim.fn.tempname()
   local out = io.open(tmp, 'w')

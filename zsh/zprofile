@@ -30,3 +30,7 @@ if [[ $OPERATING_SYSTEM != "windows" ]]; then
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
   [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 fi
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/jreng/.local/bin:$PATH"

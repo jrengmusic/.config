@@ -5,9 +5,9 @@
 # Output:   {lib}/docs/html/  {lib}/docs/xml/  {lib}/docs/tagfile.xml
 #           {lib}/DOCS.html   (root redirect, written by build-doxygen.sh)
 #
-# Substitution markers:
-#   __JUCE_DOXYFILE__  __PROJECT_NAME__  __PROJECT_BRIEF__
-#   __INPUT__          __TAGFILES__      __DOT_MAX_NODES__
+# Substitution markers (applied by doxygen.lua):
+#   JUCE_DOXYFILE, PROJECT_NAME, PROJECT_BRIEF
+#   INPUT, TAGFILES, DOT_MAX_NODES, EXCLUDE_PATTERNS
 
 @INCLUDE = __JUCE_DOXYFILE__
 
@@ -24,16 +24,7 @@ INPUT                  = __INPUT__
 STRIP_FROM_PATH        = __INPUT__
 FILE_PATTERNS          = *.h *.cpp *.mm
 RECURSIVE              = YES
-EXCLUDE_PATTERNS       = */Builds/*          \
-                         */JuceLibraryCode/* \
-                         */.git/*            \
-                         */doxygen/*         \
-                         */docs/*            \
-                         */.DS_Store         \
-                         */freetype/*        \
-                         */___SDK___/*       \
-                         */codebase-for-dummies/* \
-                         */automation/*
+EXCLUDE_PATTERNS       = __EXCLUDE_PATTERNS__
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_HEADER            =
