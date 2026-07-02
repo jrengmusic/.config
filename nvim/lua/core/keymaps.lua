@@ -1,6 +1,16 @@
 -- Centralized keybindings (grouped by feature)
 local M = {}
 
+local function write_modified_named_buffers()
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].modified and vim.bo[buf].buftype == '' and vim.api.nvim_buf_get_name(buf) ~= '' then
+      vim.api.nvim_buf_call(buf, function()
+        vim.cmd('write')
+      end)
+    end
+  end
+end
+
 local function smart_quit()
   -- Check if any buffers are modified
   local modified_bufs = {}
@@ -15,24 +25,22 @@ local function smart_quit()
     end
   end
 
-  -- If no modified buffers, just quit
-  if #modified_bufs == 0 then
-    vim.cmd('qa!')
-    return
-  end
+  if #modified_bufs > 0 then
+    -- Show modified files and prompt
+    local msg = 'Modified buffers:\n' .. table.concat(modified_bufs, '\n') .. '\n\nSave all or discard all?'
+    local choice = vim.fn.confirm(msg, '&Save All\n&Discard All\n&Cancel', 3)
 
-  -- Show modified files and prompt
-  local msg = 'Modified buffers:\n' .. table.concat(modified_bufs, '\n') .. '\n\nSave all or discard all?'
-  local choice = vim.fn.confirm(msg, '&Save All\n&Discard All\n&Cancel', 3)
-
-  if choice == 1 then
-    -- Save all and quit
-    vim.cmd('wqa!')
-  elseif choice == 2 then
-    -- Discard all and quit
+    if choice == 1 then
+      write_modified_named_buffers()
+      vim.cmd('qa!')
+    elseif choice == 2 then
+      -- Discard all and quit
+      vim.cmd('qa!')
+    end
+    -- choice == 3 or 0 (cancelled): do nothing
+  else
     vim.cmd('qa!')
   end
-  -- choice == 3 or 0 (cancelled): do nothing
 end
 
 -- Fire split sync once on the next BufEnter, but only if the file actually changed.
@@ -76,7 +84,10 @@ function M.setup()
       vim.cmd('topleft lopen 15')
     end
   end, { desc = 'Toggle diagnostic list' })
-  vim.keymap.set('n', '<C-s>', '<cmd>wqa!<CR>', { desc = 'Save all and quit' })
+  vim.keymap.set('n', '<C-s>', function()
+    write_modified_named_buffers()
+    vim.cmd('qa!')
+  end, { desc = 'Save all and quit' })
   vim.keymap.set('n', '<C-c>', smart_quit, { desc = 'Quit with save/discard prompt' })
   vim.keymap.set('n', '<leader>tt', function() require('core.tui').tit() end, { desc = 'Open TIT (git TUI)' })
   vim.keymap.set('n', '<leader>tc', function() require('core.tui').cake() end, { desc = 'Open Cake TUI' })
