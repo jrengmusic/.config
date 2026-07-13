@@ -19,7 +19,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-opus-4-8",
+  "model": "fable",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
@@ -31,6 +31,7 @@
   "askUserQuestionTimeout": "never",
   "theme": "auto",
   "autoCompactEnabled": true,
+  "autoCompactWindow": 800000,
   "showTurnDuration": false,
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
