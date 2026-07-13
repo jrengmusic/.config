@@ -4,7 +4,6 @@ local M = {}
 function M.setup()
   local dap = require('dap')
   local dapui = require('dapui')
-  local dapConfig = require('dap.configurations')
 
   -- DAP UI layout
   dapui.setup({
@@ -81,9 +80,12 @@ function M.setup()
   end
 
   -- Float standalone app windows into PaperWM floating layer (macOS only)
+  -- 'Launch Standalone' is the SSOT config name for a no-DAW launch (pure
+  -- app or a plugin project's Standalone format alike) — same signal used
+  -- in core/keymaps.lua's standalone-pid capture and terminateDap().
   dap.listeners.after.launch.standalone_float = function(session, body)
     if not is_mac then return end
-    if dapConfig.detectProjectType() ~= 'standalone' then return end
+    if not session.config or session.config.name ~= 'Launch Standalone' then return end
 
     local program = session.config.program
     if type(program) == 'function' then program = program() end

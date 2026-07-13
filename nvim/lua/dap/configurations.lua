@@ -1,72 +1,10 @@
 -- DAP debug configurations for C++/JUCE
 -- SSOT for debug configuration management
+-- No project-type concept: a project is whatever formats its build produces
+-- (detectAvailableFormats below). What to attach to, and whether a DAW is
+-- involved, is decided entirely by the resolved format — never by classifying
+-- the project itself.
 local M = {}
-
--- ============================================================================
--- PROJECT TYPE DETECTION
--- ============================================================================
-
--- Detect if project is plugin or standalone by checking CMakeLists.txt
-function M.detectProjectType()
-  local root = vim.fn.getcwd()
-  
-  -- First check: existing config file
-  local dawConfig = root .. '/.nvim-dap-config'
-  
-  if vim.fn.filereadable(dawConfig) == 1 then
-    local ok, config = pcall(dofile, dawConfig)
-    if ok and config then
-      if config.format then
-        return 'plugin'  -- Has format field (VST3/AU/etc) = plugin
-      end
-    end
-  end
-  
-  -- Second check: CMakeLists.txt content
-  local cmakeFile = root .. '/CMakeLists.txt'
-  if vim.fn.filereadable(cmakeFile) == 1 then
-    local content = table.concat(vim.fn.readfile(cmakeFile), '\n')
-    
-    -- Check for JUCE plugin markers
-    if content:match('juce_add_plugin') or content:match('configure_plugin') or
-       content:match('PLUGIN_') or content:match('VST3') or content:match('AudioUnit') then
-      return 'plugin'
-    end
-
-    -- Check for JUCE standalone app markers
-    if content:match('juce_add_console_app') or content:match('juce_add_gui_app') or
-       content:match('configure_app') then
-      return 'standalone'
-    end
-  end
-  
-  -- Third check: build directory structure (check multiple build systems)
-  local buildDirs = {
-    root .. '/Builds/Ninja',
-    root .. '/Builds/Xcode', 
-    root .. '/build',
-    root .. '/cmake-build-debug'
-  }
-  
-  for _, buildDir in ipairs(buildDirs) do
-    -- Check for standalone artefacts
-    if vim.fn.isdirectory(buildDir .. '/Debug/Standalone') == 1 or
-       vim.fn.glob(buildDir .. '/Debug/*App_artefacts*'):len() > 0 or
-       vim.fn.glob(buildDir .. '/Release/*App_artefacts*'):len() > 0 then
-      return 'standalone'
-    end
-    
-    -- Check for plugin artefacts
-    if vim.fn.isdirectory(buildDir .. '/Debug/VST3') == 1 or 
-       vim.fn.isdirectory(buildDir .. '/Debug/AU') == 1 or
-       vim.fn.glob(buildDir .. '/*_artefacts/Debug/*.vst3'):len() > 0 or
-       vim.fn.glob(buildDir .. '/*_artefacts/Debug/*.component'):len() > 0 then
-      return 'plugin'
-    end
-  end
-  
-  return nil -- Cannot detect
-end
 
 -- ============================================================================
 -- CONFIG FILE MANAGEMENT (SSOT)
@@ -175,10 +113,19 @@ local KNOWN_PLUGIN_FORMATS = {
   Unity = true, VST = true, Standalone = true, CLAP = true,
 }
 
--- Derive buildable plugin formats by configuring CMake (if not already
--- configured) and enumerating actual ninja targets — no assumption about
--- which wrapper (JAM/KANJUT/raw juce_add_plugin/clap-juce-extensions) built
--- the project. Mirrors the configure step in scripts/build-debug.sh:22-31.
+-- AppBuilder.cmake's pure-app target (_App suffix) means the same thing as
+-- PluginBuilder.cmake's _Standalone target: launch the binary directly, no
+-- DAW pairing. build-debug.sh already treats them identically (FORMAT=
+-- "Standalone" falls back to any bare non-format target — script line 38),
+-- so both are surfaced under the single 'Standalone' format label here.
+local FORMAT_ALIAS = { App = 'Standalone' }
+
+-- Derive buildable formats — plugin formats and/or the standalone binary —
+-- by configuring CMake (if not already configured) and enumerating actual
+-- ninja targets. No assumption about which wrapper (JAM/KANJUT/AppBuilder/
+-- PluginBuilder/raw juce_add_plugin/clap-juce-extensions) built the project,
+-- and no assumption about "project type" — a project is simply whatever set
+-- of formats its build produces. Mirrors scripts/build-debug.sh:22-31.
 function M.detectAvailableFormats()
   local root = vim.fn.getcwd()
   local scheme = 'Debug'
@@ -203,24 +150,28 @@ function M.detectAvailableFormats()
   local formats, seen = {}, {}
   for line in targetsOutput:gmatch('[^\r\n]+') do
     local fmt = line:match('_([%a][%a%d]*): phony$')
+    fmt = fmt and (FORMAT_ALIAS[fmt] or fmt)
     if fmt and KNOWN_PLUGIN_FORMATS[fmt] and not seen[fmt] then
       seen[fmt] = true
       table.insert(formats, fmt)
     end
   end
 
-  assert(#formats > 0, 'detectAvailableFormats: no known plugin format targets found in ' .. buildDir)
+  assert(#formats > 0, 'detectAvailableFormats: no known format targets found in ' .. buildDir)
   return formats
 end
 
 -- Show dialog to configure format, DAW, and build scheme
 -- User must provide all fields (validation happens in dialog)
+-- Single detected format (e.g. a pure-app project's only 'Standalone') skips
+-- the picker entirely — nothing to choose, same as the format having been
+-- auto-selected.
 function M.showDawFormatDialog(callback)
   local is_windows = vim.fn.has('win32') == 1
 
   local formats = M.detectAvailableFormats()
 
-  vim.ui.select(formats, { prompt = 'Select plugin format:' }, function(format)
+  local function onFormatChosen(format)
     if not format then
       vim.notify('DAP config cancelled')
       return
@@ -317,27 +268,33 @@ function M.showDawFormatDialog(callback)
         picker:close()
       end,
     })
-  end)
+  end
+
+  if #formats == 1 then
+    onFormatChosen(formats[1])
+    return
+  end
+
+  vim.ui.select(formats, { prompt = 'Select plugin format:' }, onFormatChosen)
 end
 
 -- ============================================================================
 -- DAP CONFIGURATIONS
 -- ============================================================================
 
--- Helper to get DAW PID from config (PLUGIN-ONLY)
+-- Helper to get DAW PID from config. Only valid for DAW-paired formats —
+-- the loaded config's own daw field is the SSOT (Standalone/App formats
+-- are saved with daw = '', per showDawFormatDialog's onFormatChosen).
 local function getDawPid()
-  
-  -- Check project type - only valid for plugin projects
-  local projectType = M.detectProjectType()
-  if projectType ~= 'plugin' then
-    error('This DAP config is for plugin projects only. Use "Launch Standalone" for standalone apps.')
-  end
-  
   local config = M.loadDawConfig()
   if not config then
     return nil
   end
-  
+
+  if not config.daw or config.daw == '' then
+    error('This DAP config has no DAW pairing (' .. tostring(config.format) .. ' format). Use "Launch Standalone" instead.')
+  end
+
   local is_windows = vim.fn.has('win32') == 1
   local handle
   if is_windows then

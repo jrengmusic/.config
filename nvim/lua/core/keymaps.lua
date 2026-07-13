@@ -305,7 +305,10 @@ function M.setupDap()
   local standalonePid = nil
 
   dap.listeners.after.launch[STANDALONE_PID_LISTENER_KEY] = function(session, _)
-    if dapConfig.detectProjectType() == 'standalone' then
+    -- 'Launch Standalone' is the one config name every no-DAW launch runs
+    -- through (pure-app _App target or a plugin project's _Standalone
+    -- target alike) — the SSOT for "this session has no DAW to pair with".
+    if session.config and session.config.name == 'Launch Standalone' then
       local program = session.config and session.config.program
       if program then
         vim.defer_fn(function()
@@ -327,11 +330,28 @@ function M.setupDap()
     end
   end
 
+  -- SSOT is the DAP config that actually ran, captured before dap.terminate()
+  -- clears the session — not a re-derived "project type". 'Launch Standalone'
+  -- covers both pure-app and plugin-with-Standalone-format sessions; any
+  -- 'Attach to DAW (...)' config is the only case that needs a DAW killed.
   local function terminateDap()
+    local session = dap.session()
+    local configName = session and session.config and session.config.name
     dap.terminate()
     dapui.close()
-    local projectType = dapConfig.detectProjectType()
-    if projectType == 'plugin' then
+
+    if configName == 'Launch Standalone' then
+      if standalonePid then
+        local pid = standalonePid
+        standalonePid = nil
+        if is_windows then
+          vim.fn.jobstart({ 'taskkill', '/F', '/PID', tostring(pid) })
+        else
+          vim.fn.jobstart({ 'kill', '-9', tostring(pid) })
+          vim.fn.system({ '/usr/bin/lsappinfo', 'kill', '-force', tostring(pid) })
+        end
+      end
+    elseif configName and configName:match('^Attach to DAW') then
       local function killDaw(daw)
         if is_windows then
           vim.fn.jobstart({ 'taskkill', '/F', '/IM', daw })
@@ -345,17 +365,9 @@ function M.setupDap()
       if config and config.daw then
         killDaw(config.daw)
       end
-    elseif projectType == 'standalone' and standalonePid then
-      local pid = standalonePid
-      standalonePid = nil
-      if is_windows then
-        vim.fn.jobstart({ 'taskkill', '/F', '/PID', tostring(pid) })
-      else
-        vim.fn.jobstart({ 'kill', '-9', tostring(pid) })
-        vim.fn.system({ '/usr/bin/lsappinfo', 'kill', '-force', tostring(pid) })
-      end
     end
-    return projectType
+
+    return configName == 'Launch Standalone'
   end
 
   local function killDapThen(continuation)
@@ -387,7 +399,6 @@ function M.setupDap()
 
     local root = vim.fn.getcwd()
     local script = buildScript()
-    local projectType = dapConfig.detectProjectType()
 
     local function runBuildInTerminal(args, onSuccess)
       for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -479,45 +490,42 @@ function M.setupDap()
       end)
     end
 
-    if projectType == 'standalone' then
-      buildAndLaunchStandalone()
-
-    elseif projectType == 'plugin' then
-      local function go(cfg)
-        if cfg.format == 'Standalone' then
-          buildAndLaunchStandalone()
-          return
-        end
-        runBuildInTerminal(args_base(cfg.format), function()
-          local configName = dapConfig.getConfigNameForFormat(cfg.format)
-          if vim.fn.has('win32') == 1 then
-            vim.notify('Built! Launching DAW via debugger...', vim.log.levels.INFO, { timeout = 1500 })
-            vim.defer_fn(function()
-              local dap = require('dap')
-              for _, dapCfg in ipairs(dap.configurations.cpp) do
-                if dapCfg.name == configName then dap.run(dapCfg); return end
-              end
-              vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
-            end, 500)
-          else
-            vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
-            vim.fn.jobstart({ cfg.dawPath })
-            vim.defer_fn(function()
-              local dap = require('dap')
-              for _, dapCfg in ipairs(dap.configurations.cpp) do
-                if dapCfg.name == configName then dap.run(dapCfg); return end
-              end
-              vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
-            end, 2000)
-          end
-        end)
+    -- One path: resolve the format (cached .nvim-dap-config, or the picker
+    -- if absent/invalid — dapConfig.showDawFormatDialog auto-selects when
+    -- detectAvailableFormats finds only one), then dispatch on the format
+    -- value alone. No project-type branch — Standalone/App-derived builds
+    -- and DAW-paired plugin formats both flow through the same dispatch.
+    local function go(cfg)
+      if cfg.format == 'Standalone' then
+        buildAndLaunchStandalone()
+        return
       end
-      local config = dapConfig.loadDawConfig(function(cfg) if cfg then go(cfg) end end)
-      if config then go(config) end
-
-    else
-      vim.notify('Cannot detect project type. Check CMakeLists.txt or build directory.', vim.log.levels.ERROR)
+      runBuildInTerminal(args_base(cfg.format), function()
+        local configName = dapConfig.getConfigNameForFormat(cfg.format)
+        if vim.fn.has('win32') == 1 then
+          vim.notify('Built! Launching DAW via debugger...', vim.log.levels.INFO, { timeout = 1500 })
+          vim.defer_fn(function()
+            local dap = require('dap')
+            for _, dapCfg in ipairs(dap.configurations.cpp) do
+              if dapCfg.name == configName then dap.run(dapCfg); return end
+            end
+            vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+          end, 500)
+        else
+          vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
+          vim.fn.jobstart({ cfg.dawPath })
+          vim.defer_fn(function()
+            local dap = require('dap')
+            for _, dapCfg in ipairs(dap.configurations.cpp) do
+              if dapCfg.name == configName then dap.run(dapCfg); return end
+            end
+            vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+          end, 2000)
+        end
+      end)
     end
+    local config = dapConfig.loadDawConfig(function(cfg) if cfg then go(cfg) end end)
+    if config then go(config) end
   end
 
   local function runCleanOnly()
@@ -558,22 +566,19 @@ function M.setupDap()
   end
 
   -- Function keys
-  -- F5: Always show config dialog (auto-detects plugin vs standalone)
+  -- F5: Show/reconfigure format dialog. Format is the only SSOT — a build
+  -- producing a single format (e.g. a pure-app project's sole 'Standalone')
+  -- auto-selects with no DAW question (showDawFormatDialog's #formats==1
+  -- short-circuit); multi-format builds show the picker as before.
   vim.keymap.set('n', '<F5>', function()
-    local projectType = dapConfig.detectProjectType()
-    
-    if projectType == 'standalone' then
-      vim.notify('Standalone:\n  bb  build debug + run\n  br  build release + run\n  bR  build release + signing + run')
-    elseif projectType == 'plugin' then
-      -- Plugin: ask for format + DAW + build scheme
-      dapConfig.showDawFormatDialog(function(config)
-        if config then
-          vim.notify('Plugin config saved. Press <leader>br to build.')
-        end
-      end)
-    else
-      vim.notify('Cannot detect project type (plugin or standalone). Check CMakeLists.txt.')
-    end
+    dapConfig.showDawFormatDialog(function(config)
+      if not config then return end
+      if config.format == 'Standalone' then
+        vim.notify('Standalone:\n  bb  build debug + run\n  br  build release + run\n  bR  build release + signing + run')
+      else
+        vim.notify('Plugin config saved. Press <leader>br to build.')
+      end
+    end)
   end, { desc = 'DAP: Configure project' })
   
   map('<F10>', dap.step_over, 'Step over')
@@ -594,9 +599,9 @@ function M.setupDap()
   map('<leader>du', dapui.toggle, 'Toggle UI')
   map('<leader>de', dapui.eval, 'Evaluate expression')
 
-  -- Terminate + close DAW/App (auto-detects project type)
+  -- Terminate + close DAW/App (dispatches on the config that actually ran)
   vim.keymap.set('n', '<leader>dt', function()
-    if terminateDap() == 'standalone' then
+    if terminateDap() then
       vim.notify('Standalone app terminated')
     end
   end, { desc = 'DAP: Terminate + close DAW/App' })
