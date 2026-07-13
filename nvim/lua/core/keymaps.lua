@@ -466,23 +466,28 @@ function M.setupDap()
       return args
     end
 
+    local function buildAndLaunchStandalone()
+      runBuildInTerminal(args_base('Standalone'), function()
+        vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })
+        vim.defer_fn(function()
+          local dap = require('dap')
+          for _, dapCfg in ipairs(dap.configurations.cpp) do
+            if dapCfg.name == 'Launch Standalone' then dap.run(dapCfg); return end
+          end
+          vim.notify('DAP config not found: Launch Standalone', vim.log.levels.ERROR)
+        end, 1000)
+      end)
+    end
+
     if projectType == 'standalone' then
-      local function go()
-        runBuildInTerminal(args_base('Standalone'), function()
-          vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })
-          vim.defer_fn(function()
-            local dap = require('dap')
-            for _, dapCfg in ipairs(dap.configurations.cpp) do
-              if dapCfg.name == 'Launch Standalone' then dap.run(dapCfg); return end
-            end
-            vim.notify('DAP config not found: Launch Standalone', vim.log.levels.ERROR)
-          end, 1000)
-        end)
-      end
-      go()
+      buildAndLaunchStandalone()
 
     elseif projectType == 'plugin' then
       local function go(cfg)
+        if cfg.format == 'Standalone' then
+          buildAndLaunchStandalone()
+          return
+        end
         runBuildInTerminal(args_base(cfg.format), function()
           local configName = dapConfig.getConfigNameForFormat(cfg.format)
           if vim.fn.has('win32') == 1 then
