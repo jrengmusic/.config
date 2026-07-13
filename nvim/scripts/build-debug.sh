@@ -35,7 +35,7 @@ fi
 if [ "$FORMAT" = "Standalone" ]; then
     TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_Standalone: phony" | cut -d: -f1 | head -1 || true)
     if [ -z "$TARGET" ]; then
-        TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "^[A-Za-z][A-Za-z0-9_]*: phony" | grep -v -E "_(VST3|AU|AAX|AUv3|Unity|VST|Standalone|All): phony" | grep -v -E "^(edit_cache|rebuild_cache|install|list_install_components|codegen|.*_BinaryData): phony" | cut -d: -f1 | head -1 || true)
+        TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "^[A-Za-z][A-Za-z0-9_]*: phony" | grep -v -E "_(VST3|AU|AAX|AUv3|Unity|VST|Standalone|All|CLAP): phony" | grep -v -E "^(edit_cache|rebuild_cache|install|list_install_components|codegen|.*_BinaryData): phony" | cut -d: -f1 | head -1 || true)
     fi
 else
     TARGET=$(ninja -C "$BUILD_DIR" -t targets 2>/dev/null | grep -E "_${FORMAT}: phony" | cut -d: -f1 | head -1 || true)
@@ -94,6 +94,15 @@ case "$FORMAT" in
             rm -rf "$dest"
             cp -R "$plugin" "$dest"
             echo "✓ AAX: $name"
+        done
+        ;;
+    CLAP)
+        find "$ARTEFACTS" -name "*.clap" 2>/dev/null | while read -r plugin; do
+            name=$(basename "$plugin")
+            dest="$HOME/Library/Audio/Plug-Ins/CLAP/$name"
+            rm -rf "$dest"
+            cp -R "$plugin" "$dest"
+            echo "✓ CLAP: $name"
         done
         ;;
     Standalone)
