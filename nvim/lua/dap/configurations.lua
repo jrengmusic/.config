@@ -539,13 +539,17 @@ function M.setup()
       pid = getDawPid,
       program = function()
         local root = vim.fn.getcwd()
+        -- jam_clap builds CLAP as a raw CMake MODULE target (PluginBuilder.cmake),
+        -- not through JUCE's FORMATS artefact pipeline — it never lands under
+        -- {TARGET}_artefacts/{Config}/CLAP/ like VST3/AU/AAX do. Output sits directly
+        -- in the per-config build dir: Builds/Ninja/{Config}/{PRODUCT_NAME}.clap
         local patterns = {
           -- macOS
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/CLAP/*.clap/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/CLAP/*.clap/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*.clap/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*.clap/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/CLAP/*.clap',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/CLAP/*.clap',
+          root .. '/Builds/Ninja/Debug/**/*.clap',
+          root .. '/Builds/Ninja/Release/**/*.clap',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
