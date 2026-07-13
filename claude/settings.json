@@ -19,7 +19,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus",
+  "model": "claude-opus-4-8",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"

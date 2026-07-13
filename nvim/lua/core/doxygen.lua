@@ -38,6 +38,7 @@ local VENDOR_DIR_NAMES = {
   'moltenVK',
   'vulkan',
   'spv',
+  'clap',
 }
 
 -- Formats combined exclude list as a Doxygen multiline value string.
@@ -66,11 +67,22 @@ local function get_project_root()
   return #markers > 0 and vim.fn.fnamemodify(markers[1], ':h') or vim.fn.getcwd()
 end
 
--- Returns lib root dir (e.g. .../jam, .../ ___lib___), or nil if undetected.
+-- Substitutes the two CMake variable forms seen across project CMakeLists.txt
+-- (${CMAKE_CURRENT_SOURCE_DIR} and $ENV{HOME}) with their resolved values.
+local function resolve_cmake_value(value, root)
+  value = value:gsub('%$%{CMAKE_CURRENT_SOURCE_DIR%}', root)
+  value = value:gsub('%$ENV%{HOME%}', HOME)
+  return value
+end
+
+-- Returns lib root dir (e.g. .../jam, .../___lib___), or nil if undetected.
 -- Three independent frameworks, three peer checks:
---   JAM     → marker JAM_ROOT                → ../jam
+--   JAM     → marker JAM_ROOT                → parsed from set(JAM_ROOT "...")
 --   CIUM    → ../___cium___/docs/Doxyfile    → ../___cium___
---   KANJUT  → marker FRAMEWORK_MODULES_PATH  → ../___lib___
+--   KANJUT  → marker FRAMEWORK_MODULES_PATH  → parsed from FRAMEWORK_PATH + FRAMEWORK_MODULES_PATH
+-- Values are parsed rather than assumed at a fixed nesting depth — projects
+-- nest at varying depths under dev/ and kuassa/ (e.g. dev/plugins/whelmed
+-- sets JAM_ROOT two levels up, dev/end sets it one level up).
 local function detect_lib_root(root)
   local cmake = root .. '/CMakeLists.txt'
   local f = io.open(cmake, 'r')
@@ -78,16 +90,36 @@ local function detect_lib_root(root)
   local content = f:read('*a')
   f:close()
 
-  if content:find('JAM_ROOT') then
-    return vim.fn.fnamemodify(root .. '/../jam', ':p'):gsub('[/\\]$', '')
+  local jam_root = content:match('set%(%s*JAM_ROOT%s+"([^"]+)"%s*%)')
+  if jam_root then
+    return vim.fn.fnamemodify(resolve_cmake_value(jam_root, root), ':p'):gsub('[/\\]$', '')
   end
   if vim.loop.fs_stat(root .. '/../___cium___/docs/Doxyfile') then
     return vim.fn.fnamemodify(root .. '/../___cium___', ':p'):gsub('[/\\]$', '')
   end
-  if content:find('FRAMEWORK_MODULES_PATH') then
-    return vim.fn.fnamemodify(root .. '/../___lib___', ':p'):gsub('[/\\]$', '')
+  local modules_path = content:match('set%(%s*FRAMEWORK_MODULES_PATH%s+"([^"]+)"%s*%)')
+  if modules_path then
+    local framework_path = content:match('set%(%s*FRAMEWORK_PATH%s+"([^"]+)"%s*%)') or '${CMAKE_CURRENT_SOURCE_DIR}/..'
+    local combined = resolve_cmake_value(framework_path, root) .. '/' .. modules_path
+    return vim.fn.fnamemodify(combined, ':p'):gsub('[/\\]$', '')
   end
   return nil
+end
+
+-- Returns the relative path from absolute dir `from_dir` to absolute dir `to_dir`.
+-- Walks common leading components, then emits '..' for the remainder of from_dir
+-- followed by the remainder of to_dir. Depth-agnostic — no assumed nesting level.
+local function relpath(from_dir, to_dir)
+  local from_parts = vim.split(from_dir, '/', { trimempty = true })
+  local to_parts   = vim.split(to_dir,   '/', { trimempty = true })
+  local i = 1
+  while from_parts[i] and to_parts[i] and from_parts[i] == to_parts[i] do
+    i = i + 1
+  end
+  local parts = {}
+  for _ = i, #from_parts do parts[#parts + 1] = '..' end
+  for j = i, #to_parts   do parts[#parts + 1] = to_parts[j] end
+  return table.concat(parts, '/')
 end
 
 -- Copies TEMPLATE_JUCE to a temp file as-is. Returns temp path.
@@ -106,18 +138,22 @@ local function make_juce_doxyfile()
 end
 
 -- Reads TEMPLATE_LIB, substitutes __MARKERS__, writes to a temp file. Returns temp path.
--- TAGFILES path: relative from {lib}/docs/ — three levels up reaches Poems/ where JUCE/ lives.
+-- TAGFILES path: relative from {lib}/docs/ (cwd) to JUCE_ROOT, computed via relpath().
+-- HTML-side gets one extra '..': generated HTML pages live in {lib}/docs/html/, one level
+-- deeper than cwd, so doxygen resolves that half relative to the html/ output dir.
 local function make_lib_doxyfile(lib_root, name, brief)
   local tf = io.open(TEMPLATE_LIB, 'r')
   assert(tf, '[doxygen] Missing template: ' .. TEMPLATE_LIB)
   local content = tf:read('*a')
   tf:close()
 
+  local juce_rel = relpath(lib_root .. '/docs', JUCE_ROOT)
+
   content = content:gsub('__JUCE_DOXYFILE__', JUCE_DOXYFILE)
   content = content:gsub('__PROJECT_NAME__',  name)
   content = content:gsub('__PROJECT_BRIEF__', brief)
   content = content:gsub('__INPUT__',         lib_root)
-  content = content:gsub('__TAGFILES__',      '../../../JUCE/docs/tagfile.xml=../../../../JUCE/docs/html')
+  content = content:gsub('__TAGFILES__',      juce_rel .. '/docs/tagfile.xml=../' .. juce_rel .. '/docs/html')
   content = content:gsub('__DOT_MAX_NODES__',    '100')
   content = content:gsub('__EXCLUDE_PATTERNS__', format_exclude_patterns())
 
@@ -145,9 +181,11 @@ local function make_project_doxyfile(lib_root, root)
   local content = tf:read('*a')
   tf:close()
 
-  local lib_dir  = vim.fn.fnamemodify(lib_root, ':t')
-  local lib_tag  = '../../' .. lib_dir .. '/docs/tagfile.xml=../../' .. lib_dir .. '/docs/html'
-  local juce_tag = '../../../JUCE/docs/tagfile.xml=../../../JUCE/docs/html'
+  local proj_docs = root .. '/docs'
+  local lib_rel   = relpath(proj_docs, lib_root)
+  local juce_rel  = relpath(proj_docs, JUCE_ROOT)
+  local lib_tag   = lib_rel  .. '/docs/tagfile.xml=' .. lib_rel  .. '/docs/html'
+  local juce_tag  = juce_rel .. '/docs/tagfile.xml=' .. juce_rel .. '/docs/html'
 
   content = content:gsub('__INPUT__',    root .. '/Source')
   content = content:gsub('__TAGFILES__', lib_tag .. ' \\\n                         ' .. juce_tag)
