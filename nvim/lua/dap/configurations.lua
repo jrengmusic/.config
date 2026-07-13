@@ -168,38 +168,48 @@ function M.saveDawConfig(format, daw, dawPath)
   return true
 end
 
--- Derive buildable plugin formats from CMakeLists.txt.
--- Neither JAM's nor KANJUT's configure_plugin() wrapper accepts a FORMATS
--- parameter — the format set is hardcoded per-framework in each wrapper's
--- own PluginBuilder.cmake. Detect which wrapper is in use (JAM_ROOT vs
--- ___lib___ marker) and return that framework's fixed format set.
+-- Known JUCE/clap-juce-extensions plugin format target suffixes.
+-- Same vocabulary build-debug.sh already matches against (script line ~38).
+local KNOWN_PLUGIN_FORMATS = {
+  VST3 = true, AU = true, AAX = true, AUv3 = true,
+  Unity = true, VST = true, Standalone = true, CLAP = true,
+}
+
+-- Derive buildable plugin formats by configuring CMake (if not already
+-- configured) and enumerating actual ninja targets — no assumption about
+-- which wrapper (JAM/KANJUT/raw juce_add_plugin/clap-juce-extensions) built
+-- the project. Mirrors the configure step in scripts/build-debug.sh:22-31.
 function M.detectAvailableFormats()
   local root = vim.fn.getcwd()
-  local cmakeFile = root .. '/CMakeLists.txt'
-  assert(vim.fn.filereadable(cmakeFile) == 1, 'detectAvailableFormats: no CMakeLists.txt in ' .. root)
+  local scheme = 'Debug'
+  local buildDir = root .. '/Builds/Ninja/' .. scheme
 
-  local content = table.concat(vim.fn.readfile(cmakeFile), '\n')
-  local is_windows = vim.fn.has('win32') == 1
-
-  local formats
-  if content:match('JAM_ROOT') then
-    -- JAM: configure_plugin() hardcodes FORMATS VST3 AU Standalone
-    -- (jam/cmake/PluginBuilder.cmake:189); CLAP added separately when
-    -- CLAP_ID is set (PluginBuilder.cmake:409-415).
-    formats = { 'VST3' }
-    if not is_windows then table.insert(formats, 'AU') end
-    if content:match('CLAP_ID') then table.insert(formats, 'CLAP') end
-  elseif content:match('___lib___') then
-    -- KANJUT: configure_plugin() hardcodes FORMATS VST VST3 AU AAX Standalone
-    -- (kuassa/___lib___/cmake/PluginBuilder.cmake:154); no CLAP support.
-    formats = { 'VST', 'VST3' }
-    if not is_windows then table.insert(formats, 'AU') end
-    table.insert(formats, 'AAX')
-  else
-    error('detectAvailableFormats: unrecognized plugin framework in ' .. cmakeFile)
+  if vim.fn.filereadable(buildDir .. '/CMakeCache.txt') ~= 1 or vim.fn.filereadable(buildDir .. '/build.ninja') ~= 1 then
+    vim.notify('Configuring CMake (' .. scheme .. ')...', vim.log.levels.INFO)
+    vim.fn.mkdir(buildDir, 'p')
+    local nativeArch = vim.trim(vim.fn.system('uname -m'))
+    local configureOutput = vim.fn.system({
+      'cmake', '-S', root, '-B', buildDir, '-G', 'Ninja',
+      '-DCMAKE_BUILD_TYPE=' .. scheme,
+      '-DCMAKE_OSX_ARCHITECTURES=' .. nativeArch,
+      '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
+    })
+    assert(vim.v.shell_error == 0, 'detectAvailableFormats: cmake configure failed:\n' .. configureOutput)
   end
 
-  table.insert(formats, 'Standalone')
+  local targetsOutput = vim.fn.system({ 'ninja', '-C', buildDir, '-t', 'targets' })
+  assert(vim.v.shell_error == 0, 'detectAvailableFormats: ninja -t targets failed:\n' .. targetsOutput)
+
+  local formats, seen = {}, {}
+  for line in targetsOutput:gmatch('[^\r\n]+') do
+    local fmt = line:match('_([%a][%a%d]*): phony$')
+    if fmt and KNOWN_PLUGIN_FORMATS[fmt] and not seen[fmt] then
+      seen[fmt] = true
+      table.insert(formats, fmt)
+    end
+  end
+
+  assert(#formats > 0, 'detectAvailableFormats: no known plugin format targets found in ' .. buildDir)
   return formats
 end
 
@@ -379,21 +389,21 @@ function M.setup()
         -- JUCE standalone apps are in *_App_artefacts/Debug|Release/*.app or *.exe
         local patterns = {
           -- macOS: standalone-only projects (juce_add_gui_app)
-          root .. '/Builds/Ninja/Debug/*App_artefacts*/Debug/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*App_artefacts*/Release/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*App_artefacts*/Debug/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*App_artefacts*/Release/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/*.app/Contents/MacOS/*',
           -- macOS: plugin projects with Standalone among FORMATS (nested like VST3/AU/CLAP)
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/Standalone/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/Standalone/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/Standalone/*.app/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/Standalone/*.app/Contents/MacOS/*',
           -- Windows: standalone-only projects
-          root .. '/Builds/Ninja/Debug/*App_artefacts*/Debug/*.exe',
-          root .. '/Builds/Ninja/Release/*App_artefacts*/Release/*.exe',
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/*.exe',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/*.exe',
+          root .. '/Builds/Ninja/Debug/**/*App_artefacts*/Debug/*.exe',
+          root .. '/Builds/Ninja/Release/**/*App_artefacts*/Release/*.exe',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/*.exe',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/*.exe',
           -- Windows: plugin projects with Standalone among FORMATS
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/Standalone/*.exe',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/Standalone/*.exe',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/Standalone/*.exe',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/Standalone/*.exe',
         }
         
         local found = nil
@@ -435,8 +445,8 @@ function M.setup()
         -- Mac: attach mode, program is the plugin binary
         local root = vim.fn.getcwd()
         local patterns = {
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/VST3/*.vst3/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/VST3/*.vst3/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST3/*.vst3/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST3/*.vst3/Contents/MacOS/*',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
@@ -456,8 +466,8 @@ function M.setup()
         local root = vim.fn.getcwd()
         local patterns = {
           -- macOS only (no AU on Windows)
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/AU/*.component/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/AU/*.component/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AU/*.component/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AU/*.component/Contents/MacOS/*',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
@@ -479,11 +489,11 @@ function M.setup()
         local root = vim.fn.getcwd()
         local patterns = {
           -- macOS
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/VST/*.vst/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/VST/*.vst/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST/*.vst/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST/*.vst/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/VST/*.dll',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/VST/*.dll',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST/*.dll',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST/*.dll',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
@@ -505,11 +515,11 @@ function M.setup()
         local root = vim.fn.getcwd()
         local patterns = {
           -- macOS
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/AAX/*.aaxplugin/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/AAX/*.aaxplugin/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AAX/*.aaxplugin/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AAX/*.aaxplugin/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
@@ -531,11 +541,11 @@ function M.setup()
         local root = vim.fn.getcwd()
         local patterns = {
           -- macOS
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/CLAP/*.clap/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/CLAP/*.clap/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/CLAP/*.clap/Contents/MacOS/*',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/CLAP/*.clap/Contents/MacOS/*',
           -- Windows
-          root .. '/Builds/Ninja/Debug/*artefacts*/Debug/CLAP/*.clap',
-          root .. '/Builds/Ninja/Release/*artefacts*/Release/CLAP/*.clap',
+          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/CLAP/*.clap',
+          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/CLAP/*.clap',
         }
         for _, pattern in ipairs(patterns) do
           local matches = vim.fn.glob(pattern, false, true)
