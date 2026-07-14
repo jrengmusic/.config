@@ -236,8 +236,10 @@ function M.setup()
   --   <leader>dL → Run last
   --   <leader>du → Toggle UI
   --   <leader>de → Evaluate expression
-  --   <leader>br → Build + Launch + Attach (auto-detects plugin/standalone)
-  --   <leader>bb → Build only (no launch)
+  --   <leader>br → Build release + Launch + Attach (auto-detects plugin/standalone)
+  --   <leader>bb → Build debug + Launch + Attach
+  --   <leader>bR → Build release only (no run)
+  --   <leader>bB → Build debug only (no run)
   --   <leader>bc → Clean build
   --   <leader>bk → Clean
   --   <F5> → Configure project (auto-detects plugin/standalone)
@@ -394,7 +396,12 @@ function M.setupDap()
   end
 
   -- Build functions (extracted for reuse)
-  local function runBuildAndLaunch(scheme, notarize)
+  -- buildFormat resolves the DAW/plugin format, builds it, and hands the
+  -- resolved cfg to onBuilt — copy-to-system-dir always happens inside the
+  -- build script itself, so onBuilt only ever decides post-build action
+  -- (launch, or just notify). Notarize/codesign is dropped: nvim always
+  -- builds with 'nonotarize'.
+  local function buildFormat(scheme, onBuilt)
     vim.cmd('silent! wa')
 
     local root = vim.fn.getcwd()
@@ -471,23 +478,8 @@ function M.setupDap()
       vim.cmd('startinsert')
     end
 
-    local args_base = function(format)
-      local args = {script, root, scheme, format}
-      if not notarize then args[#args + 1] = 'nonotarize' end
-      return args
-    end
-
-    local function buildAndLaunchStandalone()
-      runBuildInTerminal(args_base('Standalone'), function()
-        vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })
-        vim.defer_fn(function()
-          local dap = require('dap')
-          for _, dapCfg in ipairs(dap.configurations.cpp) do
-            if dapCfg.name == 'Launch Standalone' then dap.run(dapCfg); return end
-          end
-          vim.notify('DAP config not found: Launch Standalone', vim.log.levels.ERROR)
-        end, 1000)
-      end)
+    local function args_base(format)
+      return {script, root, scheme, format, 'nonotarize'}
     end
 
     -- One path: resolve the format (cached .nvim-dap-config, or the picker
@@ -496,36 +488,53 @@ function M.setupDap()
     -- value alone. No project-type branch — Standalone/App-derived builds
     -- and DAW-paired plugin formats both flow through the same dispatch.
     local function go(cfg)
-      if cfg.format == 'Standalone' then
-        buildAndLaunchStandalone()
-        return
-      end
-      runBuildInTerminal(args_base(cfg.format), function()
-        local configName = dapConfig.getConfigNameForFormat(cfg.format)
-        if vim.fn.has('win32') == 1 then
-          vim.notify('Built! Launching DAW via debugger...', vim.log.levels.INFO, { timeout = 1500 })
-          vim.defer_fn(function()
-            local dap = require('dap')
-            for _, dapCfg in ipairs(dap.configurations.cpp) do
-              if dapCfg.name == configName then dap.run(dapCfg); return end
-            end
-            vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
-          end, 500)
-        else
-          vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
-          vim.fn.jobstart({ cfg.dawPath })
-          vim.defer_fn(function()
-            local dap = require('dap')
-            for _, dapCfg in ipairs(dap.configurations.cpp) do
-              if dapCfg.name == configName then dap.run(dapCfg); return end
-            end
-            vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
-          end, 2000)
-        end
-      end)
+      runBuildInTerminal(args_base(cfg.format), function() onBuilt(cfg) end)
     end
     local config = dapConfig.loadDawConfig(function(cfg) if cfg then go(cfg) end end)
     if config then go(config) end
+  end
+
+  local function runBuildAndLaunch(scheme)
+    buildFormat(scheme, function(cfg)
+      if cfg.format == 'Standalone' then
+        vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })
+        vim.defer_fn(function()
+          local dap = require('dap')
+          for _, dapCfg in ipairs(dap.configurations.cpp) do
+            if dapCfg.name == 'Launch Standalone' then dap.run(dapCfg); return end
+          end
+          vim.notify('DAP config not found: Launch Standalone', vim.log.levels.ERROR)
+        end, 1000)
+        return
+      end
+      local configName = dapConfig.getConfigNameForFormat(cfg.format)
+      if vim.fn.has('win32') == 1 then
+        vim.notify('Built! Launching DAW via debugger...', vim.log.levels.INFO, { timeout = 1500 })
+        vim.defer_fn(function()
+          local dap = require('dap')
+          for _, dapCfg in ipairs(dap.configurations.cpp) do
+            if dapCfg.name == configName then dap.run(dapCfg); return end
+          end
+          vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+        end, 500)
+      else
+        vim.notify('Built! Launching DAW...', vim.log.levels.INFO, { timeout = 1500 })
+        vim.fn.jobstart({ cfg.dawPath })
+        vim.defer_fn(function()
+          local dap = require('dap')
+          for _, dapCfg in ipairs(dap.configurations.cpp) do
+            if dapCfg.name == configName then dap.run(dapCfg); return end
+          end
+          vim.notify('DAP config not found: ' .. configName, vim.log.levels.ERROR)
+        end, 2000)
+      end
+    end)
+  end
+
+  local function runBuildOnly(scheme)
+    buildFormat(scheme, function(cfg)
+      vim.notify('Built!', vim.log.levels.INFO, { timeout = 1500 })
+    end)
   end
 
   local function runCleanOnly()
@@ -574,7 +583,7 @@ function M.setupDap()
     dapConfig.showDawFormatDialog(function(config)
       if not config then return end
       if config.format == 'Standalone' then
-        vim.notify('Standalone:\n  bb  build debug + run\n  br  build release + run\n  bR  build release + signing + run')
+        vim.notify('Standalone:\n  bb  build debug + run\n  br  build release + run\n  bB  build debug only\n  bR  build release only')
       else
         vim.notify('Plugin config saved. Press <leader>br to build.')
       end
@@ -610,10 +619,11 @@ function M.setupDap()
   vim.keymap.set('v', '<leader>de', dapui.eval, { desc = 'DAP: Evaluate selection' })
 
   -- Build group keymaps
-  vim.keymap.set('n', '<leader>br', function() killDapThen(function() runBuildAndLaunch('Release', false) end) end, { desc = 'DAP: Build release + run' })
+  vim.keymap.set('n', '<leader>br', function() killDapThen(function() runBuildAndLaunch('Release') end) end, { desc = 'DAP: Build release + run' })
 
-  vim.keymap.set('n', '<leader>bb', function() killDapThen(function() runBuildAndLaunch('Debug', false) end) end, { desc = 'DAP: Build debug + run' })
-  vim.keymap.set('n', '<leader>bR', function() killDapThen(function() runBuildAndLaunch('Release', true) end) end, { desc = 'DAP: Full release (codesign + notarize) + run' })
+  vim.keymap.set('n', '<leader>bb', function() killDapThen(function() runBuildAndLaunch('Debug') end) end, { desc = 'DAP: Build debug + run' })
+  vim.keymap.set('n', '<leader>bR', function() killDapThen(function() runBuildOnly('Release') end) end, { desc = 'DAP: Build release only (no run)' })
+  vim.keymap.set('n', '<leader>bB', function() killDapThen(function() runBuildOnly('Debug') end) end, { desc = 'DAP: Build debug only (no run)' })
 
   vim.keymap.set('n', '<leader>bc', function() killDapThen(function()
     local root = vim.fn.getcwd()
@@ -631,7 +641,7 @@ function M.setupDap()
         else
           if exit_code == 0 then
             vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
-            runBuildAndLaunch('Debug', false)
+            runBuildAndLaunch('Debug')
           else
             vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
           end
@@ -649,7 +659,7 @@ function M.setupDap()
             local exit_code = vim.v.event.status
             if exit_code == 0 then
               vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
-              runBuildAndLaunch('Debug', false)
+              runBuildAndLaunch('Debug')
             else
               vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
             end

@@ -118,8 +118,10 @@ Opens at top (horizontal split, 15 lines):
 
 | Key | Action |
 |-----|--------|
-| `<leader>br` | Build + Launch + Attach |
-| `<leader>bb` | Build only (+ LSP restart) |
+| `<leader>br` | Build release + Launch + Attach |
+| `<leader>bb` | Build debug + Launch + Attach |
+| `<leader>bR` | Build release only (no run) |
+| `<leader>bB` | Build debug only (no run) |
 | `<leader>bc` | Clean build (clean + build) |
 | `<leader>bk` | Clean + Reconfigure build |
 
