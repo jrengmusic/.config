@@ -19,19 +19,19 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "fable",
+  "model": "sonnet",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
   },
   "enabledPlugins": {},
   "effortLevel": "high",
+  "autoCompactWindow": 800000,
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "askUserQuestionTimeout": "never",
   "theme": "auto",
   "autoCompactEnabled": true,
-  "autoCompactWindow": 800000,
   "showTurnDuration": false,
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
