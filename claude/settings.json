@@ -18,17 +18,17 @@
       "Bash(git checkout --*)"
     ]
   },
-  "model": "claude-sonnet-5",
+  "model": "fable",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
   },
   "enabledPlugins": {},
-  "effortLevel": "medium",
+  "effortLevel": "high",
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "tui": "fullscreen",
   "showTurnDuration": false,
-  "agentPushNotifEnabled": true,
-  "inputNeededNotifEnabled": true
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }
