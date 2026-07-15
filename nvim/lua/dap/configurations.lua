@@ -120,27 +120,90 @@ local KNOWN_PLUGIN_FORMATS = {
 -- so both are surfaced under the single 'Standalone' format label here.
 local FORMAT_ALIAS = { App = 'Standalone' }
 
--- Derive buildable formats — plugin formats and/or the standalone binary —
--- by configuring CMake (if not already configured) and enumerating actual
--- ninja targets. No assumption about which wrapper (JAM/KANJUT/AppBuilder/
--- PluginBuilder/raw juce_add_plugin/clap-juce-extensions) built the project,
--- and no assumption about "project type" — a project is simply whatever set
--- of formats its build produces. Mirrors scripts/build-debug.sh:22-31.
-function M.detectAvailableFormats()
-  local root = vim.fn.getcwd()
+-- Read the real FORMATS list straight out of the framework's PluginBuilder.cmake
+-- — text only, no cmake process, so this can never surface a configure/build
+-- error. The project's own CMakeLists.txt names its framework modules dir via
+-- FRAMEWORK_MODULES_PATH (e.g. jreng-filter-strip/CMakeLists.txt:40-41 sets it
+-- to "___lib___"); the framework root is one directory above the project
+-- (CMakeLists.txt:37, "${CMAKE_CURRENT_SOURCE_DIR}/.."). PluginBuilder.cmake's
+-- FORMATS line (e.g. kuassa/___lib___/cmake/PluginBuilder.cmake:154) is the
+-- actual, single source of truth juce_add_plugin() itself will use — read
+-- directly rather than duplicated as a lookup table here.
+local function detectFormatsFromPluginBuilder(root)
+  local cmakeFile = root .. '/CMakeLists.txt'
+  if vim.fn.filereadable(cmakeFile) ~= 1 then
+    return nil
+  end
+
+  local content = table.concat(vim.fn.readfile(cmakeFile), '\n')
+  local modulesPath = content:match('set%(FRAMEWORK_MODULES_PATH%s+"([^"]+)"')
+  if not modulesPath then
+    return nil
+  end
+
+  local pluginBuilderFile = root .. '/../' .. modulesPath .. '/cmake/PluginBuilder.cmake'
+  if vim.fn.filereadable(pluginBuilderFile) ~= 1 then
+    return nil
+  end
+
+  local builderContent = table.concat(vim.fn.readfile(pluginBuilderFile), '\n')
+  -- Capture the rest of the FORMATS line only — the file's next line is
+  -- VST3_CATEGORIES/AAX_CATEGORY etc. (kuassa/___lib___/cmake/PluginBuilder.cmake:155-156),
+  -- which must not bleed into this token scan.
+  local formatsLine = builderContent:match('FORMATS%s+([^\r\n]*)')
+  if not formatsLine then
+    return nil
+  end
+
+  -- AU is Apple-only (JUCE itself won't produce it on Windows) — a platform
+  -- fact, not project-specific data, so filtering it here isn't hardcoding
+  -- a format list. Tokens matched against KNOWN_PLUGIN_FORMATS (not a bare
+  -- uppercase character class) so names with digits/lowercase (VST3, AUv3,
+  -- Standalone) are captured correctly.
+  local is_windows = vim.fn.has('win32') == 1
+  local formats, seen = {}, {}
+  for token in formatsLine:gmatch('%a[%a%d]*') do
+    local fmt = FORMAT_ALIAS[token] or token
+    if KNOWN_PLUGIN_FORMATS[fmt] and not (fmt == 'AU' and is_windows) and not seen[fmt] then
+      seen[fmt] = true
+      table.insert(formats, fmt)
+    end
+  end
+
+  return #formats > 0 and formats or nil
+end
+
+-- Fallback for projects with no FRAMEWORK_MODULES_PATH marker to resolve
+-- (e.g. clap-juce-extensions' raw juce_add_plugin, or a framework whose
+-- PluginBuilder.cmake isn't implemented yet — JAM's is currently a stub).
+-- Configures CMake (if not already configured) and enumerates actual ninja
+-- targets. Mirrors scripts/build-debug.sh:22-31.
+local function detectFormatsViaCmake(root)
   local scheme = 'Debug'
   local buildDir = root .. '/Builds/Ninja/' .. scheme
 
   if vim.fn.filereadable(buildDir .. '/CMakeCache.txt') ~= 1 or vim.fn.filereadable(buildDir .. '/build.ninja') ~= 1 then
     vim.notify('Configuring CMake (' .. scheme .. ')...', vim.log.levels.INFO)
+    vim.cmd('redraw')
     vim.fn.mkdir(buildDir, 'p')
     local nativeArch = vim.trim(vim.fn.system('uname -m'))
-    local configureOutput = vim.fn.system({
+    local configureArgs = {
       'cmake', '-S', root, '-B', buildDir, '-G', 'Ninja',
       '-DCMAKE_BUILD_TYPE=' .. scheme,
       '-DCMAKE_OSX_ARCHITECTURES=' .. nativeArch,
       '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-    })
+    }
+    if vim.fn.has('win32') == 1 then
+      -- core/options.lua's augment_path() puts MSYS2's mingw64/bin on PATH
+      -- (for rg/fd) alongside the MSVC dev-env PATH it also establishes —
+      -- without pinning the compiler here, CMake's auto-detection picks
+      -- whichever cc/c++ it finds first on PATH, which can be MSYS2's gcc.
+      -- JUCE (juce_TargetPlatform.h:113) hard-errors on MinGW. Pin MSVC
+      -- explicitly so detection is deterministic regardless of PATH order.
+      table.insert(configureArgs, '-DCMAKE_C_COMPILER=cl.exe')
+      table.insert(configureArgs, '-DCMAKE_CXX_COMPILER=cl.exe')
+    end
+    local configureOutput = vim.fn.system(configureArgs)
     assert(vim.v.shell_error == 0, 'detectAvailableFormats: cmake configure failed:\n' .. configureOutput)
   end
 
@@ -159,6 +222,15 @@ function M.detectAvailableFormats()
 
   assert(#formats > 0, 'detectAvailableFormats: no known format targets found in ' .. buildDir)
   return formats
+end
+
+-- Derive buildable formats. Text-parsing the real PluginBuilder.cmake is
+-- tried first — it can never fail on a broken configure/build, since it
+-- never invokes cmake. Falls back to live cmake+ninja enumeration only when
+-- no static answer can be resolved.
+function M.detectAvailableFormats()
+  local root = vim.fn.getcwd()
+  return detectFormatsFromPluginBuilder(root) or detectFormatsViaCmake(root)
 end
 
 -- Show dialog to configure format, DAW, and build scheme

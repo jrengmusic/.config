@@ -554,6 +554,11 @@ function M.setupDap()
         else
           vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
         end
+        -- Force a redraw: closing a ConPTY-backed (term=true) terminal window
+        -- on Windows can leave stale screen content until the next redraw —
+        -- the job/window are genuinely done (confirmed via instrumentation),
+        -- but the display doesn't reflect it without this.
+        vim.cmd('redraw')
       end)
     end
     local isAborted = false
@@ -571,7 +576,10 @@ function M.setupDap()
       job_id = vim.fn.termopen({script, root}, {on_exit = onExit})
     end
     bindAbort(buf, win, job_id, function() isAborted = true end)
-    vim.cmd('startinsert')
+    -- No startinsert: clean is non-interactive and the window closes itself
+    -- on completion — entering terminal-insert mode right before that close
+    -- fires (clean-build finishes in well under a second) leaves nvim stuck
+    -- in insert mode on whatever buffer remains, indistinguishable from a hang.
   end
 
   -- Function keys
@@ -668,7 +676,8 @@ function M.setupDap()
       })
     end
     bindAbort(buf, win, job_id, function() isAborted = true end)
-    vim.cmd('startinsert')
+    -- No startinsert: same reasoning as runCleanOnly — clean is non-interactive
+    -- and closes its own window on completion.
   end) end, { desc = 'DAP: Clean build' })
 
   vim.keymap.set('n', '<leader>bk', function() killDapThen(runCleanOnly) end, { desc = 'DAP: Clean' })

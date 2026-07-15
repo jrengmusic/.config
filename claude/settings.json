@@ -16,24 +16,19 @@
     "deny": [
       "Bash(git reset --hard*)",
       "Bash(git checkout --*)"
-    ],
-    "defaultMode": "auto"
+    ]
   },
-  "model": "sonnet",
+  "model": "claude-sonnet-5",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
   },
   "enabledPlugins": {},
-  "effortLevel": "high",
-  "autoCompactWindow": 800000,
+  "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
-  "askUserQuestionTimeout": "never",
-  "theme": "auto",
-  "autoCompactEnabled": true,
+  "tui": "fullscreen",
   "showTurnDuration": false,
-  "remoteControlAtStartup": true,
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "inputNeededNotifEnabled": true
 }
