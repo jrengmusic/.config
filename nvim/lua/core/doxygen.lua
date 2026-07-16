@@ -92,16 +92,16 @@ local function detect_lib_root(root)
 
   local jam_root = content:match('set%(%s*JAM_ROOT%s+"([^"]+)"%s*%)')
   if jam_root then
-    return vim.fn.fnamemodify(resolve_cmake_value(jam_root, root), ':p'):gsub('[/\\]$', '')
+    return vim.fn.fnamemodify(resolve_cmake_value(jam_root, root), ':p'):gsub('\\', '/'):gsub('/$', '')
   end
   if vim.loop.fs_stat(root .. '/../___cium___/docs/Doxyfile') then
-    return vim.fn.fnamemodify(root .. '/../___cium___', ':p'):gsub('[/\\]$', '')
+    return vim.fn.fnamemodify(root .. '/../___cium___', ':p'):gsub('\\', '/'):gsub('/$', '')
   end
   local modules_path = content:match('set%(%s*FRAMEWORK_MODULES_PATH%s+"([^"]+)"%s*%)')
   if modules_path then
     local framework_path = content:match('set%(%s*FRAMEWORK_PATH%s+"([^"]+)"%s*%)') or '${CMAKE_CURRENT_SOURCE_DIR}/..'
     local combined = resolve_cmake_value(framework_path, root) .. '/' .. modules_path
-    return vim.fn.fnamemodify(combined, ':p'):gsub('[/\\]$', '')
+    return vim.fn.fnamemodify(combined, ':p'):gsub('\\', '/'):gsub('/$', '')
   end
   return nil
 end
