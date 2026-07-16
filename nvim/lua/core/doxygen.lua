@@ -51,8 +51,16 @@ local function format_exclude_patterns()
   return table.concat(all, ' \\\n' .. EXCLUDE_PATTERNS_PAD)
 end
 
+-- Normalizes a path to forward slashes, stripping any trailing slash.
+-- vim.fn.fnamemodify(..., ':p'/':h') returns native-separator paths, which on
+-- Windows means backslashes — relpath() below is forward-slash-only, so every
+-- absolute path entering it must be normalized through this single point.
+local function normalize_path(path)
+  return (path:gsub('\\', '/'):gsub('/$', ''))
+end
+
 -- Fixed machine paths
-local HOME          = vim.fn.expand('~'):gsub('\\', '/')
+local HOME          = normalize_path(vim.fn.expand('~'))
 local JUCE_ROOT     = HOME .. '/Documents/Poems/JUCE'
 local JUCE_MODULES  = JUCE_ROOT .. '/modules'
 local JUCE_DOXY_DIR = JUCE_ROOT .. '/docs/doxygen'
@@ -64,7 +72,8 @@ local function get_project_root()
     path   = vim.fn.getcwd(),
     limit  = 1,
   })
-  return #markers > 0 and vim.fn.fnamemodify(markers[1], ':h') or vim.fn.getcwd()
+  local root = #markers > 0 and vim.fn.fnamemodify(markers[1], ':h') or vim.fn.getcwd()
+  return normalize_path(root)
 end
 
 -- Substitutes the two CMake variable forms seen across project CMakeLists.txt
@@ -92,16 +101,16 @@ local function detect_lib_root(root)
 
   local jam_root = content:match('set%(%s*JAM_ROOT%s+"([^"]+)"%s*%)')
   if jam_root then
-    return vim.fn.fnamemodify(resolve_cmake_value(jam_root, root), ':p'):gsub('\\', '/'):gsub('/$', '')
+    return normalize_path(vim.fn.fnamemodify(resolve_cmake_value(jam_root, root), ':p'))
   end
   if vim.loop.fs_stat(root .. '/../___cium___/docs/Doxyfile') then
-    return vim.fn.fnamemodify(root .. '/../___cium___', ':p'):gsub('\\', '/'):gsub('/$', '')
+    return normalize_path(vim.fn.fnamemodify(root .. '/../___cium___', ':p'))
   end
   local modules_path = content:match('set%(%s*FRAMEWORK_MODULES_PATH%s+"([^"]+)"%s*%)')
   if modules_path then
     local framework_path = content:match('set%(%s*FRAMEWORK_PATH%s+"([^"]+)"%s*%)') or '${CMAKE_CURRENT_SOURCE_DIR}/..'
     local combined = resolve_cmake_value(framework_path, root) .. '/' .. modules_path
-    return vim.fn.fnamemodify(combined, ':p'):gsub('\\', '/'):gsub('/$', '')
+    return normalize_path(vim.fn.fnamemodify(combined, ':p'))
   end
   return nil
 end
@@ -308,7 +317,7 @@ end
 
 -- Force clean rebuild of JUCE + library (HTML+XML) + project (XML).
 function M.build(root)
-  root = root or get_project_root()
+  root = normalize_path(root or get_project_root())
   local lib_root = detect_lib_root(root)
   if not lib_root then
     vim.notify('[doxygen] Cannot detect framework (no JAM_ROOT or FRAMEWORK_MODULES_PATH)', vim.log.levels.WARN)
@@ -323,7 +332,7 @@ end
 
 -- Rebuild only what is stale. Called after successful binary build.
 function M.build_incremental(root)
-  root = root or get_project_root()
+  root = normalize_path(root or get_project_root())
   local lib_root = detect_lib_root(root)
   if not lib_root then return end
 
