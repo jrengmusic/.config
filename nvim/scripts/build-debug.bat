@@ -28,8 +28,10 @@ if not exist "%VCVARSALL%" (
     exit /b 1
 )
 
-echo Setting up MSVC x64 environment...
-call "%VCVARSALL%" x64
+if not defined VSCMD_VER (
+    echo Setting up MSVC x64 environment...
+    call "%VCVARSALL%" x64
+)
 
 :: Use VS-bundled ninja (avoids MSYS2 ld.exe conflict)
 set PATH=%VS_PATH%\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
