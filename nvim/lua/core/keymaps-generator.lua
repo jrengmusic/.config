@@ -349,7 +349,9 @@ function M.verify()
     return
   end
 
-  local outFile = assert(io.open(OUT_PATH, 'w'))
+  -- 'wb': binary mode so line endings are LF on every platform — emission
+  -- must be byte-identical across machines (text mode writes CRLF on Windows).
+  local outFile = assert(io.open(OUT_PATH, 'wb'))
   outFile:write(emit(groups, hash))
   outFile:close()
   vim.notify('[keymaps-generator] keymaps.lua regenerated from KEYMAPS.md', vim.log.levels.INFO)
