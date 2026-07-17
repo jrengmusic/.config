@@ -13,6 +13,28 @@ function M.setup()
     desc = 'Sync .clangd from compile_commands.json on startup',
   })
 
+  -- Stop any build/clean/doxygen job still running on quit. Nvim itself only
+  -- guarantees this for LSP clients (vim.lsp's own VimLeavePre asks clangd to
+  -- shut down); jobstart/termopen jobs are never auto-killed by Nvim on any
+  -- platform — on Unix they're spawned detached (setsid) so :qa leaves them
+  -- running regardless, on Windows the OS Job Object only catches direct
+  -- children on crash, not this cooperative-quit path. Identical on both OS:
+  -- same two calls, no platform branch.
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    once = true,
+    callback = function()
+      -- stopActiveBuildJob only exists once core.keymaps' setupDap() has run
+      -- (lazy-loaded with the DAP/build plugin, nvim/lua/plugins/dap.lua:3,15)
+      -- — a session that never touched a build/DAP keymap never defines it.
+      local keymaps = require('core.keymaps')
+      if keymaps.stopActiveBuildJob then
+        keymaps.stopActiveBuildJob()
+      end
+      require('core.doxygen').stop_active_job()
+    end,
+    desc = 'Stop in-flight build/clean/doxygen jobs before quitting',
+  })
+
   -- Filetype overrides
   vim.filetype.add({
     extension = {

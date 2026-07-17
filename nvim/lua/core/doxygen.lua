@@ -10,6 +10,28 @@ local M = {}
 
 local is_windows = vim.fn.has('win32') == 1
 
+-- Half of logical cores, floor, minimum 1 — identical formula to the clangd
+-- `-j` cap (nvim/lua/lsp/clangd.lua), same vim.uv API on both platforms, so
+-- doxygen's dot-graph rendering never saturates every core the way clangd's
+-- unthrottled background-index did.
+local function dot_num_threads()
+  return math.max(1, math.floor(vim.uv.available_parallelism() / 2))
+end
+
+-- Only one doxygen job may run at a time — a second trigger (e.g. two builds
+-- in quick succession) stops the previous job rather than letting both
+-- compete for CPU. jobstop on an already-exited id is a documented no-op.
+local active_job_id = nil
+local function stop_active_job()
+  if active_job_id then
+    vim.fn.jobstop(active_job_id)
+    active_job_id = nil
+  end
+end
+-- Published on M so autocommands.lua's VimLeavePre can stop the doxygen job
+-- still running (if any) when nvim quits.
+M.stop_active_job = stop_active_job
+
 local SCRIPT            = vim.fn.stdpath('config') .. (is_windows and '\\scripts\\build-doxygen.sh'     or '/scripts/build-doxygen.sh')
 local TEMPLATE_LIB      = vim.fn.stdpath('config') .. (is_windows and '\\doxygen\\Doxyfile.lib'         or '/doxygen/Doxyfile.lib')
 local TEMPLATE_JUCE     = vim.fn.stdpath('config') .. (is_windows and '\\doxygen\\Doxyfile.juce'        or '/doxygen/Doxyfile.juce')
@@ -131,13 +153,15 @@ local function relpath(from_dir, to_dir)
   return table.concat(parts, '/')
 end
 
--- Copies TEMPLATE_JUCE to a temp file as-is. Returns temp path.
--- JUCE runs from JUCE_DOXY_DIR so @INCLUDE = Doxyfile resolves correctly.
+-- Reads TEMPLATE_JUCE, substitutes __DOT_NUM_THREADS__, writes to a temp file.
+-- Returns temp path. JUCE runs from JUCE_DOXY_DIR so @INCLUDE = Doxyfile
+-- resolves correctly.
 local function make_juce_doxyfile()
   local tf = io.open(TEMPLATE_JUCE, 'r')
   assert(tf, '[doxygen] Missing template: ' .. TEMPLATE_JUCE)
   local content = tf:read('*a')
   tf:close()
+  content = content:gsub('__DOT_NUM_THREADS__', tostring(dot_num_threads()))
   local tmp = vim.fn.tempname()
   local out = io.open(tmp, 'w')
   assert(out, '[doxygen] Cannot write temp Doxyfile')
@@ -164,6 +188,7 @@ local function make_lib_doxyfile(lib_root, name, brief)
   content = content:gsub('__INPUT__',         lib_root)
   content = content:gsub('__TAGFILES__',      juce_rel .. '/docs/tagfile.xml=../' .. juce_rel .. '/docs/html')
   content = content:gsub('__DOT_MAX_NODES__',    '100')
+  content = content:gsub('__DOT_NUM_THREADS__',  tostring(dot_num_threads()))
   content = content:gsub('__EXCLUDE_PATTERNS__', format_exclude_patterns())
 
   local tmp = vim.fn.tempname()
@@ -241,6 +266,7 @@ local function is_stale(src_dir, xml_stamp)
 end
 
 local function run_in_terminal(juce_doxy_tmp, lib_doxy_tmp, lib_root, proj_doxy_tmp, proj_dir)
+  stop_active_job()
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     local buf = vim.api.nvim_win_get_buf(win)
     if vim.bo[buf].buftype == 'terminal' then
@@ -291,14 +317,14 @@ local function run_in_terminal(juce_doxy_tmp, lib_doxy_tmp, lib_root, proj_doxy_
   end
 
   if is_windows then
-    vim.fn.jobstart(args, { term = true, on_exit = function(_, code)
+    active_job_id = vim.fn.jobstart(args, { term = true, on_exit = function(_, code)
       vim.schedule(function()
         vim.cmd('stopinsert')
         close_if_clean(code)
       end)
     end })
   else
-    vim.fn.termopen(args)
+    active_job_id = vim.fn.termopen(args)
     vim.api.nvim_create_autocmd('TermClose', {
       buffer = term_buf,
       once   = true,

@@ -51,7 +51,8 @@ fi
 echo "=========================================="
 echo "Building $TARGET ($SCHEME)..."
 echo "=========================================="
-JAM_NOTARIZE=$( [ "$NO_NOTARIZE" -eq 1 ] && echo OFF || echo ON ) cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" 2>&1 | cat
+BUILD_JOBS=$(( $(sysctl -n hw.ncpu) / 2 ))
+JAM_NOTARIZE=$( [ "$NO_NOTARIZE" -eq 1 ] && echo OFF || echo ON ) cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" --parallel "$BUILD_JOBS" 2>&1 | cat
 
 echo "=========================================="
 echo "Copying $FORMAT to system directory..."

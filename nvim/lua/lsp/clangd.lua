@@ -13,9 +13,12 @@ local M = {}
         local query_driver = is_windows
           and '--query-driver=/mingw64/bin/g++'
           or '--query-driver=/usr/bin/c++,/usr/bin/clang++'
+        local index_jobs = math.max(1, math.floor(vim.uv.available_parallelism() / 2))
         return {
           clangd_bin,
           '--background-index',
+          '--background-index-priority=background',
+          '-j=' .. index_jobs,
           '--header-insertion=never',
           '--clang-tidy',
           '--completion-style=detailed',

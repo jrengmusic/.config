@@ -71,7 +71,8 @@ if not defined TARGET (
 echo ==========================================
 echo Building %TARGET% (%SCHEME%)...
 echo ==========================================
-cmake --build "%BUILD_DIR%" --config %SCHEME% --target %TARGET%
+set /a HALF_CORES=%NUMBER_OF_PROCESSORS%/2
+cmake --build "%BUILD_DIR%" --config %SCHEME% --target %TARGET% --parallel %HALF_CORES%
 if errorlevel 1 ( echo Build FAILED & exit /b 1 )
 
 echo ==========================================

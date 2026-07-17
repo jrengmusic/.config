@@ -14,3 +14,4 @@ GENERATE_LATEX         = NO
 USE_MATHJAX            = YES
 GENERATE_TAGFILE       = ../tagfile.xml
 DOT_GRAPH_MAX_NODES    = 200
+DOT_NUM_THREADS        = __DOT_NUM_THREADS__

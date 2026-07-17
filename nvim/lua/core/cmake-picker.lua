@@ -541,14 +541,19 @@ function M.open_explorer()
   end
 end
 
+-- Regenerates the project's .clangd file from compile_commands.json.
+-- Returns (ok, changed): ok is false on failure; changed is true when the
+-- written content differs from what was already on disk, so callers can
+-- skip an LSP client restart (and the full clangd reindex it triggers)
+-- when the compile flags didn't actually change.
 function M.syncClangd()
   local compile_db = find_compile_db()
-  if compile_db == nil then return false end
+  if compile_db == nil then return false, false end
 
   local data = parse_compile_db(compile_db)
   if data == nil then
     vim.notify('syncClangd: parse failed', vim.log.levels.WARN)
-    return false
+    return false, false
   end
 
   -- Extract all compiler flags from the first source entry.
@@ -607,8 +612,11 @@ function M.syncClangd()
     '  UnusedIncludes: None',
   })
 
+  local old_lines = vim.fn.filereadable(clangd_path) == 1 and vim.fn.readfile(clangd_path) or nil
+  local changed = old_lines == nil or table.concat(old_lines, '\n') ~= table.concat(lines, '\n')
+
   vim.fn.writefile(lines, clangd_path)
-  return true
+  return true, changed
 end
 
 function M.regenerate()

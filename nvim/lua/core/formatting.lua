@@ -1,7 +1,7 @@
 -- Custom formatting logic for C/C++
 local M = {}
 
--- Module-level so formatBuffer() can build the jobstart array on Windows
+-- Module-level so formatBuffer() can build the jobstart array
 local clangFormatBin
 local stylePath
 
@@ -37,60 +37,35 @@ function M.formatBuffer()
     local tmpfile = vim.fn.tempname()
     vim.cmd('write! ' .. tmpfile)
 
-    if vim.fn.has('win32') == 1 then
-      -- On Windows: use jobstart with array form to bypass shell entirely (avoids zsh/bash issues)
-      -- Each element is a separate arg — no shell, no quoting issues with spaces in paths
-      local output_lines = {}
-      vim.fn.jobstart({ clangFormatBin, '--style=file:' .. stylePath, tmpfile }, {
-        on_stdout = function(_, data)
-          if #data == 0 then return end
-          -- Stitch chunk boundary: last element of previous chunk is a partial line;
-          -- first element of this chunk continues it.
-          if #output_lines > 0 then
-            output_lines[#output_lines] = output_lines[#output_lines] .. data[1]
-            for i = 2, #data do
-              table.insert(output_lines, data[i])
-            end
-          else
-            for _, line in ipairs(data) do
-              table.insert(output_lines, line)
-            end
+    -- Array form bypasses the shell entirely (no quoting issues with spaces
+    -- in paths) and stdout_buffered hands on_stdout the fully-collected,
+    -- already-line-split output in one call — identical async, non-blocking
+    -- path on both platforms, no manual chunk-stitching needed.
+    local output_lines = nil
+    vim.fn.jobstart({ clangFormatBin, '--style=file:' .. stylePath, tmpfile }, {
+      stdout_buffered = true,
+      on_stdout = function(_, data)
+        output_lines = data
+      end,
+      on_exit = function(_, exit_code)
+        if exit_code == 0 and output_lines and #output_lines > 0 then
+          -- jobstart appends a trailing empty string; drop it
+          if output_lines[#output_lines] == '' then
+            table.remove(output_lines)
           end
-        end,
-        on_exit = function(_, exit_code)
-          if exit_code == 0 and #output_lines > 0 then
-            -- jobstart appends a trailing empty string; drop it
-            if output_lines[#output_lines] == '' then
-              table.remove(output_lines)
-            end
-            -- Strip embedded CR bytes (Windows pipe may produce CRLF)
-            for i, line in ipairs(output_lines) do
-              output_lines[i] = line:gsub('\r', '')
-            end
-            if vim.bo.modifiable then
-              vim.api.nvim_buf_set_lines(0, 0, -1, false, output_lines)
-            end
-          elseif exit_code ~= 0 then
-            vim.notify('clang-format failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+          -- Strip embedded CR bytes (Windows pipe may produce CRLF)
+          for i, line in ipairs(output_lines) do
+            output_lines[i] = line:gsub('\r', '')
           end
-          os.remove(tmpfile)
-        end,
-      })
-    else
-      local formatted = vim.fn.system(vim.g.clang_format_command .. ' < ' .. tmpfile)
-      local exitCode = vim.v.shell_error
-
-      if exitCode == 0 and formatted ~= '' then
-        -- Check if buffer is modifiable before trying to format
-        if vim.bo.modifiable then
-          vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.fn.split(formatted, '\n'))
+          if vim.bo.modifiable then
+            vim.api.nvim_buf_set_lines(0, 0, -1, false, output_lines)
+          end
+        elseif exit_code ~= 0 then
+          vim.notify('clang-format failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
         end
-      elseif exitCode ~= 0 then
-        vim.notify('clang-format failed (exit ' .. exitCode .. '): ' .. formatted, vim.log.levels.ERROR)
-      end
-
-      os.remove(tmpfile)
-    end
+        os.remove(tmpfile)
+      end,
+    })
   end)
 end
 

@@ -300,6 +300,22 @@ function M.setupDap()
   local function buildScript() return vim.fn.stdpath('config') .. (is_windows and '\\scripts\\build-debug.bat' or '/scripts/build-debug.sh') end
   local function cleanScript() return toMsys(vim.fn.stdpath('config') .. '/scripts/clean-build.sh') end
 
+  -- Single-flight guard shared by every build/clean job spawn site
+  -- (runBuildInTerminal, runCleanOnly, the bc clean+build handler) — stops
+  -- whatever build/clean job is still running before starting a new one, so
+  -- two Ninja invocations never race on the same build directory. jobstop on
+  -- an already-exited id is a documented no-op (same pattern bindAbort uses).
+  local activeBuildJob = nil
+  local function stopActiveBuildJob()
+    if activeBuildJob then
+      vim.fn.jobstop(activeBuildJob)
+      activeBuildJob = nil
+    end
+  end
+  -- Published on M so autocommands.lua's VimLeavePre can reach this closure's
+  -- upvalue and stop any build/clean job still running when nvim quits.
+  M.stopActiveBuildJob = stopActiveBuildJob
+
   local DAP_TERMINATE_GRACE_MS = 200
   local BUILD_GUARD_LISTENER_KEY = 'build_guard'
   local STANDALONE_PID_LISTENER_KEY = 'standalone_pid_capture'
@@ -408,6 +424,7 @@ function M.setupDap()
     local script = buildScript()
 
     local function runBuildInTerminal(args, onSuccess)
+      stopActiveBuildJob()
       for _, win in ipairs(vim.api.nvim_list_wins()) do
         local buf = vim.api.nvim_win_get_buf(win)
         if vim.bo[buf].buftype == 'terminal' then
@@ -423,24 +440,29 @@ function M.setupDap()
           if vim.api.nvim_win_is_valid(term_win) then
             vim.api.nvim_win_close(term_win, true)
           end
-          require('core.cmake-picker').syncClangd()
+          local _, clangdChanged = require('core.cmake-picker').syncClangd()
           require('core.doxygen').build_incremental(root)
-          vim.schedule(function()
-            for _, client in ipairs(vim.lsp.get_clients()) do
-              local bufs = vim.tbl_keys(client.attached_buffers)
-              client:stop()
-              for _, buf in ipairs(bufs) do
-                if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
-                  vim.defer_fn(function()
-                    local saved = vim.api.nvim_get_current_buf()
-                    vim.api.nvim_set_current_buf(buf)
-                    vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
-                    vim.api.nvim_set_current_buf(saved)
-                  end, 500)
+          -- Only restart LSP clients when .clangd actually changed — a
+          -- restart forces clangd to cold-reindex the whole project, so
+          -- skip it on rebuilds where the compile flags didn't move.
+          if clangdChanged then
+            vim.schedule(function()
+              for _, client in ipairs(vim.lsp.get_clients()) do
+                local bufs = vim.tbl_keys(client.attached_buffers)
+                client:stop()
+                for _, buf in ipairs(bufs) do
+                  if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
+                    vim.defer_fn(function()
+                      local saved = vim.api.nvim_get_current_buf()
+                      vim.api.nvim_set_current_buf(buf)
+                      vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+                      vim.api.nvim_set_current_buf(saved)
+                    end, 500)
+                  end
                 end
               end
-            end
-          end)
+            end)
+          end
           onSuccess()
         else
           vim.bo[term_buf].modifiable = false
@@ -474,6 +496,7 @@ function M.setupDap()
           end,
         })
       end
+      activeBuildJob = job_id
       bindAbort(term_buf, term_win, job_id, function() isAborted = true end)
       vim.cmd('startinsert')
     end
@@ -538,6 +561,7 @@ function M.setupDap()
   end
 
   local function runCleanOnly()
+    stopActiveBuildJob()
     local root = vim.fn.getcwd()
     local script = cleanScript()
     vim.cmd('botright 20split')
@@ -575,6 +599,7 @@ function M.setupDap()
     else
       job_id = vim.fn.termopen({script, root}, {on_exit = onExit})
     end
+    activeBuildJob = job_id
     bindAbort(buf, win, job_id, function() isAborted = true end)
     -- No startinsert: clean is non-interactive and the window closes itself
     -- on completion — entering terminal-insert mode right before that close
@@ -634,6 +659,7 @@ function M.setupDap()
   vim.keymap.set('n', '<leader>bB', function() killDapThen(function() runBuildOnly('Debug') end) end, { desc = 'DAP: Build debug only (no run)' })
 
   vim.keymap.set('n', '<leader>bc', function() killDapThen(function()
+    stopActiveBuildJob()
     local root = vim.fn.getcwd()
     local script = cleanScript()
     vim.cmd('botright 20split')
@@ -675,6 +701,7 @@ function M.setupDap()
         end,
       })
     end
+    activeBuildJob = job_id
     bindAbort(buf, win, job_id, function() isAborted = true end)
     -- No startinsert: same reasoning as runCleanOnly — clean is non-interactive
     -- and closes its own window on completion.
