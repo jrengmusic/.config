@@ -334,20 +334,6 @@ return {
       
     end, 300)
     
-    vim.keymap.set('i', '<C-l>', function() luasnip.jump(1) end, { silent = true })
-    vim.keymap.set('i', '<C-h>', function() luasnip.jump(-1) end, { silent = true })
-    vim.keymap.set('i', '<C-e>', function()
-      if luasnip.choice_active() then
-        luasnip.change_choice(1)
-      end
-    end, { silent = true })
-
-    vim.keymap.set('n', '<leader>fs', function()
-      require('snacks').picker.snippets()
-    end, { desc = 'Snippet picker' })
-
-    vim.keymap.set('i', '<C-v>', function()
-      require('snacks').picker.snippets()
-    end, { desc = 'Snippet picker (insert mode)' })
+    require('core.keymaps').setupSnippets()
   end,
 }

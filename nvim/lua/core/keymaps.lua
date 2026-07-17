@@ -746,4 +746,64 @@ function M.setupFlash()
   vim.keymap.set('c', '<c-s>', function() require('flash').toggle() end, { desc = 'Toggle Flash Search' })
 end
 
+-- Treesitter textobjects keymaps
+function M.setupTextobjects()
+  local select = require('nvim-treesitter-textobjects.select').select_textobject
+  vim.keymap.set({ 'x', 'o' }, 'aF', function() select('@function.outer', 'textobjects') end, { desc = 'around function' })
+  vim.keymap.set({ 'x', 'o' }, 'iF', function() select('@function.inner', 'textobjects') end, { desc = 'inside function' })
+  vim.keymap.set({ 'x', 'o' }, 'aC', function() select('@class.outer', 'textobjects') end, { desc = 'around class' })
+  vim.keymap.set({ 'x', 'o' }, 'iC', function() select('@class.inner', 'textobjects') end, { desc = 'inside class' })
+  vim.keymap.set({ 'x', 'o' }, 'aL', function() select('@loop.outer', 'textobjects') end, { desc = 'around loop' })
+  vim.keymap.set({ 'x', 'o' }, 'iL', function() select('@loop.inner', 'textobjects') end, { desc = 'inside loop' })
+  vim.keymap.set({ 'x', 'o' }, 'aI', function() select('@conditional.outer', 'textobjects') end, { desc = 'around if/conditional' })
+  vim.keymap.set({ 'x', 'o' }, 'iI', function() select('@conditional.inner', 'textobjects') end, { desc = 'inside if/conditional' })
+end
+
+-- Snippet keymaps
+function M.setupSnippets()
+  local luasnip = require('luasnip')
+  vim.keymap.set('i', '<C-l>', function() luasnip.jump(1) end, { silent = true })
+  vim.keymap.set('i', '<C-h>', function() luasnip.jump(-1) end, { silent = true })
+  vim.keymap.set('i', '<C-e>', function()
+    if luasnip.choice_active() then
+      luasnip.change_choice(1)
+    end
+  end, { silent = true })
+
+  vim.keymap.set('n', '<leader>fs', function()
+    require('snacks').picker.snippets()
+  end, { desc = 'Snippet picker' })
+
+  vim.keymap.set('i', '<C-v>', function()
+    require('snacks').picker.snippets()
+  end, { desc = 'Snippet picker (insert mode)' })
+end
+
+-- 99 AI agent keymaps
+function M.setup99()
+  local _99 = require('99')
+
+  vim.keymap.set('n', '<leader>9f', function()
+    _99.fill_in_function()
+  end, { desc = '99: Fill function' })
+
+  vim.keymap.set('v', '<leader>9v', function()
+    _99.visual()
+  end, { desc = '99: Visual AI' })
+
+  vim.keymap.set('n', '<leader>9s', function()
+    _99.stop_all_requests()
+  end, { desc = '99: Stop requests' })
+end
+
+-- Diagnostic/quickfix window keymaps (buffer-scoped, called from the FileType
+-- 'qf' autocmd — same event-param shape as setupLsp(event)).
+function M.setupDiagnosticsQf(event)
+  local opts = { buffer = event.buf, silent = true }
+
+  vim.keymap.set('n', '<CR>', '<CR>', vim.tbl_extend('force', opts, { desc = 'Jump to diagnostic' }))
+  vim.keymap.set('n', 'q', '<cmd>lclose<CR>', vim.tbl_extend('force', opts, { desc = 'Close diagnostic list' }))
+  vim.keymap.set('n', 'p', '<CR><C-w>p', vim.tbl_extend('force', opts, { desc = 'Preview diagnostic' }))
+end
+
 return M

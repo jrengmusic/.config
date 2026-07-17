@@ -63,16 +63,7 @@ function M.setup()
     pattern = 'qf',
     group = vim.api.nvim_create_augroup('diagnostic-keys', { clear = true }),
     callback = function(event)
-      local opts = { buffer = event.buf, silent = true }
-
-      -- Enter: Jump to file and line (stay in diagnostic window)
-      vim.keymap.set('n', '<CR>', '<CR>', vim.tbl_extend('force', opts, { desc = 'Jump to diagnostic' }))
-
-      -- q: Close diagnostic window manually
-      vim.keymap.set('n', 'q', '<cmd>lclose<CR>', vim.tbl_extend('force', opts, { desc = 'Close diagnostic list' }))
-
-      -- p: Preview diagnostic (peek without jumping)
-      vim.keymap.set('n', 'p', '<CR><C-w>p', vim.tbl_extend('force', opts, { desc = 'Preview diagnostic' }))
+      require('core.keymaps').setupDiagnosticsQf(event)
     end,
   })
 
