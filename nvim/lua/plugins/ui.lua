@@ -56,7 +56,6 @@ return {
         ['m'] = { output = { left = 'std::move (', right = ')' } },
       },
     })
-    require('core.keymaps').setupSurround()
     require('mini.pairs').setup({})
     require('core.keymaps').setupMiniPairs()
     local statusline = require('mini.statusline')

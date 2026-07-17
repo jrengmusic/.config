@@ -114,6 +114,10 @@ function M.setup()
   vim.api.nvim_set_hl(0, 'DapStoppedLine', { bg = '#2d3319' })
   vim.api.nvim_set_hl(0, 'DapLogPoint', { fg = '#61afef' })
 
+  -- Build orchestration listeners (standalone PID capture) must be live
+  -- before any launch, including manual dap.continue.
+  require('core.build').registerDapListeners()
+
   -- Setup keymaps
   require('core.keymaps').setupDap()
 end

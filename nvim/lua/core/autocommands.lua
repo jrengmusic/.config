@@ -23,16 +23,21 @@ function M.setup()
   vim.api.nvim_create_autocmd('VimLeavePre', {
     once = true,
     callback = function()
-      -- stopActiveBuildJob only exists once core.keymaps' setupDap() has run
-      -- (lazy-loaded with the DAP/build plugin, nvim/lua/plugins/dap.lua:3,15)
-      -- — a session that never touched a build/DAP keymap never defines it.
-      local keymaps = require('core.keymaps')
-      if keymaps.stopActiveBuildJob then
-        keymaps.stopActiveBuildJob()
-      end
+      require('core.build').stopActiveBuildJob()
       require('core.doxygen').stop_active_job()
     end,
     desc = 'Stop in-flight build/clean/doxygen jobs before quitting',
+  })
+
+  -- Live keymap lexicon regen: saving KEYMAPS.md regenerates keymaps.lua
+  -- immediately. Launch-time verify() in init.lua remains the backstop for
+  -- edits arriving via git pull from other machines.
+  vim.api.nvim_create_autocmd('BufWritePost', {
+    pattern = vim.fn.stdpath('config'):gsub('\\', '/') .. '/doc/KEYMAPS.md',
+    callback = function()
+      require('core.keymaps-generator').verify()
+    end,
+    desc = 'Regenerate keymaps.lua from the KEYMAPS.md lexicon',
   })
 
   -- Filetype overrides

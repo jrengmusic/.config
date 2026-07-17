@@ -15,6 +15,10 @@ require('core.options').setup()
 require('core.diagnostics').setup()
 require('core.formatting').setup()
 require('core.autocommands').setup()
+-- Keymap lexicon gate: regenerates core/keymaps.lua from doc/KEYMAPS.md when
+-- the lexicon's sha256 no longer matches the generated banner. No-op (<1ms)
+-- when in sync. Must run before the first require('core.keymaps').
+require('core.keymaps-generator').verify()
 require('core.keymaps').setup()
 
 -- ============================================================================
