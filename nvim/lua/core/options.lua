@@ -75,10 +75,14 @@ local function augment_path()
     and { 'C:/msys64/mingw64/bin', 'C:/msys64/usr/bin' }
     or  { '/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin' }
 
+  -- Windows: append after the MSVC dev PATH assembled above, so cl.exe
+  -- resolves ahead of MSYS2's cc.exe/c++.exe (JUCE rejects MinGW —
+  -- keymaps.lua:293). macOS: prepend, giving package-manager bins
+  -- precedence over system tools.
   for _, dir in ipairs(candidates) do
     local current = vim.env.PATH or ''
     if vim.fn.isdirectory(dir) == 1 and not current:find(dir, 1, true) then
-      vim.env.PATH = dir .. sep .. current
+      vim.env.PATH = is_windows and (current .. sep .. dir) or (dir .. sep .. current)
     end
   end
 end
