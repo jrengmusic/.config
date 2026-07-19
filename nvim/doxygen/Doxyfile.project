@@ -78,7 +78,8 @@ PREDEFINED             = WIN32=1                                        \
                          JUCE_BEGIN_IGNORE_WARNINGS_MSVC(warnings)=     \
                          JUCE_END_IGNORE_WARNINGS_MSVC=                 \
                          JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE(...)=      \
-                         JUCE_END_IGNORE_WARNINGS_GCC_LIKE=
+                         JUCE_END_IGNORE_WARNINGS_GCC_LIKE=             \
+                         JAM_VULKAN_RUNTIME_SHADER_COMPILER=1
 
 #---------------------------------------------------------------------------
 # Graphs

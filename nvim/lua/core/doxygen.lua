@@ -4,8 +4,9 @@
 -- All lib docs built from unified ~/.config/nvim/doxygen/Doxyfile.lib template.
 -- Output: {lib}/docs/html/, {lib}/docs/xml/, {lib}/DOCS.html (root redirect)
 --
--- leader bd  → build_clean  (always rebuild all)
--- leader bb  → build_incremental (rebuild only stale, post-binary-build hook)
+-- leader bd  → build_clean  (always rebuild all, manual)
+-- build_incremental (rebuild only stale) is triggered by the debounced
+-- source-tree watcher in core/autocommands.lua, not by any keymap.
 local M = {}
 
 local is_windows = vim.fn.has('win32') == 1
@@ -88,7 +89,7 @@ local JUCE_MODULES  = JUCE_ROOT .. '/modules'
 local JUCE_DOXY_DIR = JUCE_ROOT .. '/docs/doxygen'
 local JUCE_DOXYFILE = JUCE_DOXY_DIR .. '/Doxyfile'
 
-local function get_project_root()
+function M.get_project_root()
   local markers = vim.fs.find('CMakeLists.txt', {
     upward = true,
     path   = vim.fn.getcwd(),
@@ -114,7 +115,7 @@ end
 -- Values are parsed rather than assumed at a fixed nesting depth — projects
 -- nest at varying depths under dev/ and kuassa/ (e.g. dev/plugins/whelmed
 -- sets JAM_ROOT two levels up, dev/end sets it one level up).
-local function detect_lib_root(root)
+function M.detect_lib_root(root)
   local cmake = root .. '/CMakeLists.txt'
   local f = io.open(cmake, 'r')
   if not f then return nil end
@@ -343,8 +344,8 @@ end
 
 -- Force clean rebuild of JUCE + library (HTML+XML) + project (XML).
 function M.build(root)
-  root = normalize_path(root or get_project_root())
-  local lib_root = detect_lib_root(root)
+  root = normalize_path(root or M.get_project_root())
+  local lib_root = M.detect_lib_root(root)
   if not lib_root then
     vim.notify('[doxygen] Cannot detect framework (no JAM_ROOT or FRAMEWORK_MODULES_PATH)', vim.log.levels.WARN)
     return
@@ -356,10 +357,23 @@ function M.build(root)
   run_in_terminal(juce_tmp, lib_tmp, lib_root, proj_tmp, proj_dir)
 end
 
--- Rebuild only what is stale. Called after successful binary build.
+-- Returns the three source trees build_incremental checks for staleness
+-- (JUCE modules, framework lib, project Source), or nil if the project's
+-- framework can't be detected. Lets callers (e.g. a file watcher) watch
+-- exactly what build_incremental reads, without duplicating its knowledge
+-- of JUCE_MODULES/lib_root/Source.
+function M.get_watch_dirs(root)
+  root = normalize_path(root or M.get_project_root())
+  local lib_root = M.detect_lib_root(root)
+  if not lib_root then return nil end
+  return { JUCE_MODULES, lib_root, root .. '/Source' }
+end
+
+-- Rebuild only what is stale. Called by the doxygen source-tree watcher
+-- (core/autocommands.lua), debounced — not tied to binary build completion.
 function M.build_incremental(root)
-  root = normalize_path(root or get_project_root())
-  local lib_root = detect_lib_root(root)
+  root = normalize_path(root or M.get_project_root())
+  local lib_root = M.detect_lib_root(root)
   if not lib_root then return end
 
   local juce_stale = is_stale(JUCE_MODULES, JUCE_ROOT .. '/docs/xml/index.xml')

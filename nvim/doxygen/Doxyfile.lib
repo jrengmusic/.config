@@ -12,6 +12,7 @@
 @INCLUDE = __JUCE_DOXYFILE__
 
 PREDEFINED += KUASSA_VULKAN_RUNTIME_SHADER_COMPILER=1
+PREDEFINED += JAM_VULKAN_RUNTIME_SHADER_COMPILER=1
 
 #---------------------------------------------------------------------------
 # Per-lib overrides

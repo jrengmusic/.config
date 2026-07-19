@@ -172,29 +172,11 @@ local function buildFormat(scheme, onBuilt)
         if vim.api.nvim_win_is_valid(term_win) then
           vim.api.nvim_win_close(term_win, true)
         end
-        local _, clangdChanged = require('core.cmake-picker').syncClangd()
-        require('core.doxygen').build_incremental(root)
-        -- Only restart LSP clients when .clangd actually changed — a
-        -- restart forces clangd to cold-reindex the whole project, so
-        -- skip it on rebuilds where the compile flags didn't move.
-        if clangdChanged then
-          vim.schedule(function()
-            for _, client in ipairs(vim.lsp.get_clients()) do
-              local bufs = vim.tbl_keys(client.attached_buffers)
-              client:stop()
-              for _, buf in ipairs(bufs) do
-                if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
-                  vim.defer_fn(function()
-                    local saved = vim.api.nvim_get_current_buf()
-                    vim.api.nvim_set_current_buf(buf)
-                    vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
-                    vim.api.nvim_set_current_buf(saved)
-                  end, 500)
-                end
-              end
-            end
-          end)
-        end
+        -- .clangd sync + LSP restart, and doxygen incremental rebuild, are
+        -- both handled by watchers (core/autocommands.lua) — not tied to
+        -- build completion. compile_commands.json only changes on a CMake
+        -- reconfigure; doxygen sources change every save, so that watcher
+        -- is long-debounced instead.
         onSuccess()
       else
         vim.bo[term_buf].modifiable = false

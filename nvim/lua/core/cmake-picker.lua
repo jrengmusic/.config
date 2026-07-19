@@ -5,7 +5,7 @@ local M = {}
 local _grep_fixed = true
 
 local SOURCE_EXTENSIONS = {
-  'cpp', 'cc', 'c', 'mm', 'm', 'h', 'hpp', 'hxx',
+  'cpp', 'cc', 'c', 'mm', 'm', 'h', 'hpp', 'hxx', 'inl',
   'xml', 'svg', 'json', 'txt', 'md', 'cmake', 'html', 'lua',
   'frag', 'vert',
 }
@@ -35,7 +35,7 @@ local function get_project_root()
   return #markers > 0 and vim.fn.fnamemodify(markers[1], ':h') or vim.fn.getcwd()
 end
 
-local function find_compile_db()
+function M.find_compile_db()
   local root = get_project_root()
   local markers = vim.fs.find('compile_commands.json', {
     path  = root .. '/Builds/Ninja',
@@ -61,7 +61,7 @@ local function get_project_dir()
 end
 
 local function is_symlink_tree_stale()
-  local compile_db = find_compile_db()
+  local compile_db = M.find_compile_db()
   if compile_db == nil then return false end
 
   local project_dir = get_project_dir()
@@ -171,7 +171,7 @@ end
 local function generate_symlink_tree()
   local cwd = get_project_root()
   local project_dir = get_project_dir()
-  local compile_db = find_compile_db()
+  local compile_db = M.find_compile_db()
 
   if compile_db == nil then
     return false
@@ -194,7 +194,7 @@ local function generate_symlink_tree()
   for _, entry in ipairs(data) do
     local file = entry.file
     if file ~= nil and seen[file] == nil then
-      local skip = file:find('/Builds/') ~= nil
+      local skip = file:find('/Builds/') ~= nil or file:find('/juce-patched/') ~= nil
       if not skip then
         seen[file] = true
         local group, submodule = classify_file(file)
@@ -275,7 +275,7 @@ end
 
 function M.files()
   local Snacks = require('snacks')
-  local compile_db = find_compile_db()
+  local compile_db = M.find_compile_db()
   local cwd = get_project_root()
 
   if compile_db == nil and vim.fn.filereadable(cwd .. '/CMakeLists.txt') ~= 1 then
@@ -298,7 +298,7 @@ function M.files()
       for i, entry in ipairs(data) do
         local file = entry.file
         if file ~= nil and seen[file] == nil then
-          local skip = file:find('/Builds/') ~= nil
+          local skip = file:find('/Builds/') ~= nil or file:find('/juce-patched/') ~= nil
           if not skip then
             seen[file] = true
             local group, submodule = classify_file(file)
@@ -547,7 +547,7 @@ end
 -- skip an LSP client restart (and the full clangd reindex it triggers)
 -- when the compile flags didn't actually change.
 function M.syncClangd()
-  local compile_db = find_compile_db()
+  local compile_db = M.find_compile_db()
   if compile_db == nil then return false, false end
 
   local data = parse_compile_db(compile_db)
@@ -633,7 +633,7 @@ end
 -- into it, so subdirs must NOT be listed separately to avoid duplicate results.
 -- Returns nil when no compile db is found.
 local function get_dirs()
-  local compile_db = find_compile_db()
+  local compile_db = M.find_compile_db()
   if compile_db == nil then return nil end
 
   local data = parse_compile_db(compile_db)
@@ -652,7 +652,7 @@ local function get_dirs()
   -- One module_root per User Module (rg recurses into it)
   for _, entry in ipairs(data) do
     local file = entry.file
-    if file ~= nil and not file:find('/Builds/') then
+    if file ~= nil and not file:find('/Builds/') and not file:find('/juce-patched/') then
       local group, submodule = classify_file(file)
       if group == 'User Modules' and submodule ~= nil then
         local idx = file:find('/' .. submodule .. '/')

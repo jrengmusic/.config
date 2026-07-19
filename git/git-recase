@@ -1,0 +1,7 @@
+#!/usr/bin/env zsh
+# git-recase — force working-tree filenames to the index's casing
+# (case-insensitive filesystems keep stale casing across case-only renames)
+set -e
+git rev-parse --is-inside-work-tree > /dev/null
+git ls-files -z | xargs -0 rm -f --
+git checkout -f HEAD --
