@@ -16,6 +16,7 @@ local M = {}
         local index_jobs = math.max(1, math.floor(vim.uv.available_parallelism() / 2))
         return {
           clangd_bin,
+          '--log=error',
           '--background-index',
           '--background-index-priority=background',
           '-j=' .. index_jobs,

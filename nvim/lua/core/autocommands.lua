@@ -5,6 +5,17 @@ local CLANGD_WATCH_DEBOUNCE_MS = 300
 local LSP_REFRESH_DELAY_MS = 500
 local DOXYGEN_WATCH_DEBOUNCE_MS = 300000
 
+-- Nvim mirrors every LSP client's stderr into stdpath('log')/lsp.log at
+-- ERROR severity with no rotation (vim/lsp/log.lua). clangd's own stderr
+-- chatter during indexing floods it unbounded across months of sessions, so
+-- each session starts from an empty file instead of accumulating history.
+local function truncateLspLog()
+  local log_path = vim.lsp.get_log_path()
+  if vim.fn.filereadable(log_path) == 1 then
+    vim.fn.writefile({}, log_path)
+  end
+end
+
 -- Re-syncs .clangd and restarts LSP clients only when compile flags
 -- actually changed — a restart forces clangd to cold-reindex the whole
 -- project, so skip it when the compile flags didn't move.
@@ -109,6 +120,8 @@ local function watchDoxygenSources()
 end
 
 function M.setup()
+  truncateLspLog()
+
   -- Sync .clangd from compile_commands.json on startup, then watch it for
   -- lazy re-sync (see watchCompileDb doc comment). Also arms the doxygen
   -- source-tree watcher (see watchDoxygenSources doc comment).

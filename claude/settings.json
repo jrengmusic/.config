@@ -18,7 +18,7 @@
       "Bash(git checkout --*)"
     ]
   },
-  "model": "fable",
+  "model": "claude-opus-4-8",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
