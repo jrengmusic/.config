@@ -43,6 +43,35 @@ local function onClientIdle(client, onIdle)
   })
 end
 
+-- Client ids currently mid-restart (onClientIdle armed or client:stop()
+-- already called for them). watchClangdConfig's debounce timer can invoke
+-- refreshLsp again while a previous call is still waiting on the same
+-- still-alive client — without this guard that registers a second
+-- LspProgress/LspDetach waiter pair for the same clientId, so the eventual
+-- exit fires both, double-triggering FileType and client:stop(). Same
+-- single-flight precedent as doxygen.lua's active_job_id.
+local restartingClients = {}
+
+-- Calls onGone once clientId is fully gone from vim.lsp.client._all (the
+-- same table vim.lsp.get_client_by_id / get_clients read). LspDetach fires
+-- from inside Client:_on_detach (vim/lsp/client.lua) *before* that removal
+-- — attached_buffers[bufnr] isn't cleared until after the autocmd dispatch
+-- returns, and the client's entry in _all is cleared even later, in a
+-- nested vim.schedule inside _on_exit ("so it exists in the execution of
+-- autocommands", per that function's own comment). Firing FileType inside
+-- the LspDetach callback itself therefore retriggers LSP autostart while
+-- the dying client is still visible to vim.lsp.get_clients() (which does
+-- not filter by is_stopped()), a state a fresh nvim start never has.
+-- Polling get_client_by_id ties the retrigger to that removal directly
+-- instead of guessing how many scheduler ticks it takes.
+local function waitForClientGone(clientId, onGone)
+  if vim.lsp.get_client_by_id(clientId) == nil then
+    onGone()
+    return
+  end
+  vim.schedule(function() waitForClientGone(clientId, onGone) end)
+end
+
 -- Restarts every attached LSP client — called only by watchClangdConfig,
 -- once .clangd itself has actually changed on disk.
 --
@@ -58,52 +87,61 @@ end
 local function refreshLsp()
   for _, client in ipairs(vim.lsp.get_clients()) do
     local clientId = client.id
-    local bufs = vim.tbl_keys(client.attached_buffers)
-    onClientIdle(client, function()
-      for _, buf in ipairs(bufs) do
-        if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
-          vim.api.nvim_create_autocmd('LspDetach', {
-            buffer = buf,
-            callback = function(event)
-              if event.data.client_id == clientId then
-                local saved = vim.api.nvim_get_current_buf()
-                vim.api.nvim_set_current_buf(buf)
-                vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
-                vim.api.nvim_set_current_buf(saved)
-                return true
-              end
-            end,
-          })
+    if not restartingClients[clientId] then
+      restartingClients[clientId] = true
+      local bufs = vim.tbl_keys(client.attached_buffers)
+      onClientIdle(client, function()
+        for _, buf in ipairs(bufs) do
+          if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
+            vim.api.nvim_create_autocmd('LspDetach', {
+              buffer = buf,
+              callback = function(event)
+                if event.data.client_id == clientId then
+                  waitForClientGone(clientId, function()
+                    local saved = vim.api.nvim_get_current_buf()
+                    vim.api.nvim_set_current_buf(buf)
+                    vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+                    vim.api.nvim_set_current_buf(saved)
+                  end)
+                  return true
+                end
+              end,
+            })
+          end
         end
-      end
-      client:stop(LSP_STOP_TIMEOUT_MS)
-    end)
+        client:stop(LSP_STOP_TIMEOUT_MS)
+      end)
+    end
   end
 end
 
--- Watches compile_commands.json for changes (CMake reconfigure — added/
--- removed source file, changed compile flags) and lazily re-syncs .clangd.
--- Not tied to build completion: ordinary recompiles never touch this file,
--- so watching it directly fires far less often than "every build". The
--- directory (not the file) is watched because generators commonly replace
--- the file via rename rather than in-place write, which a file-level watch
--- would miss. Debounced since a reconfigure touches several files in the
--- same directory in quick succession. Restarting LSP clients is not this
--- watcher's job — see watchClangdConfig, which reacts to .clangd itself.
-local function watchCompileDb()
+-- Watches the build directory (Builds/Ninja/Debug/) for *any* file
+-- activity — not just compile_commands.json. A clean rebuild regenerates
+-- JuceHeader.h, generated headers, binary data libs, and .clangd all at
+-- different times during the build. Clangd attaching mid-build caches a
+-- stale preamble against transient/absent headers, and nothing tells it to
+-- re-check later. The debounce timer resets on every single fs event in
+-- the directory, so the callback only fires once the *entire* directory
+-- has been quiet for CLANGD_WATCH_DEBOUNCE_MS — meaning the build has
+-- settled. At that point it syncs .clangd (no-op if compile_commands.json
+-- didn't change), then restarts LSP so clangd re-parses with all
+-- generated headers in their final state.
+local function watchBuildDir()
   local cmakePicker = require('core.cmake-picker')
   local compile_db = cmakePicker.find_compile_db()
   if compile_db == nil then return end
 
   local db_dir = vim.fn.fnamemodify(compile_db, ':h')
-  local db_name = vim.fn.fnamemodify(compile_db, ':t')
   local watcher = assert(vim.uv.new_fs_event())
   local debounce_timer = assert(vim.uv.new_timer())
 
-  watcher:start(db_dir, {}, function(err, filename)
-    if err ~= nil or filename ~= db_name then return end
+  watcher:start(db_dir, {}, function(err)
+    if err ~= nil then return end
     debounce_timer:stop()
-    debounce_timer:start(CLANGD_WATCH_DEBOUNCE_MS, 0, vim.schedule_wrap(cmakePicker.syncClangd))
+    debounce_timer:start(CLANGD_WATCH_DEBOUNCE_MS, 0, vim.schedule_wrap(function()
+      cmakePicker.syncClangd()
+      refreshLsp()
+    end))
   end)
 
   vim.api.nvim_create_autocmd('VimLeavePre', {
@@ -112,39 +150,7 @@ local function watchCompileDb()
       watcher:stop()
       debounce_timer:stop()
     end,
-    desc = 'Stop compile_commands.json watcher before quitting',
-  })
-end
-
--- Watches .clangd itself (project root) and restarts LSP clients whenever
--- it's rewritten. Separate path from watchCompileDb by design — that
--- watcher only regenerates .clangd (syncClangd writes unconditionally on
--- every real CMake reconfigure, cmake-picker.lua), so this watcher fires
--- on every reconfigure, including a clean rebuild that reproduces
--- identical flags — the underlying files were still deleted and recreated,
--- so already-open buffers need clangd to reparse them regardless of
--- whether .clangd's text actually changed.
-local function watchClangdConfig()
-  local cmakePicker = require('core.cmake-picker')
-  local root = cmakePicker.get_project_root()
-  if vim.fn.filereadable(root .. '/CMakeLists.txt') ~= 1 then return end
-
-  local watcher = assert(vim.uv.new_fs_event())
-  local debounce_timer = assert(vim.uv.new_timer())
-
-  watcher:start(root, {}, function(err, filename)
-    if err ~= nil or filename ~= '.clangd' then return end
-    debounce_timer:stop()
-    debounce_timer:start(CLANGD_WATCH_DEBOUNCE_MS, 0, vim.schedule_wrap(refreshLsp))
-  end)
-
-  vim.api.nvim_create_autocmd('VimLeavePre', {
-    once = true,
-    callback = function()
-      watcher:stop()
-      debounce_timer:stop()
-    end,
-    desc = 'Stop .clangd watcher before quitting',
+    desc = 'Stop build directory watcher before quitting',
   })
 end
 
@@ -197,20 +203,19 @@ end
 function M.setup()
   truncateLspLog()
 
-  -- Sync .clangd from compile_commands.json on startup, then arm its two
-  -- independent watchers (see watchCompileDb / watchClangdConfig doc
-  -- comments) plus the doxygen source-tree watcher.
+  -- Sync .clangd from compile_commands.json on startup, then arm the
+  -- build directory watcher (see watchBuildDir doc comment) plus the
+  -- doxygen source-tree watcher.
   vim.api.nvim_create_autocmd('VimEnter', {
     once = true,
     callback = function()
       vim.schedule(function()
         require('core.cmake-picker').syncClangd()
-        watchCompileDb()
-        watchClangdConfig()
+        watchBuildDir()
         watchDoxygenSources()
       end)
     end,
-    desc = 'Sync .clangd on startup; watch compile_commands.json, .clangd, and doxygen sources for changes',
+    desc = 'Sync .clangd on startup; watch build dir and doxygen sources for changes',
   })
 
   -- Stop any build/clean/doxygen job still running on quit. Nvim itself only
