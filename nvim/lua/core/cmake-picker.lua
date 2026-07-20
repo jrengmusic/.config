@@ -35,6 +35,10 @@ local function get_project_root()
   return #markers > 0 and vim.fn.fnamemodify(markers[1], ':h') or vim.fn.getcwd()
 end
 
+-- Exposed so callers outside this module (e.g. a .clangd file watcher) can
+-- locate .clangd without duplicating root-detection logic.
+M.get_project_root = get_project_root
+
 function M.find_compile_db()
   local root = get_project_root()
   local markers = vim.fs.find('compile_commands.json', {
@@ -542,10 +546,10 @@ function M.open_explorer()
 end
 
 -- Regenerates the project's .clangd file from compile_commands.json.
+-- Unconditionally writes on every call — see the write-site comment below
+-- for why a content-diff gate is wrong here.
 -- Returns (ok, changed): ok is false on failure; changed is true when the
--- written content differs from what was already on disk, so callers can
--- skip an LSP client restart (and the full clangd reindex it triggers)
--- when the compile flags didn't actually change.
+-- written content differs from what was already on disk.
 function M.syncClangd()
   local compile_db = M.find_compile_db()
   if compile_db == nil then return false, false end
@@ -615,6 +619,15 @@ function M.syncClangd()
   local old_lines = vim.fn.filereadable(clangd_path) == 1 and vim.fn.readfile(clangd_path) or nil
   local changed = old_lines == nil or table.concat(old_lines, '\n') ~= table.concat(lines, '\n')
 
+  -- Always write, even when content is unchanged: this only runs on a real
+  -- CMake reconfigure (syncClangd is called exclusively from the
+  -- compile_commands.json watcher, core/autocommands.lua, which itself only
+  -- fires on that exact file). A clean rebuild reconfigures and reproduces
+  -- identical flags, but the underlying files were deleted and recreated —
+  -- clangd's diagnostics for already-open buffers go stale regardless of
+  -- whether the resulting .clangd text matches. Writing unconditionally
+  -- bumps .clangd's mtime every reconfigure, which is what the .clangd file
+  -- watcher needs to reliably trigger an LSP restart in that case too.
   vim.fn.writefile(lines, clangd_path)
   return true, changed
 end
