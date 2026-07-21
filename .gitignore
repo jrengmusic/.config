@@ -12,6 +12,8 @@
 !cake/**
 !claude/
 !claude/**
+!echo/
+!echo/**
 !git/
 !git/**
 !hammerspoon/

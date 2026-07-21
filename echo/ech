@@ -1,0 +1,51 @@
+#!/usr/bin/env zsh
+
+typeset -a echo_verbs
+echo_verbs=(verify lint diff apply render self-apply)
+
+echo_script_dir="${0:A:h}"
+
+echo_known_verb() {
+    local candidate="$1"
+    local verb
+    for verb in "${echo_verbs[@]}"; do
+        if [[ "$verb" == "$candidate" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+echo_dispatch() {
+    local verb="$1"
+    shift
+    local script_path="${echo_script_dir}/${verb}.cmake"
+    if [[ ! -f "$script_path" ]]; then
+        print -u2 "ech: verb '${verb}' not yet implemented (missing ${script_path})"
+        exit 1
+    fi
+    exec cmake -P "$script_path" "$@"
+}
+
+if (( $# > 0 )); then
+    echo_requested_verb="$1"
+    shift
+    if echo_known_verb "$echo_requested_verb"; then
+        echo_dispatch "$echo_requested_verb" "$@"
+    else
+        print -u2 "ech: unknown verb '${echo_requested_verb}'"
+        print -u2 "ech: available verbs: ${echo_verbs[*]}"
+        exit 1
+    fi
+else
+    print "ech — select a verb:"
+    select echo_chosen_verb in "${echo_verbs[@]}"; do
+        if [[ -n "$echo_chosen_verb" ]]; then
+            break
+        fi
+        print "ech: invalid selection"
+    done
+    print -n "ech: arguments for '${echo_chosen_verb}': "
+    read echo_argument_line
+    echo_dispatch "$echo_chosen_verb" "${(z)echo_argument_line}"
+fi
