@@ -18,12 +18,14 @@
       "Bash(git checkout --*)"
     ]
   },
-  "model": "opus",
+  "model": "fable",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
   },
-  "enabledPlugins": {},
+  "enabledPlugins": {
+    "carol@carol-marketplace": true
+  },
   "effortLevel": "high",
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,

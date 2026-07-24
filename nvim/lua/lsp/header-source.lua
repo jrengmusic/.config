@@ -7,7 +7,7 @@ local M = {}
 -- ============================================================================
 
 local function isCpp(file)
-  return file:match('%.cpp$') or file:match('%.cc$') or file:match('%.mm$')
+  return file:match('%.cpp$') or file:match('%.cc$') or file:match('%.mm$') or file:match('%.inl$')
 end
 
 local function isHeader(file)
@@ -21,7 +21,7 @@ local function getAllCorrespondingFiles(current)
   if not basename then return files end
   
   -- Check all possible extensions
-  local extensions = { '.cpp', '.mm', '.h', '.hpp' }
+  local extensions = { '.cpp', '.mm', '.inl', '.h', '.hpp' }
   for _, ext in ipairs(extensions) do
     local candidate = basename .. ext
     if vim.fn.filereadable(candidate) == 1 and candidate ~= current then
@@ -207,11 +207,11 @@ function M.syncSplit()
       end
     end
     targetFile = getNextInCycle(current, leftCandidates, currentOtherFile)
-  elseif current:match('%.mm$') then
-    -- .mm file (left side): cycle through cpp/h files on right
+  elseif current:match('%.mm$') or current:match('%.inl$') then
+    -- .mm/.inl file (left side): cycle through cpp/h files on right
     local rightCandidates = {}
     for _, file in ipairs(allFiles) do
-      if not file:match('%.mm$') then -- cpp or h
+      if not (file:match('%.mm$') or file:match('%.inl$')) then -- cpp or h
         table.insert(rightCandidates, file)
       end
     end
