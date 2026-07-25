@@ -12,6 +12,8 @@
 !cake/**
 !claude/
 !claude/**
+!cli-proxy/
+!cli-proxy/**
 !echo/
 !echo/**
 !git/
@@ -42,3 +44,4 @@
 # ── Excluded from whitelisted directories ────────────────────────────────
 .DS_Store
 nvim/lazy-lock.json
+cli-proxy/static/
