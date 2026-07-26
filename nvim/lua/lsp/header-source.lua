@@ -64,7 +64,13 @@ local function applySplitRatio()
 end
 
 local function openSplit(leftFile, rightFile)
-  local winCount = #vim.api.nvim_tabpage_list_wins(0)
+  local normalWins = {}
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if vim.bo[vim.api.nvim_win_get_buf(win)].buftype ~= 'terminal' then
+      table.insert(normalWins, win)
+    end
+  end
+  local winCount = #normalWins
 
   if winCount == 1 then
     -- Create split: left=leftFile, right=rightFile
@@ -75,12 +81,20 @@ local function openSplit(leftFile, rightFile)
     vim.cmd('wincmd h')
     vim.cmd('buffer ' .. vim.fn.bufadd(leftFile))
   else
-    -- Update existing split: left=leftFile, right=rightFile
-    vim.cmd('wincmd h')
+    -- Update existing split using explicit leftmost/rightmost of normal windows
+    local leftWin, rightWin = normalWins[1], normalWins[1]
+    for _, win in ipairs(normalWins) do
+      local pos = vim.api.nvim_win_get_position(win)
+      if pos[2] < vim.api.nvim_win_get_position(leftWin)[2] then leftWin = win end
+      if pos[2] > vim.api.nvim_win_get_position(rightWin)[2] then rightWin = win end
+    end
+    vim.api.nvim_set_current_win(leftWin)
     vim.cmd('buffer ' .. vim.fn.bufadd(leftFile))
-    vim.cmd('wincmd l')
-    vim.cmd('buffer ' .. vim.fn.bufadd(rightFile))
-    vim.cmd('wincmd h')
+    if rightWin ~= leftWin then
+      vim.api.nvim_set_current_win(rightWin)
+      vim.cmd('buffer ' .. vim.fn.bufadd(rightFile))
+    end
+    vim.api.nvim_set_current_win(leftWin)
   end
 
   applySplitRatio()
@@ -88,6 +102,20 @@ end
 
 local function closeSplit()
   vim.cmd('only')
+end
+
+-- Close all non-terminal normal windows except the current one.
+-- Used before sync-split operations to reset layout while preserving build terminal.
+local function closeNonTerminalOthers()
+  local current = vim.api.nvim_get_current_win()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if win ~= current then
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.bo[buf].buftype ~= 'terminal' then
+        pcall(vim.api.nvim_win_close, win, false)
+      end
+    end
+  end
 end
 
 -- ============================================================================
@@ -301,6 +329,7 @@ end
 -- ============================================================================
 
 function M.smartDefinitionJump()
+  vim.cmd("normal! m'")  -- push origin to jumplist before navigating
   vim.lsp.buf.definition({
     on_list = function(options)
       if not options.items or #options.items == 0 then
@@ -313,7 +342,7 @@ function M.smartDefinitionJump()
       local defLine = item.lnum
       local defCol = (item.col or 1) - 1
 
-      vim.cmd('only')
+      closeNonTerminalOthers()
       M.ensureCppHeaderLayout(defFile)
 
       -- Position cursor at definition in whichever window now has defFile
@@ -352,9 +381,13 @@ function M.ensureCppHeaderLayout(targetFile, stayOnTarget)
     local rightFile = isCpp(targetFile) and other or targetFile
     openSplit(leftFile, rightFile)
   else
+    -- No pair: contract requires single split — close other normal windows.
+    closeNonTerminalOthers()
     vim.cmd('buffer ' .. vim.fn.bufadd(targetFile))
   end
 end
+
+M.closeNonTerminalOthers = closeNonTerminalOthers
 
 function M.toggleHeaderSplit()
   M.syncSplit()

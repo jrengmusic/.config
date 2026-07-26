@@ -1,7 +1,6 @@
 -- Autocommands
 local M = {}
 
-local CLANGD_WATCH_DEBOUNCE_MS = 300
 local DOXYGEN_WATCH_DEBOUNCE_MS = 300000
 local LSP_STOP_TIMEOUT_MS = 5000
 
@@ -64,50 +63,67 @@ local restartingClients = {}
 -- not filter by is_stopped()), a state a fresh nvim start never has.
 -- Polling get_client_by_id ties the retrigger to that removal directly
 -- instead of guessing how many scheduler ticks it takes.
+local CLIENT_GONE_POLL_MS = 50
+
 local function waitForClientGone(clientId, onGone)
   if vim.lsp.get_client_by_id(clientId) == nil then
     onGone()
     return
   end
-  vim.schedule(function() waitForClientGone(clientId, onGone) end)
+  vim.defer_fn(function() waitForClientGone(clientId, onGone) end, CLIENT_GONE_POLL_MS)
 end
 
--- Restarts every attached LSP client — called only by watchClangdConfig,
--- once .clangd itself has actually changed on disk.
+-- Stops every attached LSP client and calls onStopped(allBufs) once every
+-- one of them is confirmed fully gone (allBufs is the union of buffers all
+-- stopped clients were attached to — the list startLspForBuffers needs to
+-- bring LSP back later).
 --
 -- client:stop() is asynchronous — it sends a shutdown request and the
 -- client only actually dies later, once the server process exits. Waiting
 -- on LspDetach (fired only after that real exit) instead of a fixed delay
--- means the new client never races the old one's teardown. A bounded
+-- means a subsequent restart never races the old one's teardown. A bounded
 -- force-stop timeout is required: clients default to exit_timeout=false
 -- (no escalation), so a server that never answers "shutdown" — e.g.
 -- clangd deferring it while background-indexing — would otherwise stall
--- LspDetach, and the restart, forever. onClientIdle additionally holds off
--- the stop itself until the client's current background work has settled.
-local function refreshLsp()
-  for _, client in ipairs(vim.lsp.get_clients()) do
+-- LspDetach forever. onClientIdle additionally holds off the stop itself
+-- until the client's current background work has settled.
+local function stopLsp(onStopped)
+  local clients = vim.lsp.get_clients()
+  local pending = #clients
+  local allBufs = {}
+  if pending == 0 then
+    onStopped(allBufs)
+    return
+  end
+  for _, client in ipairs(clients) do
     local clientId = client.id
-    if not restartingClients[clientId] then
+    if restartingClients[clientId] then
+      pending = pending - 1
+      if pending == 0 then onStopped(allBufs) end
+    else
       restartingClients[clientId] = true
       local bufs = vim.tbl_keys(client.attached_buffers)
+      vim.list_extend(allBufs, bufs)
       onClientIdle(client, function()
-        for _, buf in ipairs(bufs) do
-          if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
-            vim.api.nvim_create_autocmd('LspDetach', {
-              buffer = buf,
-              callback = function(event)
-                if event.data.client_id == clientId then
-                  waitForClientGone(clientId, function()
-                    local saved = vim.api.nvim_get_current_buf()
-                    vim.api.nvim_set_current_buf(buf)
-                    vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
-                    vim.api.nvim_set_current_buf(saved)
-                  end)
-                  return true
-                end
-              end,
-            })
-          end
+        local lastBuf = bufs[#bufs]
+        if lastBuf == nil then
+          restartingClients[clientId] = nil
+          pending = pending - 1
+          if pending == 0 then onStopped(allBufs) end
+        else
+          vim.api.nvim_create_autocmd('LspDetach', {
+            buffer = lastBuf,
+            callback = function(event)
+              if event.data.client_id == clientId then
+                waitForClientGone(clientId, function()
+                  restartingClients[clientId] = nil
+                  pending = pending - 1
+                  if pending == 0 then onStopped(allBufs) end
+                end)
+                return true
+              end
+            end,
+          })
         end
         client:stop(LSP_STOP_TIMEOUT_MS)
       end)
@@ -115,43 +131,24 @@ local function refreshLsp()
   end
 end
 
--- Watches the build directory (Builds/Ninja/Debug/) for *any* file
--- activity — not just compile_commands.json. A clean rebuild regenerates
--- JuceHeader.h, generated headers, binary data libs, and .clangd all at
--- different times during the build. Clangd attaching mid-build caches a
--- stale preamble against transient/absent headers, and nothing tells it to
--- re-check later. The debounce timer resets on every single fs event in
--- the directory, so the callback only fires once the *entire* directory
--- has been quiet for CLANGD_WATCH_DEBOUNCE_MS — meaning the build has
--- settled. At that point it syncs .clangd (no-op if compile_commands.json
--- didn't change), then restarts LSP so clangd re-parses with all
--- generated headers in their final state.
-local function watchBuildDir()
-  local cmakePicker = require('core.cmake-picker')
-  local compile_db = cmakePicker.find_compile_db()
-  if compile_db == nil then return end
+-- Re-triggers LSP autostart (FileType) on each given buffer — the second
+-- half of a stopLsp(...) call. Split out so build.lua can stop clangd
+-- before spawning a build (freeing its indexing threads' CPU share for the
+-- compiler) and bring it back only once the build has actually exited.
+local function startLspForBuffers(bufs)
+  for _, buf in ipairs(bufs) do
+    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
+      local saved = vim.api.nvim_get_current_buf()
+      vim.api.nvim_set_current_buf(buf)
+      vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+      vim.api.nvim_set_current_buf(saved)
+    end
+  end
+end
 
-  local db_dir = vim.fn.fnamemodify(compile_db, ':h')
-  local watcher = assert(vim.uv.new_fs_event())
-  local debounce_timer = assert(vim.uv.new_timer())
-
-  watcher:start(db_dir, {}, function(err)
-    if err ~= nil then return end
-    debounce_timer:stop()
-    debounce_timer:start(CLANGD_WATCH_DEBOUNCE_MS, 0, vim.schedule_wrap(function()
-      cmakePicker.syncClangd()
-      refreshLsp()
-    end))
-  end)
-
-  vim.api.nvim_create_autocmd('VimLeavePre', {
-    once = true,
-    callback = function()
-      watcher:stop()
-      debounce_timer:stop()
-    end,
-    desc = 'Stop build directory watcher before quitting',
-  })
+-- Convenience: full stop-then-restart of every attached client.
+local function refreshLsp()
+  stopLsp(startLspForBuffers)
 end
 
 -- Watches the same source trees build_incremental checks for staleness
@@ -203,19 +200,21 @@ end
 function M.setup()
   truncateLspLog()
 
-  -- Sync .clangd from compile_commands.json on startup, then arm the
-  -- build directory watcher (see watchBuildDir doc comment) plus the
-  -- doxygen source-tree watcher.
+  -- Sync .clangd from compile_commands.json on startup (covers a build that
+  -- happened while nvim was closed), then arm the doxygen source-tree
+  -- watcher. Build-triggered .clangd sync + LSP restart is wired directly
+  -- into core/build.lua's on_exit (deterministic: the build process itself
+  -- signals completion) — no filesystem-quiet-guessing watcher; see
+  -- build.lua's on_exit for rationale.
   vim.api.nvim_create_autocmd('VimEnter', {
     once = true,
     callback = function()
       vim.schedule(function()
         require('core.cmake-picker').syncClangd()
-        watchBuildDir()
         watchDoxygenSources()
       end)
     end,
-    desc = 'Sync .clangd on startup; watch build dir and doxygen sources for changes',
+    desc = 'Sync .clangd on startup; watch doxygen sources for changes',
   })
 
   -- Stop any build/clean/doxygen job still running on quit. Nvim itself only
@@ -363,5 +362,13 @@ function M.setup()
     desc = 'Highlight error indicators in terminal',
   })
 end
+
+-- Exposed for core/build.lua: stop clangd before a build starts (frees its
+-- indexing threads' CPU share for the compiler), restart once the build has
+-- actually finished (see build.lua's on_exit) instead of guessing from
+-- filesystem quiet.
+M.stopLsp = stopLsp
+M.startLspForBuffers = startLspForBuffers
+M.refreshLsp = refreshLsp
 
 return M

@@ -3,7 +3,14 @@
     "allow": [
       "Bash(rm /Users/jreng/.claude/settings.json)",
       "Bash(ln -s /Users/jreng/.config/claude/settings.json /Users/jreng/.claude/settings.json)",
-      "Read(//Users/jreng/.claude/**)"
+      "Read(//Users/jreng/.claude/**)",
+      "WebFetch(domain:clangd.llvm.org)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:clang.llvm.org)",
+      "WebFetch(domain:www.mail-archive.com)",
+      "Bash(nvim *)",
+      "Read(//c/Users/jreng/AppData/Local/nvim-data/**)"
     ]
   }
 }

@@ -155,6 +155,13 @@ local function buildFormat(scheme, onBuilt)
   local root = vim.fn.getcwd()
   local script = buildScript()
 
+  -- -1 (vim.fn.getftime's own "doesn't exist" value) when there's no
+  -- compile_commands.json yet — a valid, comparable state on its own.
+  local function compileDbMtime()
+    local compile_db = require('core.cmake-picker').find_compile_db()
+    return compile_db ~= nil and vim.fn.getftime(compile_db) or -1
+  end
+
   local function runBuildInTerminal(args, onSuccess)
     M.stopActiveBuildJob()
     for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -167,16 +174,62 @@ local function buildFormat(scheme, onBuilt)
     local term_buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_set_current_buf(term_buf)
     local term_win = vim.api.nvim_get_current_win()
+    -- Captured before the job spawns: build-debug.{bat,sh} only reconfigures
+    -- (regenerating compile_commands.json) when CMakeCache.txt/build.ninja
+    -- are absent — an ordinary incremental build leaves it untouched. Since
+    -- CMake configure always runs before compiling (never after), this mtime
+    -- has already settled to its post-build value by the time compilation
+    -- starts, whether that compilation goes on to succeed or fail.
+    local mtimeBefore = compileDbMtime()
+
+    -- clangd's --background-index threads (lsp/clangd.lua) and ninja's own
+    -- --parallel compiler jobs (build-debug.{bat,sh}) are uncoordinated —
+    -- both compete for the same cores at once, which is what actually makes
+    -- the editor sluggish during a build (the build process itself is
+    -- already async via jobstart/termopen below; this is CPU contention,
+    -- not an event-loop block). Stopping clangd for the build's duration
+    -- hands the compiler the full core count; stopLsp/startLspForBuffers
+    -- (core/autocommands.lua) resumes it once the build actually exits.
+    -- lspStoppedBufs/buildExited: stopLsp and the job's on_exit complete in
+    -- either order (a trivial build with clangd already idle can finish
+    -- stopping before the job even starts) — resumeLsp only proceeds once
+    -- both have landed.
+    local lspStoppedBufs = nil
+    local buildExited = false
+    local autocommands = require('core.autocommands')
+
+    local function resumeLsp()
+      if lspStoppedBufs == nil or not buildExited then return end
+      -- Runs on both success and failure: a failing compile after a clean
+      -- rebuild still reconfigured (fresh compile_commands.json, deleted and
+      -- recreated generated headers) before the first file ever failed to
+      -- compile — clangd needs the resync regardless of whether compilation
+      -- itself succeeded. Gating on exit_code alone left clangd stale after
+      -- exactly that case. Conversely, an ordinary incremental build (no
+      -- reconfigure) leaves compileDbMtime() unchanged, so this skips the
+      -- resync — avoiding pointless work — but LSP is restarted either way,
+      -- since it was unconditionally stopped above.
+      if compileDbMtime() ~= mtimeBefore then
+        require('core.cmake-picker').syncClangdAsync(function()
+          autocommands.startLspForBuffers(lspStoppedBufs)
+        end)
+      else
+        autocommands.startLspForBuffers(lspStoppedBufs)
+      end
+    end
+
+    autocommands.stopLsp(function(bufs)
+      lspStoppedBufs = bufs
+      resumeLsp()
+    end)
+
     local function on_exit(exit_code)
+      buildExited = true
+      resumeLsp()
       if exit_code == 0 then
         if vim.api.nvim_win_is_valid(term_win) then
           vim.api.nvim_win_close(term_win, true)
         end
-        -- .clangd sync + LSP restart, and doxygen incremental rebuild, are
-        -- both handled by watchers (core/autocommands.lua) — not tied to
-        -- build completion. compile_commands.json only changes on a CMake
-        -- reconfigure; doxygen sources change every save, so that watcher
-        -- is long-debounced instead.
         onSuccess()
       else
         vim.bo[term_buf].modifiable = false

@@ -96,21 +96,56 @@ function M.closeAllTerminals()
   end
 end
 
--- Feed a jumplist motion, then re-sync the C++ header/source split layout.
-local function jumpSynced(motion)
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(motion, true, false, true), 'n', false)
-  vim.schedule(function()
-    vim.cmd('only')
-    require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
-  end)
+-- Step through the jumplist one entry at a time in the given direction,
+-- skipping non-project files. `normal!` runs the motion synchronously —
+-- unlike nvim_feedkeys (which only queues typeahead, racing any check that
+-- follows it), the jumplist position and current file are guaranteed
+-- updated by the time this call returns.
+-- getcwd() returns OS-native separators ('\' on Windows); expand('%:p') on
+-- a buffer opened via :edit/LSP can come back '/'-separated (LSP URIs decode
+-- via vim.uri_to_fname, which always yields '/'). Both sides are normalized
+-- to '/' before the prefix check — verified via headless repro that without
+-- this, getcwd()='C:\...' vs expand('%:p')='C:/...' never matches, silently
+-- treating every in-project file as foreign.
+local function toForwardSlash(path)
+  return path:gsub('\\', '/')
+end
+
+local function jumpSynced(direction)
+  local cwd = toForwardSlash(vim.fn.fnamemodify(vim.fn.getcwd(), ':p')):lower()
+  local motion = direction < 0 and '<C-o>' or '<C-i>'
+  local termMotion = vim.api.nvim_replace_termcodes(motion, true, false, true)
+
+  local function step(triesLeft)
+    if triesLeft == 0 then
+      vim.notify('No more jumps in project', vim.log.levels.WARN)
+      return
+    end
+    local posBefore = vim.fn.getjumplist()[2]
+    vim.cmd('silent! normal! ' .. termMotion)
+    if vim.fn.getjumplist()[2] == posBefore then
+      vim.notify('No more jumps in project', vim.log.levels.WARN)
+      return
+    end
+    local file = toForwardSlash(vim.fn.expand('%:p'))
+    if file ~= '' and file:lower():sub(1, #cwd) == cwd then
+      local hs = require('lsp.header-source')
+      hs.closeNonTerminalOthers()
+      hs.ensureCppHeaderLayout(file)
+    else
+      step(triesLeft - 1)
+    end
+  end
+
+  step(30)
 end
 
 function M.jumpBackSynced()
-  jumpSynced('<C-o>')
+  jumpSynced(-1)
 end
 
 function M.jumpForwardSynced()
-  jumpSynced('<C-i>')
+  jumpSynced(1)
 end
 
 -- Dispatches to the C++ clang-format path or conform by filetype.
