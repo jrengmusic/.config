@@ -333,89 +333,119 @@ local function runCleanOnly()
   M.stopActiveBuildJob()
   local root = vim.fn.getcwd()
   local script = cleanScript()
-  vim.cmd('botright 20split')
-  local buf = vim.api.nvim_create_buf(false, true)
-  local win = vim.api.nvim_get_current_win()
-  vim.api.nvim_set_current_buf(buf)
-  local function closeTerminal(_, exit_code)
-    vim.schedule(function()
-      if vim.api.nvim_win_is_valid(win) then
-        vim.api.nvim_win_close(win, true)
-      end
-      if exit_code == 0 then
-        vim.notify('Clean succeeded', vim.log.levels.INFO)
-      else
-        vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
-      end
-      -- Force a redraw: closing a ConPTY-backed (term=true) terminal window
-      -- on Windows can leave stale screen content until the next redraw —
-      -- the job/window are genuinely done (confirmed via instrumentation),
-      -- but the display doesn't reflect it without this.
-      vim.cmd('redraw')
-    end)
-  end
-  local isAborted = false
-  local job_id
-  local function onExit(_, exit_code)
-    if isAborted then
-      -- skip: abort handler already closed window and notified
-    else
-      closeTerminal(_, exit_code)
+  local autocommands = require('core.autocommands')
+
+  local function spawnClean(lspStoppedBufs)
+    vim.cmd('botright 20split')
+    local buf = vim.api.nvim_create_buf(false, true)
+    local win = vim.api.nvim_get_current_win()
+    vim.api.nvim_set_current_buf(buf)
+    local function closeTerminal(_, exit_code)
+      vim.schedule(function()
+        if vim.api.nvim_win_is_valid(win) then
+          vim.api.nvim_win_close(win, true)
+        end
+        if exit_code == 0 then
+          vim.notify('Clean succeeded', vim.log.levels.INFO)
+        else
+          vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+        end
+        -- Force a redraw: closing a ConPTY-backed (term=true) terminal window
+        -- on Windows can leave stale screen content until the next redraw —
+        -- the job/window are genuinely done (confirmed via instrumentation),
+        -- but the display doesn't reflect it without this.
+        vim.cmd('redraw')
+        -- clean-build.sh removes the whole Builds tree, including
+        -- .cache/clangd/index — clangd was stopped above to release its
+        -- handle on that directory (rm -rf fails with "Directory not
+        -- empty" on Windows otherwise), so it must be restarted here
+        -- regardless of exit code to pick the project back up.
+        autocommands.startLspForBuffers(lspStoppedBufs)
+      end)
     end
+    local isAborted = false
+    local job_id
+    local function onExit(_, exit_code)
+      if isAborted then
+        -- skip: abort handler already closed window and notified
+      else
+        closeTerminal(_, exit_code)
+      end
+    end
+    if is_windows then
+      job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = onExit})
+    else
+      job_id = vim.fn.termopen({script, root}, {on_exit = onExit})
+    end
+    activeBuildJob = job_id
+    bindAbort(buf, win, job_id, function() isAborted = true end)
+    -- No startinsert: clean is non-interactive and the window closes itself
+    -- on completion — entering terminal-insert mode right before that close
+    -- fires (clean-build finishes in well under a second) leaves nvim stuck
+    -- in insert mode on whatever buffer remains, indistinguishable from a hang.
   end
-  if is_windows then
-    job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = onExit})
-  else
-    job_id = vim.fn.termopen({script, root}, {on_exit = onExit})
-  end
-  activeBuildJob = job_id
-  bindAbort(buf, win, job_id, function() isAborted = true end)
-  -- No startinsert: clean is non-interactive and the window closes itself
-  -- on completion — entering terminal-insert mode right before that close
-  -- fires (clean-build finishes in well under a second) leaves nvim stuck
-  -- in insert mode on whatever buffer remains, indistinguishable from a hang.
+
+  -- clean deletes the build directory clangd's index lives under — stop it
+  -- first (same rationale as runBuildInTerminal above) so the rm -rf isn't
+  -- racing an open file handle.
+  autocommands.stopLsp(spawnClean)
 end
 
 local function runCleanThenBuild()
   M.stopActiveBuildJob()
   local root = vim.fn.getcwd()
   local script = cleanScript()
-  vim.cmd('botright 20split')
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_set_current_buf(buf)
-  local win = vim.api.nvim_get_current_win()
-  local isAborted = false
-  local job_id
-  local function onExit(exit_code)
-    if isAborted then
-      -- skip: abort handler already closed window and notified
-    else
-      if exit_code == 0 then
-        vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
-        runBuildAndLaunch('Debug')
+  local autocommands = require('core.autocommands')
+
+  local function spawnClean(lspStoppedBufs)
+    vim.cmd('botright 20split')
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(buf)
+    local win = vim.api.nvim_get_current_win()
+    local isAborted = false
+    local job_id
+    local function onExit(exit_code)
+      if isAborted then
+        -- skip: abort handler already closed window and notified
       else
-        vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+        if exit_code == 0 then
+          vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
+          -- runBuildAndLaunch/buildFormat issues its own stopLsp/startLspForBuffers
+          -- pair around the build; clangd is already stopped here so that
+          -- call simply sees zero attached clients and proceeds straight to
+          -- the build, restarting clangd once it exits.
+          runBuildAndLaunch('Debug')
+        else
+          vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
+          -- No build follows a failed clean — restart clangd here instead,
+          -- otherwise it stays stopped indefinitely.
+          autocommands.startLspForBuffers(lspStoppedBufs)
+        end
       end
     end
+    if is_windows then
+      job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = function(_, exit_code)
+        onExit(exit_code)
+      end})
+    else
+      job_id = vim.fn.termopen({script, root})
+      vim.api.nvim_create_autocmd('TermClose', {
+        buffer = buf,
+        once = true,
+        callback = function()
+          onExit(vim.v.event.status)
+        end,
+      })
+    end
+    activeBuildJob = job_id
+    bindAbort(buf, win, job_id, function() isAborted = true end)
+    -- No startinsert: same reasoning as runCleanOnly — clean is non-interactive
+    -- and closes its own window on completion.
   end
-  if is_windows then
-    job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = function(_, exit_code)
-      onExit(exit_code)
-    end})
-  else
-    job_id = vim.fn.termopen({script, root})
-    vim.api.nvim_create_autocmd('TermClose', {
-      buffer = buf,
-      once = true,
-      callback = function()
-        onExit(vim.v.event.status)
-      end,
-    })
-  end
-  activeBuildJob = job_id
-  bindAbort(buf, win, job_id, function() isAborted = true end)
-  -- No startinsert: same reasoning as runCleanOnly — clean is non-interactive
-  -- and closes its own window on completion.
+
+  -- Same rationale as runCleanOnly: stop clangd before rm -rf touches the
+  -- build directory it has .cache/clangd/index open under.
+  autocommands.stopLsp(spawnClean)
 end
 
 -- Keymap-facing entry points. killDapThen composition lives here — lexicon
