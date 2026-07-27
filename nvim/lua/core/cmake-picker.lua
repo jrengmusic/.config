@@ -287,7 +287,9 @@ function M.files()
     return
   end
 
-  local clangd_synced = M.syncClangd()
+  -- Refresh the root CDB copy in case a build happened outside this nvim —
+  -- clangd picks the copy up itself (automaticReload); no LSP restart.
+  M.syncClangd()
 
   -- SSOT: Use EXACT same logic as generate_symlink_tree()
   local seen = {}
@@ -431,19 +433,6 @@ function M.files()
         picker:close()
         vim.schedule(function()
           require('lsp.header-source').closeNonTerminalOthers()
-          if clangd_synced then
-            for _, client in ipairs(vim.lsp.get_clients()) do
-              local bufs = vim.tbl_keys(client.attached_buffers)
-              client:stop()
-              for _, buf in ipairs(bufs) do
-                if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
-                  vim.defer_fn(function()
-                    vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
-                  end, 500)
-                end
-              end
-            end
-          end
           require('lsp.header-source').ensureCppHeaderLayout(item.file)
         end)
       end,
@@ -545,11 +534,6 @@ function M.open_explorer()
   end
 end
 
--- Regenerates the project's .clangd file from compile_commands.json.
--- Unconditionally writes on every call — see the write-site comment below
--- for why a content-diff gate is wrong here.
--- Returns (ok, changed): ok is false on failure; changed is true when the
--- written content differs from what was already on disk.
 -- Extract all compiler flags from the first source entry of a parsed
 -- compile_commands.json, formatted as .clangd's CompileFlags.Add lines.
 -- Exclude: compiler binary, -o <path>, -c, and the source file itself.
@@ -570,6 +554,14 @@ local function build_clangd_lines(data, db_dir)
         i = i + 1
       elseif t == src then
         i = i + 1
+      elseif t:find('^%-%-target=') or t == '-target' then
+        -- Never forward a target triple: CMake's Windows toolchain can emit
+        -- --target=AMD64-pc-windows-msvc, and LLVM triple parsing is
+        -- case-sensitive ('amd64' is a valid arch, 'AMD64' is not) —
+        -- CreateTargetInfo() returns null and every buffer dies with
+        -- "invalid AST". clangd infers the correct native triple from the
+        -- compiler binary on its own.
+        i = i + (t == '-target' and 2 or 1)
       elseif t:sub(1, 1) == '-' then
         local next = tokens[i + 1]
         local has_arg = next ~= nil
@@ -593,6 +585,10 @@ local function build_clangd_lines(data, db_dir)
   local lines = {
     'CompileFlags:',
     '  CompilationDatabase: ' .. db_dir,
+    -- Same rationale as the extraction skip above, applied to the CDB's own
+    -- commands: a poisoned --target inside compile_commands.json entries
+    -- would break those TUs directly, .clangd Add hygiene notwithstanding.
+    '  Remove: [--target=*]',
     '  Add:',
   }
   for _, flag in ipairs(flags) do
@@ -606,16 +602,28 @@ local function build_clangd_lines(data, db_dir)
   return lines
 end
 
--- Always write .clangd, even when content is unchanged: a clean rebuild
--- reconfigures and reproduces identical flags, but the underlying files
--- were deleted and recreated — clangd's diagnostics for already-open
--- buffers go stale regardless of whether the resulting .clangd text
--- matches. Writing unconditionally bumps .clangd's mtime every
--- reconfigure/build, which callers use as their own "did this change"
--- signal.
+-- Sync gives the compilation database a stable home at the project root:
+-- Builds/Ninja/<Scheme>/compile_commands.json is copied to
+-- <root>/compile_commands.json and .clangd's CompilationDatabase points at
+-- the root, never into Builds/. Two properties follow:
+--   1. clangd's index shards (.cache/clangd/index, stored adjacent to the
+--      CDB it serves) live outside the build tree — clean-build.sh's rm -rf
+--      of Builds/ no longer destroys the index or races clangd's open file
+--      handles, so clangd is never stopped or restarted for builds/cleans.
+--   2. clangd re-stats the CDB itself (compilationDatabase.automaticReload)
+--      and picks up a reconfigured copy on the next request — no LSP
+--      restart is needed after a reconfigure either.
+-- The copy is gated on the build CDB being newer than the root copy, so
+-- ordinary incremental builds (no reconfigure) sync nothing.
+-- Returns (ok, changed): ok is false when there is nothing to sync;
+-- changed is true when the root copy or .clangd content was updated.
 function M.syncClangd()
   local compile_db = M.find_compile_db()
   if compile_db == nil then return false, false end
+
+  local root = get_project_root()
+  local root_db = root .. '/compile_commands.json'
+  if vim.fn.getftime(compile_db) <= vim.fn.getftime(root_db) then return true, false end
 
   local data = parse_compile_db(compile_db)
   if data == nil then
@@ -623,27 +631,25 @@ function M.syncClangd()
     return false, false
   end
 
-  local root = get_project_root()
+  vim.fn.writefile(vim.fn.readfile(compile_db, 'b'), root_db, 'b')
+
   local clangd_path = root .. '/.clangd'
-  local db_dir = vim.fn.fnamemodify(compile_db, ':h')
-  local lines = build_clangd_lines(data, db_dir)
-
+  local lines = build_clangd_lines(data, root)
   local old_lines = vim.fn.filereadable(clangd_path) == 1 and vim.fn.readfile(clangd_path) or nil
-  local changed = old_lines == nil or table.concat(old_lines, '\n') ~= table.concat(lines, '\n')
-
-  vim.fn.writefile(lines, clangd_path)
-  return true, changed
+  if old_lines == nil or table.concat(old_lines, '\n') ~= table.concat(lines, '\n') then
+    vim.fn.writefile(lines, clangd_path)
+  end
+  return true, true
 end
 
 -- Async variant for the build-completion hot path (core/build.lua's
 -- on_exit): compile_commands.json for a JUCE+framework project is large
--- enough that vim.fn.readfile + vim.fn.json_decode on the main thread is a
--- perceptible stall right after every successful build. vim.uv.fs_* ops are
--- dispatched to libuv's threadpool for the actual disk I/O; only the
--- (fast, in-memory) JSON decode and flag extraction run on the main thread,
--- inside the vim.schedule_wrap'd completion callback where vim.fn/vim.api
--- are safe to call — same requirement as this file's other libuv callbacks
--- (see is_symlink_tree_stale's watcher, or the old debounce_timer usage).
+-- enough that main-thread disk I/O is a perceptible stall right after every
+-- successful build. The CDB copy runs entirely on libuv's threadpool via
+-- fs_copyfile; only the (fast, in-memory) JSON decode and flag extraction
+-- for .clangd generation run on the main thread, inside vim.schedule_wrap'd
+-- callbacks where vim.fn/vim.api are safe to call.
+-- Same root-copy semantics and mtime gate as M.syncClangd() above.
 -- onDone(ok, changed) mirrors M.syncClangd()'s return values.
 function M.syncClangdAsync(onDone)
   local compile_db = M.find_compile_db()
@@ -652,66 +658,81 @@ function M.syncClangdAsync(onDone)
     return
   end
 
-  vim.uv.fs_open(compile_db, 'r', 420, function(open_err, fd)
-    if open_err then
+  local root = get_project_root()
+  local root_db = root .. '/compile_commands.json'
+  if vim.fn.getftime(compile_db) <= vim.fn.getftime(root_db) then
+    if onDone then onDone(true, false) end
+    return
+  end
+
+  vim.uv.fs_copyfile(compile_db, root_db, function(copy_err)
+    if copy_err then
       vim.schedule(function()
-        vim.notify('syncClangd: open failed', vim.log.levels.WARN)
+        vim.notify('syncClangd: copy failed', vim.log.levels.ERROR)
         if onDone then onDone(false, false) end
       end)
       return
     end
-    vim.uv.fs_fstat(fd, function(stat_err, stat)
-      if stat_err then
-        vim.uv.fs_close(fd, function() end)
+    vim.uv.fs_open(compile_db, 'r', 420, function(open_err, fd)
+      if open_err then
         vim.schedule(function()
-          vim.notify('syncClangd: stat failed', vim.log.levels.WARN)
+          vim.notify('syncClangd: open failed', vim.log.levels.WARN)
           if onDone then onDone(false, false) end
         end)
         return
       end
-      vim.uv.fs_read(fd, stat.size, 0, function(read_err, raw)
-        vim.uv.fs_close(fd, function() end)
-        if read_err then
+      vim.uv.fs_fstat(fd, function(stat_err, stat)
+        if stat_err then
+          vim.uv.fs_close(fd, function() end)
           vim.schedule(function()
-            vim.notify('syncClangd: read failed', vim.log.levels.WARN)
+            vim.notify('syncClangd: stat failed', vim.log.levels.WARN)
             if onDone then onDone(false, false) end
           end)
           return
         end
-        vim.schedule(function()
-          local ok, data = pcall(vim.json.decode, raw)
-          if not ok or data == nil then
-            vim.notify('syncClangd: parse failed', vim.log.levels.WARN)
-            if onDone then onDone(false, false) end
+        vim.uv.fs_read(fd, stat.size, 0, function(read_err, raw)
+          vim.uv.fs_close(fd, function() end)
+          if read_err then
+            vim.schedule(function()
+              vim.notify('syncClangd: read failed', vim.log.levels.WARN)
+              if onDone then onDone(false, false) end
+            end)
             return
           end
-
-          local root = get_project_root()
-          local clangd_path = root .. '/.clangd'
-          local db_dir = vim.fn.fnamemodify(compile_db, ':h')
-          local lines = build_clangd_lines(data, db_dir)
-          local content = table.concat(lines, '\n') .. '\n'
-
-          local old_lines = vim.fn.filereadable(clangd_path) == 1 and vim.fn.readfile(clangd_path) or nil
-          local changed = old_lines == nil or table.concat(old_lines, '\n') ~= table.concat(lines, '\n')
-
-          vim.uv.fs_open(clangd_path, 'w', 420, function(werr, wfd)
-            if werr then
-              vim.schedule(function()
-                vim.notify('syncClangd: write open failed', vim.log.levels.ERROR)
-                if onDone then onDone(false, false) end
-              end)
+          vim.schedule(function()
+            local ok, data = pcall(vim.json.decode, raw)
+            if not ok or data == nil then
+              vim.notify('syncClangd: parse failed', vim.log.levels.WARN)
+              if onDone then onDone(false, false) end
               return
             end
-            vim.uv.fs_write(wfd, content, 0, function(write_err)
-              vim.uv.fs_close(wfd, function() end)
-              vim.schedule(function()
-                if write_err then
-                  vim.notify('syncClangd: write failed', vim.log.levels.ERROR)
+
+            local clangd_path = root .. '/.clangd'
+            local lines = build_clangd_lines(data, root)
+            local old_lines = vim.fn.filereadable(clangd_path) == 1 and vim.fn.readfile(clangd_path) or nil
+            if old_lines ~= nil and table.concat(old_lines, '\n') == table.concat(lines, '\n') then
+              if onDone then onDone(true, true) end
+              return
+            end
+            local content = table.concat(lines, '\n') .. '\n'
+            vim.uv.fs_open(clangd_path, 'w', 420, function(werr, wfd)
+              if werr then
+                vim.schedule(function()
+                  vim.notify('syncClangd: write open failed', vim.log.levels.ERROR)
                   if onDone then onDone(false, false) end
-                  return
-                end
-                if onDone then onDone(true, changed) end
+                end)
+                return
+              end
+              vim.uv.fs_write(wfd, content, 0, function(write_err)
+                vim.uv.fs_close(wfd, function() end)
+                vim.schedule(function()
+                  if write_err then
+                    vim.notify('syncClangd: write failed', vim.log.levels.ERROR)
+                    if onDone then onDone(false, false) end
+                    return
+                  end
+                  if onDone then onDone(true, true) end
+                end)
               end)
             end)
           end)

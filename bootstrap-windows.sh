@@ -440,8 +440,9 @@ step "9. Neovim Mason tools"
 echo "After launching nvim, Mason will auto-install all LSP servers."
 echo ""
 echo "Notes:"
-echo "  - Do NOT install clangd via Mason (it's a .cmd wrapper, won't work)"
-echo "  - System clangd from LLVM.LLVM is used automatically"
+echo "  - clangd comes from Mason on all platforms; nvim resolves the real"
+echo "    clangd.exe inside mason/packages (the mason/bin .cmd shim is not"
+echo "    spawnable directly) — see lua/lsp/clangd.lua"
 echo "  - Do NOT install cmake-language-server via Mason (requires python <3.14,"
 echo "    but MSYS2 ships 3.14+). It was installed via pipx in step 4d instead."
 echo "  - DAP adapter: codelldb on macOS, whatdbg on Windows"
@@ -565,16 +566,12 @@ cat << 'EOF'
 The following should be installed via winget or manually:
 
   winget install Neovim.Neovim
-  winget install LLVM.LLVM            # clangd (LSP)
   winget install GoLang.Go
   winget install oven-sh.Bun
   winget install Git.Git
   winget install aristocratos.btop4win    # x64-only, runs under emulation on ARM64
   winget install Microsoft.VisualStudio.2022.Community
     (with "Desktop development with C++" workload)
-
-LLVM provides:
-  - clangd: LSP server (Mason's clangd is .cmd on Windows, won't work)
 
 Visual Studio provides:
   - cl.exe: MSVC compiler (produces PDB debug symbols)

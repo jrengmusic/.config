@@ -51,7 +51,17 @@ fi
 echo "=========================================="
 echo "Building $TARGET ($SCHEME)..."
 echo "=========================================="
-BUILD_JOBS=$(( $(sysctl -n hw.ncpu) / 2 ))
+# Memory-aware parallelism: jobs = min(cores/2, (RAM_GB - reserve) / per-job).
+# Same formula as build-debug.bat — see the rationale comment there. On
+# machines with ample RAM this resolves to cores/2 unchanged.
+RAM_RESERVE_GB=3
+RAM_PER_JOB_GB=1
+HALF_CORES=$(( $(sysctl -n hw.ncpu) / 2 ))
+TOTAL_RAM_GB=$(( $(sysctl -n hw.memsize) / 1073741824 ))
+RAM_JOBS=$(( (TOTAL_RAM_GB - RAM_RESERVE_GB) / RAM_PER_JOB_GB ))
+[ "$RAM_JOBS" -lt 1 ] && RAM_JOBS=1
+BUILD_JOBS=$(( RAM_JOBS < HALF_CORES ? RAM_JOBS : HALF_CORES ))
+echo "Parallel jobs: $BUILD_JOBS (cores/2=$HALF_CORES, ram-capped=$RAM_JOBS)"
 JAM_NOTARIZE=$( [ "$NO_NOTARIZE" -eq 1 ] && echo OFF || echo ON ) cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" --parallel "$BUILD_JOBS" 2>&1 | cat
 
 echo "=========================================="

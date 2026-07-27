@@ -3,9 +3,16 @@
 -- core/keymaps.lua (generated from nvim/doc/KEYMAPS.md; rows reference
 -- these as @build.*).
 --
--- No module-level require('dap'): stopActiveBuildJob() is called from
--- VimLeavePre (core/autocommands.lua) and must not force-load the lazy
--- dap plugin at quit time. All dap/dapui requires stay inside functions.
+-- All job spawning/stopping goes through core/traffic.lua — the SSOT state
+-- machine that enforces one active build/clean job per session. This module
+-- owns only the UI around those jobs (plain log windows fed by traffic's
+-- batched onLines — see openLogWindow — notifications, DAP launch
+-- sequencing).
+--
+-- clangd is never touched here: its CDB and index shards live at the
+-- project root, outside Builds/ (see core/cmake-picker.syncClangd), so
+-- builds and cleans neither contend with its file handles nor require an
+-- LSP restart — clangd hot-reloads a reconfigured CDB on its own.
 --
 -- Runtime buffer-local keymaps spawned by behavior (bindAbort's terminal
 -- <Esc>, the build-failure q-to-close) live here by design — the lexicon
@@ -24,22 +31,24 @@ local function buildScript() return vim.fn.stdpath('config') .. (is_windows and 
 local function cleanScript() return toMsys(vim.fn.stdpath('config') .. '/scripts/clean-build.sh') end
 
 local DAP_TERMINATE_GRACE_MS = 200
+-- The freshly launched Standalone process is not always visible to the
+-- OS process query on the first attempt — poll until it appears.
+local PID_CAPTURE_RETRY_MS = 500
+local PID_CAPTURE_MAX_ATTEMPTS = 10
+
+-- Both compiler dialects the build scripts produce: MSVC's
+-- 'file(line): error C1234: msg' and clang/gcc's 'file:line:col: error: msg'.
+-- %t consumes the leading letter as the entry type (e/w).
+local BUILD_ERRORFORMAT = table.concat({
+  [[%f(%l): %trror %m]],
+  [[%f(%l): %tarning %m]],
+  [[%f:%l:%c: %trror: %m]],
+  [[%f:%l:%c: %tarning: %m]],
+}, ',')
 local BUILD_GUARD_LISTENER_KEY = 'build_guard'
 local STANDALONE_PID_LISTENER_KEY = 'standalone_pid_capture'
 
--- Single-flight guard shared by every build/clean job spawn site — stops
--- whatever build/clean job is still running before starting a new one, so
--- two Ninja invocations never race on the same build directory. jobstop on
--- an already-exited id is a documented no-op (same pattern bindAbort uses).
-local activeBuildJob = nil
 local standalonePid = nil
-
-function M.stopActiveBuildJob()
-  if activeBuildJob then
-    vim.fn.jobstop(activeBuildJob)
-    activeBuildJob = nil
-  end
-end
 
 -- Registers the launch listener that captures the Standalone app's PID so
 -- terminate can kill it. Called from dap/dapui_config.setup() at dap load
@@ -55,18 +64,44 @@ function M.registerDapListeners()
       local program = session.config and session.config.program
       if program then
         vim.defer_fn(function()
+          -- Async capture: the powershell CIM query takes seconds to cold
+          -- start — vim.fn.system here blocked the main loop for its whole
+          -- duration (measured 3s), right after every Standalone launch.
+          -- Polled: one shot at +500ms returned nothing (measured pid=nil,
+          -- process not yet queryable), leaving Esc-terminate unable to
+          -- kill the app.
+          local function capturePid(cmd)
+            local attempts = 0
+            local function attempt()
+              attempts = attempts + 1
+              vim.fn.jobstart(cmd, {
+                stdout_buffered = true,
+                on_stdout = function(_, data)
+                  local pid = tonumber(vim.trim(table.concat(data, '\n')))
+                  if pid then
+                    standalonePid = pid
+                  elseif attempts < PID_CAPTURE_MAX_ATTEMPTS then
+                    vim.defer_fn(attempt, PID_CAPTURE_RETRY_MS)
+                  end
+                end,
+              })
+            end
+            attempt()
+          end
           if is_windows then
-            local result = vim.fn.system({
+            -- Match by process name, not path: a WQL ExecutablePath filter
+            -- compares literal strings, and the DAP config's forward-slash
+            -- path never equals Win32's backslash ExecutablePath — the
+            -- old query could not match anything.
+            capturePid({
               'powershell', '-NoProfile', '-Command',
               string.format(
-                "Get-CimInstance Win32_Process -Filter \"ExecutablePath='%s'\" | Select-Object -ExpandProperty ProcessId",
-                program
+                "(Get-Process -Name '%s' -ErrorAction SilentlyContinue | Select-Object -First 1).Id",
+                vim.fn.fnamemodify(program, ':t:r')
               ),
             })
-            standalonePid = tonumber(vim.trim(result))
           else
-            local result = vim.fn.system('pgrep -f "' .. program .. '"')
-            standalonePid = tonumber(vim.trim(result))
+            capturePid('pgrep -f "' .. program .. '"')
           end
         end, 500)
       end
@@ -132,15 +167,58 @@ local function killDapThen(continuation)
   end
 end
 
-local function bindAbort(term_buf, term_win, job_id, onAbort)
-  vim.keymap.set('t', '<Esc>', function()
-    onAbort()
-    vim.fn.jobstop(job_id)
-    if vim.api.nvim_win_is_valid(term_win) then
-      vim.api.nvim_win_close(term_win, true)
+-- traffic.stop() both kills the job and clears its identity, so the job's
+-- exit callback never runs — the machine-level replacement for the old
+-- per-site isAborted flags. Normal-mode mapping: the log window is a plain
+-- buffer, not a terminal.
+local function bindAbort(log_buf, log_win)
+  vim.keymap.set('n', '<Esc>', function()
+    require('core.traffic').stop()
+    if vim.api.nvim_win_is_valid(log_win) then
+      vim.api.nvim_win_close(log_win, true)
     end
     vim.notify('Aborted', vim.log.levels.WARN)
-  end, { buffer = term_buf, nowait = true })
+  end, { buffer = log_buf, nowait = true })
+end
+
+-- Opens the build/clean log window: a plain scratch buffer that traffic's
+-- onLines batch-appends into — no terminal emulation, so an output burst
+-- costs one buffer append per flush tick instead of per-chunk vterm
+-- processing and redraws (the measured multi-second stall source).
+-- Closes any previous build-log window and any terminal window first,
+-- same single-output-window behavior the terminal splits had.
+-- Returns buf, win, and the appendLines handler for traffic.spawn.
+local function openLogWindow(height)
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local b = vim.api.nvim_win_get_buf(win)
+    if vim.bo[b].buftype == 'terminal' or vim.b[b].build_log then
+      vim.api.nvim_win_close(win, true)
+    end
+  end
+  vim.cmd('botright ' .. height .. 'split')
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(buf)
+  local win = vim.api.nvim_get_current_win()
+  vim.b[buf].build_log = true
+  vim.bo[buf].bufhidden = 'wipe'
+  -- Compile command lines are thousands of characters — wrapped they turn
+  -- the log into unnavigable multi-screen blocks (the PTY used to hard-chop
+  -- them at terminal width).
+  vim.wo[win].wrap = false
+  -- Validity guards are load-bearing: the job keeps running if the user
+  -- closes the log window mid-build (bufhidden=wipe kills the buffer), and
+  -- late flush ticks from an aborted job may still arrive — both are
+  -- expected states, not errors. Tail-follow only while the window still
+  -- shows this buffer.
+  local function appendLines(batch)
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_set_lines(buf, -1, -1, false, batch)
+      if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+        vim.api.nvim_win_set_cursor(win, { vim.api.nvim_buf_line_count(buf), 0 })
+      end
+    end
+  end
+  return buf, win, appendLines
 end
 
 -- buildFormat resolves the DAW/plugin format, builds it, and hands the
@@ -162,18 +240,9 @@ local function buildFormat(scheme, onBuilt)
     return compile_db ~= nil and vim.fn.getftime(compile_db) or -1
   end
 
-  local function runBuildInTerminal(args, onSuccess)
-    M.stopActiveBuildJob()
-    for _, win in ipairs(vim.api.nvim_list_wins()) do
-      local buf = vim.api.nvim_win_get_buf(win)
-      if vim.bo[buf].buftype == 'terminal' then
-        vim.api.nvim_win_close(win, true)
-      end
-    end
-    vim.cmd('botright 15split')
-    local term_buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_set_current_buf(term_buf)
-    local term_win = vim.api.nvim_get_current_win()
+  local function runBuildJob(args, onSuccess)
+    local traffic = require('core.traffic')
+    local log_buf, log_win, appendLines = openLogWindow(15)
     -- Captured before the job spawns: build-debug.{bat,sh} only reconfigures
     -- (regenerating compile_commands.json) when CMakeCache.txt/build.ninja
     -- are absent — an ordinary incremental build leaves it untouched. Since
@@ -182,90 +251,58 @@ local function buildFormat(scheme, onBuilt)
     -- starts, whether that compilation goes on to succeed or fail.
     local mtimeBefore = compileDbMtime()
 
-    -- clangd's --background-index threads (lsp/clangd.lua) and ninja's own
-    -- --parallel compiler jobs (build-debug.{bat,sh}) are uncoordinated —
-    -- both compete for the same cores at once, which is what actually makes
-    -- the editor sluggish during a build (the build process itself is
-    -- already async via jobstart/termopen below; this is CPU contention,
-    -- not an event-loop block). Stopping clangd for the build's duration
-    -- hands the compiler the full core count; stopLsp/startLspForBuffers
-    -- (core/autocommands.lua) resumes it once the build actually exits.
-    -- lspStoppedBufs/buildExited: stopLsp and the job's on_exit complete in
-    -- either order (a trivial build with clangd already idle can finish
-    -- stopping before the job even starts) — resumeLsp only proceeds once
-    -- both have landed.
-    local lspStoppedBufs = nil
-    local buildExited = false
-    local autocommands = require('core.autocommands')
-
-    local function resumeLsp()
-      if lspStoppedBufs == nil or not buildExited then return end
-      -- Runs on both success and failure: a failing compile after a clean
-      -- rebuild still reconfigured (fresh compile_commands.json, deleted and
-      -- recreated generated headers) before the first file ever failed to
-      -- compile — clangd needs the resync regardless of whether compilation
-      -- itself succeeded. Gating on exit_code alone left clangd stale after
-      -- exactly that case. Conversely, an ordinary incremental build (no
-      -- reconfigure) leaves compileDbMtime() unchanged, so this skips the
-      -- resync — avoiding pointless work — but LSP is restarted either way,
-      -- since it was unconditionally stopped above.
-      if compileDbMtime() ~= mtimeBefore then
-        require('core.cmake-picker').syncClangdAsync(function()
-          autocommands.startLspForBuffers(lspStoppedBufs)
-        end)
-      else
-        autocommands.startLspForBuffers(lspStoppedBufs)
-      end
-    end
-
-    autocommands.stopLsp(function(bufs)
-      lspStoppedBufs = bufs
-      resumeLsp()
-    end)
-
     local function on_exit(exit_code)
-      buildExited = true
-      resumeLsp()
+      -- Runs on both success and failure: a failing compile after a clean
+      -- rebuild still reconfigured (fresh compile_commands.json) before the
+      -- first file ever failed to compile — the root CDB copy needs the
+      -- refresh regardless of whether compilation itself succeeded. An
+      -- ordinary incremental build (no reconfigure) leaves compileDbMtime()
+      -- unchanged and syncs nothing. clangd notices the refreshed copy by
+      -- itself (compilationDatabase.automaticReload) — no LSP restart.
+      if compileDbMtime() ~= mtimeBefore then
+        require('core.cmake-picker').syncClangdAsync()
+      end
       if exit_code == 0 then
-        if vim.api.nvim_win_is_valid(term_win) then
-          vim.api.nvim_win_close(term_win, true)
+        if vim.api.nvim_win_is_valid(log_win) then
+          vim.api.nvim_win_close(log_win, true)
         end
         onSuccess()
       else
-        vim.bo[term_buf].modifiable = false
-        vim.cmd('stopinsert')
-        vim.notify('Build failed (exit ' .. exit_code .. ') — press q to close', vim.log.levels.ERROR)
-        vim.keymap.set('n', 'q', function()
-          if vim.api.nvim_win_is_valid(term_win) then
-            vim.api.nvim_win_close(term_win, true)
+        -- Highlights applied once, to a now-static buffer — never during
+        -- the live scroll (see openLogWindow).
+        if vim.api.nvim_buf_is_valid(log_buf) then
+          vim.bo[log_buf].modifiable = false
+          require('core.autocommands').applyOutputHighlights(log_buf)
+          vim.keymap.set('n', 'q', function()
+            if vim.api.nvim_win_is_valid(log_win) then
+              vim.api.nvim_win_close(log_win, true)
+            end
+          end, { buffer = log_buf, nowait = true })
+          -- Errors → quickfix, cursor lands on the first failing source
+          -- line (never inside the log window — that would swap the log
+          -- buffer out from under itself). :cn/:cp walk the rest.
+          vim.fn.setqflist({}, ' ', {
+            title = 'Build',
+            lines = vim.api.nvim_buf_get_lines(log_buf, 0, -1, false),
+            efm = BUILD_ERRORFORMAT,
+          })
+          local hasError = false
+          for _, item in ipairs(vim.fn.getqflist()) do
+            if item.valid == 1 then hasError = true end
           end
-        end, { buffer = term_buf, nowait = true })
+          if hasError then
+            if vim.api.nvim_get_current_win() == log_win then
+              vim.cmd('wincmd p')
+            end
+            vim.cmd('cfirst')
+          end
+        end
+        vim.notify('Build failed (exit ' .. exit_code .. ') — press q to close', vim.log.levels.ERROR)
       end
     end
-    local isAborted = false
-    local job_id
-    if is_windows then
-      job_id = vim.fn.jobstart(args, {term = true, on_exit = function(_, exit_code)
-        if isAborted then
-        else
-          on_exit(exit_code)
-        end
-      end})
-    else
-      job_id = vim.fn.termopen(args)
-      vim.api.nvim_create_autocmd('TermClose', {
-        buffer = term_buf, once = true,
-        callback = function()
-          if isAborted then
-          else
-            on_exit(vim.v.event.status)
-          end
-        end,
-      })
-    end
-    activeBuildJob = job_id
-    bindAbort(term_buf, term_win, job_id, function() isAborted = true end)
-    vim.cmd('startinsert')
+
+    traffic.spawn(traffic.STATE.BUILDING, args, { onLines = appendLines, onExit = on_exit })
+    bindAbort(log_buf, log_win)
   end
 
   local function args_base(format)
@@ -278,7 +315,7 @@ local function buildFormat(scheme, onBuilt)
   -- value alone. No project-type branch — Standalone/App-derived builds
   -- and DAW-paired plugin formats both flow through the same dispatch.
   local function go(cfg)
-    runBuildInTerminal(args_base(cfg.format), function() onBuilt(cfg) end)
+    runBuildJob(args_base(cfg.format), function() onBuilt(cfg) end)
   end
   local config = dapConfig.loadDawConfig(function(cfg) if cfg then go(cfg) end end)
   if config then go(config) end
@@ -329,123 +366,49 @@ local function runBuildOnly(scheme)
   end)
 end
 
+-- clean-build.sh removes only the Builds tree. clangd's CDB and index
+-- shards live at the project root (core/cmake-picker.syncClangd), so the
+-- rm -rf neither destroys the index nor races clangd's open file handles —
+-- clangd keeps running untouched through a clean.
 local function runCleanOnly()
-  M.stopActiveBuildJob()
+  local traffic = require('core.traffic')
   local root = vim.fn.getcwd()
   local script = cleanScript()
-  local autocommands = require('core.autocommands')
 
-  local function spawnClean(lspStoppedBufs)
-    vim.cmd('botright 20split')
-    local buf = vim.api.nvim_create_buf(false, true)
-    local win = vim.api.nvim_get_current_win()
-    vim.api.nvim_set_current_buf(buf)
-    local function closeTerminal(_, exit_code)
-      vim.schedule(function()
-        if vim.api.nvim_win_is_valid(win) then
-          vim.api.nvim_win_close(win, true)
-        end
-        if exit_code == 0 then
-          vim.notify('Clean succeeded', vim.log.levels.INFO)
-        else
-          vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
-        end
-        -- Force a redraw: closing a ConPTY-backed (term=true) terminal window
-        -- on Windows can leave stale screen content until the next redraw —
-        -- the job/window are genuinely done (confirmed via instrumentation),
-        -- but the display doesn't reflect it without this.
-        vim.cmd('redraw')
-        -- clean-build.sh removes the whole Builds tree, including
-        -- .cache/clangd/index — clangd was stopped above to release its
-        -- handle on that directory (rm -rf fails with "Directory not
-        -- empty" on Windows otherwise), so it must be restarted here
-        -- regardless of exit code to pick the project back up.
-        autocommands.startLspForBuffers(lspStoppedBufs)
-      end)
+  local log_buf, log_win, appendLines = openLogWindow(20)
+  local function on_exit(exit_code)
+    if vim.api.nvim_win_is_valid(log_win) then
+      vim.api.nvim_win_close(log_win, true)
     end
-    local isAborted = false
-    local job_id
-    local function onExit(_, exit_code)
-      if isAborted then
-        -- skip: abort handler already closed window and notified
-      else
-        closeTerminal(_, exit_code)
-      end
-    end
-    if is_windows then
-      job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = onExit})
+    if exit_code == 0 then
+      vim.notify('Clean succeeded', vim.log.levels.INFO)
     else
-      job_id = vim.fn.termopen({script, root}, {on_exit = onExit})
+      vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
     end
-    activeBuildJob = job_id
-    bindAbort(buf, win, job_id, function() isAborted = true end)
-    -- No startinsert: clean is non-interactive and the window closes itself
-    -- on completion — entering terminal-insert mode right before that close
-    -- fires (clean-build finishes in well under a second) leaves nvim stuck
-    -- in insert mode on whatever buffer remains, indistinguishable from a hang.
   end
-
-  -- clean deletes the build directory clangd's index lives under — stop it
-  -- first (same rationale as runBuildInTerminal above) so the rm -rf isn't
-  -- racing an open file handle.
-  autocommands.stopLsp(spawnClean)
+  local cmd = is_windows and { 'bash', script, toMsys(root) } or { script, root }
+  traffic.spawn(traffic.STATE.CLEANING, cmd, { onLines = appendLines, onExit = on_exit })
+  bindAbort(log_buf, log_win)
 end
 
 local function runCleanThenBuild()
-  M.stopActiveBuildJob()
+  local traffic = require('core.traffic')
   local root = vim.fn.getcwd()
   local script = cleanScript()
-  local autocommands = require('core.autocommands')
 
-  local function spawnClean(lspStoppedBufs)
-    vim.cmd('botright 20split')
-    local buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_set_current_buf(buf)
-    local win = vim.api.nvim_get_current_win()
-    local isAborted = false
-    local job_id
-    local function onExit(exit_code)
-      if isAborted then
-        -- skip: abort handler already closed window and notified
-      else
-        if exit_code == 0 then
-          vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
-          -- runBuildAndLaunch/buildFormat issues its own stopLsp/startLspForBuffers
-          -- pair around the build; clangd is already stopped here so that
-          -- call simply sees zero attached clients and proceeds straight to
-          -- the build, restarting clangd once it exits.
-          runBuildAndLaunch('Debug')
-        else
-          vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
-          -- No build follows a failed clean — restart clangd here instead,
-          -- otherwise it stays stopped indefinitely.
-          autocommands.startLspForBuffers(lspStoppedBufs)
-        end
-      end
-    end
-    if is_windows then
-      job_id = vim.fn.jobstart({'bash', script, toMsys(root)}, {term = true, on_exit = function(_, exit_code)
-        onExit(exit_code)
-      end})
+  local log_buf, log_win, appendLines = openLogWindow(20)
+  local function on_exit(exit_code)
+    if exit_code == 0 then
+      vim.notify('Clean succeeded, running build...', vim.log.levels.INFO)
+      -- runBuildJob's openLogWindow closes this clean log window itself.
+      runBuildAndLaunch('Debug')
     else
-      job_id = vim.fn.termopen({script, root})
-      vim.api.nvim_create_autocmd('TermClose', {
-        buffer = buf,
-        once = true,
-        callback = function()
-          onExit(vim.v.event.status)
-        end,
-      })
+      vim.notify('Clean failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
     end
-    activeBuildJob = job_id
-    bindAbort(buf, win, job_id, function() isAborted = true end)
-    -- No startinsert: same reasoning as runCleanOnly — clean is non-interactive
-    -- and closes its own window on completion.
   end
-
-  -- Same rationale as runCleanOnly: stop clangd before rm -rf touches the
-  -- build directory it has .cache/clangd/index open under.
-  autocommands.stopLsp(spawnClean)
+  local cmd = is_windows and { 'bash', script, toMsys(root) } or { script, root }
+  traffic.spawn(traffic.STATE.CLEANING, cmd, { onLines = appendLines, onExit = on_exit })
+  bindAbort(log_buf, log_win)
 end
 
 -- Keymap-facing entry points. killDapThen composition lives here — lexicon

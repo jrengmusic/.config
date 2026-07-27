@@ -71,8 +71,23 @@ if not defined TARGET (
 echo ==========================================
 echo Building %TARGET% (%SCHEME%)...
 echo ==========================================
+:: Memory-aware parallelism: jobs = min(cores/2, (RAM_GB - reserve) / per-job).
+:: A JUCE debug TU peaks around 1GB per cl.exe instance; the reserve covers
+:: OS + nvim + clangd + a running app/DAW. On a low-RAM machine cores/2
+:: alone overcommits physical memory - the OS then evicts the editor's
+:: working set and every page-in contends with link.exe's PDB writes
+:: (measured: nvim RSS 41MB -> 12MB, 23k page faults, 6.9s UI stalls).
+:: Fewer non-thrashing jobs beat more thrashing ones in wall-clock too.
+set RAM_RESERVE_GB=3
+set RAM_PER_JOB_GB=1
 set /a HALF_CORES=%NUMBER_OF_PROCESSORS%/2
-cmake --build "%BUILD_DIR%" --config %SCHEME% --target %TARGET% --parallel %HALF_CORES%
+for /f %%m in ('powershell -NoProfile -Command "[math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)"') do set TOTAL_RAM_GB=%%m
+set /a RAM_JOBS=(%TOTAL_RAM_GB%-%RAM_RESERVE_GB%)/%RAM_PER_JOB_GB%
+if %RAM_JOBS% lss 1 set RAM_JOBS=1
+set BUILD_JOBS=%HALF_CORES%
+if %RAM_JOBS% lss %HALF_CORES% set BUILD_JOBS=%RAM_JOBS%
+echo Parallel jobs: %BUILD_JOBS% (cores/2=%HALF_CORES%, ram-capped=%RAM_JOBS%)
+cmake --build "%BUILD_DIR%" --config %SCHEME% --target %TARGET% --parallel %BUILD_JOBS%
 if errorlevel 1 ( echo Build FAILED & exit /b 1 )
 
 echo ==========================================

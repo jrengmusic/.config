@@ -2,7 +2,6 @@
 local M = {}
 
 local DOXYGEN_WATCH_DEBOUNCE_MS = 300000
-local LSP_STOP_TIMEOUT_MS = 5000
 
 -- Nvim mirrors every LSP client's stderr into stdpath('log')/lsp.log at
 -- ERROR severity with no rotation (vim/lsp/log.lua). clangd's own stderr
@@ -13,142 +12,6 @@ local function truncateLspLog()
   if vim.fn.filereadable(log_path) == 1 then
     vim.fn.writefile({}, log_path)
   end
-end
-
--- Calls onIdle once client has no in-flight $/progress work (e.g. clangd's
--- background-indexing). client.progress.pending is a token->title table,
--- populated on a "begin" progress event and cleared on "end"
--- (vim/lsp/handlers.lua) — emptiness is the standard LSP signal for "no
--- work in progress", not a clangd-specific parse. Killing a client mid-index
--- doesn't corrupt anything (the next spawn re-indexes from scratch either
--- way), but doing it while idle avoids compounding wasted index work across
--- several .clangd rewrites landing in quick succession from one reconfigure.
-local function onClientIdle(client, onIdle)
-  if vim.tbl_isempty(client.progress.pending) then
-    onIdle()
-    return
-  end
-  local clientId = client.id
-  vim.api.nvim_create_autocmd('LspProgress', {
-    pattern = 'end',
-    callback = function(event)
-      if event.data.client_id ~= clientId then return end
-      local c = vim.lsp.get_client_by_id(clientId)
-      if c == nil or vim.tbl_isempty(c.progress.pending) then
-        onIdle()
-        return true
-      end
-    end,
-  })
-end
-
--- Client ids currently mid-restart (onClientIdle armed or client:stop()
--- already called for them). watchClangdConfig's debounce timer can invoke
--- refreshLsp again while a previous call is still waiting on the same
--- still-alive client — without this guard that registers a second
--- LspProgress/LspDetach waiter pair for the same clientId, so the eventual
--- exit fires both, double-triggering FileType and client:stop(). Same
--- single-flight precedent as doxygen.lua's active_job_id.
-local restartingClients = {}
-
--- Calls onGone once clientId is fully gone from vim.lsp.client._all (the
--- same table vim.lsp.get_client_by_id / get_clients read). LspDetach fires
--- from inside Client:_on_detach (vim/lsp/client.lua) *before* that removal
--- — attached_buffers[bufnr] isn't cleared until after the autocmd dispatch
--- returns, and the client's entry in _all is cleared even later, in a
--- nested vim.schedule inside _on_exit ("so it exists in the execution of
--- autocommands", per that function's own comment). Firing FileType inside
--- the LspDetach callback itself therefore retriggers LSP autostart while
--- the dying client is still visible to vim.lsp.get_clients() (which does
--- not filter by is_stopped()), a state a fresh nvim start never has.
--- Polling get_client_by_id ties the retrigger to that removal directly
--- instead of guessing how many scheduler ticks it takes.
-local CLIENT_GONE_POLL_MS = 50
-
-local function waitForClientGone(clientId, onGone)
-  if vim.lsp.get_client_by_id(clientId) == nil then
-    onGone()
-    return
-  end
-  vim.defer_fn(function() waitForClientGone(clientId, onGone) end, CLIENT_GONE_POLL_MS)
-end
-
--- Stops every attached LSP client and calls onStopped(allBufs) once every
--- one of them is confirmed fully gone (allBufs is the union of buffers all
--- stopped clients were attached to — the list startLspForBuffers needs to
--- bring LSP back later).
---
--- client:stop() is asynchronous — it sends a shutdown request and the
--- client only actually dies later, once the server process exits. Waiting
--- on LspDetach (fired only after that real exit) instead of a fixed delay
--- means a subsequent restart never races the old one's teardown. A bounded
--- force-stop timeout is required: clients default to exit_timeout=false
--- (no escalation), so a server that never answers "shutdown" — e.g.
--- clangd deferring it while background-indexing — would otherwise stall
--- LspDetach forever. onClientIdle additionally holds off the stop itself
--- until the client's current background work has settled.
-local function stopLsp(onStopped)
-  local clients = vim.lsp.get_clients()
-  local pending = #clients
-  local allBufs = {}
-  if pending == 0 then
-    onStopped(allBufs)
-    return
-  end
-  for _, client in ipairs(clients) do
-    local clientId = client.id
-    if restartingClients[clientId] then
-      pending = pending - 1
-      if pending == 0 then onStopped(allBufs) end
-    else
-      restartingClients[clientId] = true
-      local bufs = vim.tbl_keys(client.attached_buffers)
-      vim.list_extend(allBufs, bufs)
-      onClientIdle(client, function()
-        local lastBuf = bufs[#bufs]
-        if lastBuf == nil then
-          restartingClients[clientId] = nil
-          pending = pending - 1
-          if pending == 0 then onStopped(allBufs) end
-        else
-          vim.api.nvim_create_autocmd('LspDetach', {
-            buffer = lastBuf,
-            callback = function(event)
-              if event.data.client_id == clientId then
-                waitForClientGone(clientId, function()
-                  restartingClients[clientId] = nil
-                  pending = pending - 1
-                  if pending == 0 then onStopped(allBufs) end
-                end)
-                return true
-              end
-            end,
-          })
-        end
-        client:stop(LSP_STOP_TIMEOUT_MS)
-      end)
-    end
-  end
-end
-
--- Re-triggers LSP autostart (FileType) on each given buffer — the second
--- half of a stopLsp(...) call. Split out so build.lua can stop clangd
--- before spawning a build (freeing its indexing threads' CPU share for the
--- compiler) and bring it back only once the build has actually exited.
-local function startLspForBuffers(bufs)
-  for _, buf in ipairs(bufs) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
-      local saved = vim.api.nvim_get_current_buf()
-      vim.api.nvim_set_current_buf(buf)
-      vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
-      vim.api.nvim_set_current_buf(saved)
-    end
-  end
-end
-
--- Convenience: full stop-then-restart of every attached client.
-local function refreshLsp()
-  stopLsp(startLspForBuffers)
 end
 
 -- Watches the same source trees build_incremental checks for staleness
@@ -200,12 +63,12 @@ end
 function M.setup()
   truncateLspLog()
 
-  -- Sync .clangd from compile_commands.json on startup (covers a build that
+  -- Sync the root CDB copy + .clangd on startup (covers a build that
   -- happened while nvim was closed), then arm the doxygen source-tree
-  -- watcher. Build-triggered .clangd sync + LSP restart is wired directly
-  -- into core/build.lua's on_exit (deterministic: the build process itself
-  -- signals completion) — no filesystem-quiet-guessing watcher; see
-  -- build.lua's on_exit for rationale.
+  -- watcher. Build-triggered sync is wired directly into core/build.lua's
+  -- on_exit (deterministic: the build process itself signals completion).
+  -- clangd itself is never restarted for any of this — it hot-reloads the
+  -- root CDB copy on its own (see core/cmake-picker.syncClangd).
   vim.api.nvim_create_autocmd('VimEnter', {
     once = true,
     callback = function()
@@ -227,7 +90,7 @@ function M.setup()
   vim.api.nvim_create_autocmd('VimLeavePre', {
     once = true,
     callback = function()
-      require('core.build').stopActiveBuildJob()
+      require('core.traffic').stop()
       require('core.doxygen').stop_active_job()
     end,
     desc = 'Stop in-flight build/clean/doxygen jobs before quitting',
@@ -299,11 +162,21 @@ function M.setup()
     desc = 'Format C/C++ on save',
   })
 
-  -- Terminal error highlighting
+  -- Compiler-output highlighting for terminal buffers (doxygen's terminal
+  -- split still goes through TermOpen). Build/clean output is a plain piped
+  -- log buffer now (core/traffic.lua) — these matches are applied to it
+  -- only once, on failure, via M.applyOutputHighlights below: evaluating
+  -- ~40 match regexes on every redraw of a live-scrolling window is
+  -- exactly the render cost the pipe redesign removes.
   vim.api.nvim_create_autocmd('TermOpen', {
     callback = function()
-      local buf = vim.api.nvim_get_current_buf()
-      
+      M.applyOutputHighlights(vim.api.nvim_get_current_buf())
+    end,
+    desc = 'Highlight error indicators in terminal',
+  })
+end
+
+function M.applyOutputHighlights(buf)
       -- Highlight error indicators (^^^^^^^ and ~~~~~~~ lines)
       vim.api.nvim_buf_call(buf, function()
         vim.fn.matchadd('TerminalCaret', '\\^\\+')
@@ -358,17 +231,6 @@ function M.setup()
         vim.api.nvim_set_hl(0, 'TerminalFunction', { fg = '#80ffff' })
         vim.fn.matchadd('TerminalFunction', '\\<\\w\\+\\>(')
       end)
-    end,
-    desc = 'Highlight error indicators in terminal',
-  })
 end
-
--- Exposed for core/build.lua: stop clangd before a build starts (frees its
--- indexing threads' CPU share for the compiler), restart once the build has
--- actually finished (see build.lua's on_exit) instead of guessing from
--- filesystem quiet.
-M.stopLsp = stopLsp
-M.startLspForBuffers = startLspForBuffers
-M.refreshLsp = refreshLsp
 
 return M

@@ -45,24 +45,43 @@ local function clangdRootDir(bufnr, on_dir)
   on_dir(own_root)
 end
 
+-- Mason's clangd package ships the official LLVM release binary on both
+-- platforms. On macOS mason/bin/clangd is a plain symlink to it; on Windows
+-- mason/bin/clangd.cmd is a batch shim libuv can't spawn directly, so the
+-- real exe inside the versioned package directory is resolved instead.
+-- Before mason-tool-installer's first install completes the glob is empty —
+-- the shim path is returned as a placeholder and the next nvim start
+-- resolves the real exe (same first-boot window the macOS path has).
+local function clangdBinary(is_windows)
+  if is_windows then
+    local exes = vim.fn.glob(vim.fn.stdpath('data') .. '/mason/packages/clangd/clangd_*/bin/clangd.exe', false, true)
+    if #exes > 0 then return exes[#exes] end
+    return vim.fn.stdpath('data') .. '/mason/bin/clangd'
+  end
+  return vim.fn.stdpath('data') .. '/mason/bin/clangd'
+end
+
   function M.setup(capabilities)
     local servers = {
     clangd = {
       root_dir = clangdRootDir,
       cmd = (function()
         local is_windows = vim.fn.has('win32') == 1
-        local clangd_bin = is_windows
-          and 'clangd'  -- system clangd via winget LLVM (Mason's clangd is .cmd, won't work)
-          or (vim.fn.stdpath('data') .. '/mason/bin/clangd')
         local query_driver = is_windows
           and '--query-driver=/mingw64/bin/g++'
           or '--query-driver=/usr/bin/c++,/usr/bin/clang++'
         local index_jobs = math.max(1, math.floor(vim.uv.available_parallelism() / 2))
         return {
-          clangd_bin,
+          clangdBinary(is_windows),
           '--log=error',
           '--background-index',
-          '--background-index-priority=background',
+          -- 'low', not 'background': background maps to Windows
+          -- THREAD_MODE_BACKGROUND_BEGIN + EcoQoS, which throttles the
+          -- indexer's CPU and I/O scheduling so hard that a JUCE-sized
+          -- index sweep never visibly completes. 'low' keeps the indexer
+          -- yielding to interactive work and compiler jobs without the
+          -- background-mode I/O starvation.
+          '--background-index-priority=low',
           '-j=' .. index_jobs,
           '--header-insertion=never',
           '--clang-tidy',
