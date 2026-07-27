@@ -134,6 +134,48 @@ end
   })
 end
 
+-- Manual escape hatch (<leader>bi): stops every clangd client and re-triggers
+-- FileType on their buffers, which re-spawns clangd through the normal
+-- LspAttach path. Two situations this recovers that the automatic design
+-- (core/traffic.lua, core/cmake-picker.syncClangd) does not cover on its
+-- own: a client wedged after a crash/invalid-AST error, and forcing a full
+-- background-index sweep (clangd only re-checks shard staleness at its own
+-- startup — see lsp/clangd.lua's --background-index-priority comment — so
+-- "reindex everything now" has no LSP-level command, only a restart).
+function M.restart()
+  local clients = vim.tbl_filter(function(c) return c.name == 'clangd' end, vim.lsp.get_clients())
+  if #clients == 0 then
+    vim.notify('clangd: no active client', vim.log.levels.WARN)
+    return
+  end
+
+  local bufs = {}
+  for _, client in ipairs(clients) do
+    vim.list_extend(bufs, vim.tbl_keys(client.attached_buffers))
+    client:stop()
+  end
+
+  local CLIENT_GONE_POLL_MS = 50
+  local function restartWhenGone()
+    for _, client in ipairs(clients) do
+      if vim.lsp.get_client_by_id(client.id) ~= nil then
+        vim.defer_fn(restartWhenGone, CLIENT_GONE_POLL_MS)
+        return
+      end
+    end
+    for _, buf in ipairs(bufs) do
+      if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == '' then
+        local saved = vim.api.nvim_get_current_buf()
+        vim.api.nvim_set_current_buf(buf)
+        vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+        vim.api.nvim_set_current_buf(saved)
+      end
+    end
+    vim.notify('clangd: restarted', vim.log.levels.INFO)
+  end
+  restartWhenGone()
+end
+
 function M.setupAttachHandlers()
   vim.api.nvim_create_autocmd('LspAttach', {
     group = vim.api.nvim_create_augroup('lsp-attach', { clear = true }),

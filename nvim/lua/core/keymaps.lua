@@ -18,7 +18,7 @@
 --   nvim/doc/KEYMAPS.md
 --
 -- Edit the lexicon file, never this file.
--- LEXICON: sha256:c89e2ee8a6bbce532b45ec7cbf7a2f4d09f9a2c70a9ff68c3a6f77a1e98f10f1
+-- LEXICON: sha256:3c8d172f3060d446dcee6ca50e387e825a97f8ff7a9ae7152d004247984e37c7
 local M = {}
 
 function M.setup()
@@ -85,6 +85,7 @@ function M.setupLsp(event)
   vim.keymap.set('n', '<leader>ws', function() actions.splitSyncOnce(); Snacks.picker.lsp_workspace_symbols() end, { buffer = event.buf, desc = 'LSP: Workspace symbols' })
   vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { buffer = event.buf, desc = 'LSP: Rename symbol' })
   vim.keymap.set({ 'n', 'x' }, '<leader>ca', vim.lsp.buf.code_action, { buffer = event.buf, desc = 'LSP: Code action' })
+  vim.keymap.set('n', '<leader>ls', function() require('lsp.clangd').restart() end, { buffer = event.buf, desc = 'LSP: Force clangd reindex + restart' })
 
   local client = vim.lsp.get_client_by_id(event.data.client_id)
   if client and client.name == 'clangd' then

@@ -229,6 +229,7 @@ in the Reference section below.
 | `<leader>ws` | n | Snacks.picker.lsp_workspace_symbols() | sync | Workspace symbols |
 | `<leader>rn` | n | vim.lsp.buf.rename | | Rename symbol |
 | `<leader>ca` | n,x | vim.lsp.buf.code_action | | Code action |
+| `<leader>ls` | n | lsp.clangd.restart() | | Force clangd reindex + restart |
 
 ## keys: lsp-clangd
 
