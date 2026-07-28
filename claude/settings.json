@@ -15,7 +15,6 @@
       "Bash(git checkout --*)"
     ]
   },
-  "model": "fable",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
@@ -26,5 +25,6 @@
   "awaySummaryEnabled": false,
   "showTurnDuration": false,
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "model": "fable"
 }

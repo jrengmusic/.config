@@ -177,60 +177,107 @@ end
 -- (e.g. clap-juce-extensions' raw juce_add_plugin, or a framework whose
 -- PluginBuilder.cmake isn't implemented yet — JAM's is currently a stub).
 -- Configures CMake (if not already configured) and enumerates actual ninja
--- targets. Mirrors scripts/build-debug.sh:22-31.
-local function detectFormatsViaCmake(root)
+-- targets. Mirrors scripts/build-debug.sh:22-31. Every subprocess runs
+-- through jobstart and reports back via callback(formats) — never
+-- vim.fn.system()/system{}, which blocks Neovim's entire main loop for the
+-- subprocess's full runtime. A cold JUCE+framework configure is tens of
+-- seconds to minutes; on the synchronous path that was a frozen editor with
+-- zero feedback, indistinguishable from a hang. Same rationale as
+-- core/traffic.lua's build/clean jobs.
+local function detectFormatsViaCmake(root, callback)
   local scheme = 'Debug'
   local buildDir = root .. '/Builds/Ninja/' .. scheme
 
-  if vim.fn.filereadable(buildDir .. '/CMakeCache.txt') ~= 1 or vim.fn.filereadable(buildDir .. '/build.ninja') ~= 1 then
-    vim.notify('Configuring CMake (' .. scheme .. ')...', vim.log.levels.INFO)
-    vim.cmd('redraw')
-    vim.fn.mkdir(buildDir, 'p')
-    local nativeArch = vim.trim(vim.fn.system('uname -m'))
+  local function runJob(cmd, onDone)
+    local output = {}
+    vim.fn.jobstart(cmd, {
+      stdout_buffered = true,
+      stderr_buffered = true,
+      on_stdout = function(_, data) if data then vim.list_extend(output, data) end end,
+      on_stderr = function(_, data) if data then vim.list_extend(output, data) end end,
+      on_exit = function(_, exit_code) onDone(exit_code, output) end,
+    })
+  end
+
+  local function ninjaTargets()
+    runJob({ 'ninja', '-C', buildDir, '-t', 'targets' }, function(exit_code, output)
+      local targetsOutput = table.concat(output, '\n')
+      assert(exit_code == 0, 'detectAvailableFormats: ninja -t targets failed:\n' .. targetsOutput)
+
+      local formats, seen = {}, {}
+      for line in targetsOutput:gmatch('[^\r\n]+') do
+        local fmt = line:match('_([%a][%a%d]*): phony$')
+        fmt = fmt and (FORMAT_ALIAS[fmt] or fmt)
+        if fmt and KNOWN_PLUGIN_FORMATS[fmt] and not seen[fmt] then
+          seen[fmt] = true
+          table.insert(formats, fmt)
+        end
+      end
+
+      assert(#formats > 0, 'detectAvailableFormats: no known format targets found in ' .. buildDir)
+      callback(formats)
+    end)
+  end
+
+  if vim.fn.filereadable(buildDir .. '/CMakeCache.txt') == 1 and vim.fn.filereadable(buildDir .. '/build.ninja') == 1 then
+    ninjaTargets()
+    return
+  end
+
+  vim.notify('Configuring CMake (' .. scheme .. ')...', vim.log.levels.INFO)
+  vim.fn.mkdir(buildDir, 'p')
+
+  local function runConfigure(nativeArch)
     local configureArgs = {
       'cmake', '-S', root, '-B', buildDir, '-G', 'Ninja',
       '-DCMAKE_BUILD_TYPE=' .. scheme,
-      '-DCMAKE_OSX_ARCHITECTURES=' .. nativeArch,
       '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
     }
     if vim.fn.has('win32') == 1 then
-      -- core/options.lua's augment_path() puts MSYS2's mingw64/bin on PATH
-      -- (for rg/fd) alongside the MSVC dev-env PATH it also establishes —
-      -- without pinning the compiler here, CMake's auto-detection picks
-      -- whichever cc/c++ it finds first on PATH, which can be MSYS2's gcc.
-      -- JUCE (juce_TargetPlatform.h:113) hard-errors on MinGW. Pin MSVC
+      -- CMAKE_OSX_ARCHITECTURES is an Apple-only cache var (mirrors
+      -- build-debug.bat:47, which never passes it) — core/options.lua's
+      -- augment_path() puts MSYS2's mingw64/bin on PATH (for rg/fd)
+      -- alongside the MSVC dev-env PATH it also establishes — without
+      -- pinning the compiler here, CMake's auto-detection picks whichever
+      -- cc/c++ it finds first on PATH, which can be MSYS2's gcc. JUCE
+      -- (juce_TargetPlatform.h:113) hard-errors on MinGW. Pin MSVC
       -- explicitly so detection is deterministic regardless of PATH order.
       table.insert(configureArgs, '-DCMAKE_C_COMPILER=cl.exe')
       table.insert(configureArgs, '-DCMAKE_CXX_COMPILER=cl.exe')
+    else
+      table.insert(configureArgs, '-DCMAKE_OSX_ARCHITECTURES=' .. nativeArch)
     end
-    local configureOutput = vim.fn.system(configureArgs)
-    assert(vim.v.shell_error == 0, 'detectAvailableFormats: cmake configure failed:\n' .. configureOutput)
+
+    runJob(configureArgs, function(exit_code, configureOutput)
+      assert(exit_code == 0, 'detectAvailableFormats: cmake configure failed:\n' .. table.concat(configureOutput, '\n'))
+      ninjaTargets()
+    end)
   end
 
-  local targetsOutput = vim.fn.system({ 'ninja', '-C', buildDir, '-t', 'targets' })
-  assert(vim.v.shell_error == 0, 'detectAvailableFormats: ninja -t targets failed:\n' .. targetsOutput)
-
-  local formats, seen = {}, {}
-  for line in targetsOutput:gmatch('[^\r\n]+') do
-    local fmt = line:match('_([%a][%a%d]*): phony$')
-    fmt = fmt and (FORMAT_ALIAS[fmt] or fmt)
-    if fmt and KNOWN_PLUGIN_FORMATS[fmt] and not seen[fmt] then
-      seen[fmt] = true
-      table.insert(formats, fmt)
-    end
+  if vim.fn.has('win32') == 1 then
+    runConfigure(nil)
+    return
   end
 
-  assert(#formats > 0, 'detectAvailableFormats: no known format targets found in ' .. buildDir)
-  return formats
+  runJob({ 'uname', '-m' }, function(_, unameOutput)
+    runConfigure(vim.trim(table.concat(unameOutput, '')))
+  end)
 end
 
 -- Derive buildable formats. Text-parsing the real PluginBuilder.cmake is
 -- tried first — it can never fail on a broken configure/build, since it
 -- never invokes cmake. Falls back to live cmake+ninja enumeration only when
--- no static answer can be resolved.
-function M.detectAvailableFormats()
+-- no static answer can be resolved. Always calls back(formats); the
+-- PluginBuilder.cmake path calls back synchronously (text-only, no
+-- subprocess), the cmake fallback asynchronously (see detectFormatsViaCmake).
+function M.detectAvailableFormats(callback)
   local root = vim.fn.getcwd()
-  return detectFormatsFromPluginBuilder(root) or detectFormatsViaCmake(root)
+  local formats = detectFormatsFromPluginBuilder(root)
+  if formats then
+    callback(formats)
+    return
+  end
+  detectFormatsViaCmake(root, callback)
 end
 
 -- Show dialog to configure format, DAW, and build scheme
@@ -240,8 +287,6 @@ end
 -- auto-selected.
 function M.showDawFormatDialog(callback)
   local is_windows = vim.fn.has('win32') == 1
-
-  local formats = M.detectAvailableFormats()
 
   local function onFormatChosen(format)
     if not format then
@@ -342,12 +387,14 @@ function M.showDawFormatDialog(callback)
     })
   end
 
-  if #formats == 1 then
-    onFormatChosen(formats[1])
-    return
-  end
+  M.detectAvailableFormats(function(formats)
+    if #formats == 1 then
+      onFormatChosen(formats[1])
+      return
+    end
 
-  vim.ui.select(formats, { prompt = 'Select plugin format:' }, onFormatChosen)
+    vim.ui.select(formats, { prompt = 'Select plugin format:' }, onFormatChosen)
+  end)
 end
 
 -- ============================================================================
