@@ -397,6 +397,24 @@ function M.showDawFormatDialog(callback)
   end)
 end
 
+-- Returns the most recently built artefact matching any of patterns.
+-- Debug and Release live in separate scheme-keyed build dirs (core/build.lua's
+-- BUILD_DIR) and both can exist on disk simultaneously — picking by mtime
+-- instead of pattern/list order means launch always follows whichever scheme
+-- was actually built last, regardless of which DAP config name triggered it.
+local function newestArtefact(patterns)
+  local newest, newestTime = nil, -1
+  for _, pattern in ipairs(patterns) do
+    for _, match in ipairs(vim.fn.glob(pattern, false, true)) do
+      local mtime = vim.fn.getftime(match)
+      if mtime > newestTime then
+        newest, newestTime = match, mtime
+      end
+    end
+  end
+  return newest
+end
+
 -- ============================================================================
 -- DAP CONFIGURATIONS
 -- ============================================================================
@@ -482,15 +500,8 @@ function M.setup()
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/Standalone/*.exe',
         }
         
-        local found = nil
-        for _, pattern in ipairs(patterns) do
-          local matches = vim.fn.glob(pattern, false, true)
-          if #matches > 0 then
-            found = matches[1]
-            break
-          end
-        end
-        
+        local found = newestArtefact(patterns)
+
         if not found then
           vim.notify('Failed to find standalone app in: ' .. root, vim.log.levels.ERROR)
           error('Standalone executable not found. Build project first.')
@@ -524,10 +535,8 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST3/*.vst3/Contents/MacOS/*',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST3/*.vst3/Contents/MacOS/*',
         }
-        for _, pattern in ipairs(patterns) do
-          local matches = vim.fn.glob(pattern, false, true)
-          if #matches > 0 then return matches[1] end
-        end
+        local found = newestArtefact(patterns)
+        if found then return found end
         error('VST3 plugin not found. Build project first.')
       end,
       cwd = '${workspaceFolder}',
@@ -545,11 +554,9 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AU/*.component/Contents/MacOS/*',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AU/*.component/Contents/MacOS/*',
         }
-        for _, pattern in ipairs(patterns) do
-          local matches = vim.fn.glob(pattern, false, true)
-          if #matches > 0 then
-            return matches[1]
-          end
+        local found = newestArtefact(patterns)
+        if found then
+          return found
         end
         error('AU plugin not found. Build project first.')
       end,
@@ -571,11 +578,9 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST/*.dll',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST/*.dll',
         }
-        for _, pattern in ipairs(patterns) do
-          local matches = vim.fn.glob(pattern, false, true)
-          if #matches > 0 then
-            return matches[1]
-          end
+        local found = newestArtefact(patterns)
+        if found then
+          return found
         end
         error('VST plugin not found. Build project first.')
       end,
@@ -597,11 +602,9 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
         }
-        for _, pattern in ipairs(patterns) do
-          local matches = vim.fn.glob(pattern, false, true)
-          if #matches > 0 then
-            return matches[1]
-          end
+        local found = newestArtefact(patterns)
+        if found then
+          return found
         end
         error('AAX plugin not found. Build project first.')
       end,
@@ -627,11 +630,9 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*.clap',
           root .. '/Builds/Ninja/Release/**/*.clap',
         }
-        for _, pattern in ipairs(patterns) do
-          local matches = vim.fn.glob(pattern, false, true)
-          if #matches > 0 then
-            return matches[1]
-          end
+        local found = newestArtefact(patterns)
+        if found then
+          return found
         end
         error('CLAP plugin not found. Build project first.')
       end,
