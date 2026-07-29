@@ -50,16 +50,23 @@ function M.smart_quit()
   end
 end
 
--- Fire split sync once on the next BufEnter, but only if the file actually changed.
+-- Fire split sync on the next real BufEnter, but only if the file actually changed.
 -- Used by all picker/navigation keymaps so opening a file always syncs the split layout.
+-- Picker windows (Snacks) focus their own prompt buffer on open, which fires a BufEnter
+-- for an empty, unnamed buffer before the user's actual selection lands. `once = true`
+-- would consume the watcher on that spurious event and never see the real navigation,
+-- so the autocmd stays armed across such no-op events and only clears itself once the
+-- file-change condition below actually holds. `clear = true` on the augroup still
+-- supersedes any still-armed watcher from a previous, cancelled invocation.
 function M.splitSyncOnce()
   local fileBefore = vim.fn.expand('%:p')
+  local group = vim.api.nvim_create_augroup('split_sync_once', { clear = true })
   vim.api.nvim_create_autocmd('BufEnter', {
-    group = vim.api.nvim_create_augroup('split_sync_once', { clear = true }),
-    once = true,
+    group = group,
     callback = function()
       local fileAfter = vim.fn.expand('%:p')
       if fileAfter ~= fileBefore and fileAfter ~= '' then
+        vim.api.nvim_del_augroup_by_id(group)
         vim.schedule(function()
           require('lsp.header-source').ensureCppHeaderLayout(vim.fn.expand('%:p'))
         end)
