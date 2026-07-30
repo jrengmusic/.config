@@ -324,6 +324,11 @@ end
 local function runBuildAndLaunch(scheme)
   local dapConfig = require('dap.configurations')
 
+  -- SSOT write happens before build or launch touch anything — every
+  -- program() closure in dap/configurations.lua resolves its artefact
+  -- against this persisted scheme, not by guessing from mtime.
+  dapConfig.setScheme(scheme)
+
   buildFormat(scheme, function(cfg)
     if cfg.format == 'Standalone' then
       vim.notify('Built! Launching Standalone...', vim.log.levels.INFO, { timeout = 1500 })

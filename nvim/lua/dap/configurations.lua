@@ -82,7 +82,9 @@ end
 
 -- Save .nvim-dap-config as Lua table (self-documented)
 -- Only fails if write fails (disk full, permissions) - beyond our control
-function M.saveDawConfig(format, daw, dawPath)
+-- scheme defaults to 'Debug' when omitted (showDawFormatDialog's initial
+-- save predates scheme tracking and has no build behind it yet).
+function M.saveDawConfig(format, daw, dawPath, scheme)
   local configFile = getConfigFilePath()
   local content = string.format(
     '-- DAP Debug Configuration\n' ..
@@ -91,19 +93,44 @@ function M.saveDawConfig(format, daw, dawPath)
     '  format = "%s",        -- Plugin format (framework-dependent, see detectAvailableFormats)\n' ..
     '  daw = "%s",           -- DAW name (for display/killall)\n' ..
     '  dawPath = "%s",       -- Absolute path to DAW executable\n' ..
+    '  scheme = "%s",        -- Debug or Release, last written by buildDebugAndRun/buildReleaseAndRun\n' ..
     '}',
     format,
     daw,
-    dawPath
+    dawPath,
+    scheme or 'Debug'
   )
-  
+
   local ok, err = pcall(vim.fn.writefile, vim.split(content, '\n'), configFile)
   if not ok then
     vim.notify('Failed to write DAP config (disk/permissions issue): ' .. tostring(err))
     return false
   end
-  
+
   return true
+end
+
+-- Persists scheme (Debug/Release) into the existing SSOT config ahead of
+-- build+launch — runBuildAndLaunch calls this before buildFormat so every
+-- program() closure below resolves the artefact for the scheme this
+-- invocation actually requested, not whichever is newest on disk.
+--
+-- Reads the file directly rather than through loadDawConfig: on a fresh
+-- project with no .nvim-dap-config yet, loadDawConfig's missing/invalid
+-- branches show the format dialog as a side effect, which would race
+-- buildFormat's own loadDawConfig call immediately after. No config yet
+-- means no scheme to persist — buildFormat's dialog handles first-time
+-- setup on its own.
+function M.setScheme(scheme)
+  local configFile = getConfigFilePath()
+  if vim.fn.filereadable(configFile) ~= 1 then
+    return false
+  end
+  local ok, config = pcall(dofile, configFile)
+  if not ok or not config or not config.format then
+    return false
+  end
+  return M.saveDawConfig(config.format, config.daw, config.dawPath, scheme)
 end
 
 -- Known JUCE/clap-juce-extensions plugin format target suffixes.
@@ -357,11 +384,26 @@ function M.showDawFormatDialog(callback)
   end)
 end
 
--- Returns the most recently built artefact matching any of patterns.
 -- Debug and Release live in separate scheme-keyed build dirs (core/build.lua's
--- BUILD_DIR) and both can exist on disk simultaneously — picking by mtime
--- instead of pattern/list order means launch always follows whichever scheme
--- was actually built last, regardless of which DAP config name triggered it.
+-- BUILD_DIR) and both can exist on disk simultaneously. Every pattern list
+-- below carries one Debug entry and one Release entry per platform variant,
+-- so filtering to the SSOT scheme (M.setScheme, written by
+-- buildDebugAndRun/buildReleaseAndRun before launch) before globbing keeps
+-- newestArtefact's mtime comparison scoped to same-scheme candidates only —
+-- it never crosses Debug/Release.
+local function filterPatternsByScheme(patterns, scheme)
+  local filtered = {}
+  for _, pattern in ipairs(patterns) do
+    if pattern:find('/' .. scheme .. '/', 1, true) then
+      table.insert(filtered, pattern)
+    end
+  end
+  return filtered
+end
+
+-- Returns the most recently built artefact matching any of patterns —
+-- a tie-breaker among same-scheme platform variants (patterns is expected
+-- pre-filtered by filterPatternsByScheme).
 local function newestArtefact(patterns)
   local newest, newestTime = nil, -1
   for _, pattern in ipairs(patterns) do
@@ -459,8 +501,9 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/Standalone/*.exe',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/Standalone/*.exe',
         }
-        
-        local found = newestArtefact(patterns)
+
+        local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
+        local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
 
         if not found then
           vim.notify('Failed to find standalone app in: ' .. root, vim.log.levels.ERROR)
@@ -495,7 +538,8 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST3/*.vst3/Contents/MacOS/*',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST3/*.vst3/Contents/MacOS/*',
         }
-        local found = newestArtefact(patterns)
+        local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
+        local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then return found end
         error('VST3 plugin not found. Build project first.')
       end,
@@ -514,7 +558,8 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AU/*.component/Contents/MacOS/*',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AU/*.component/Contents/MacOS/*',
         }
-        local found = newestArtefact(patterns)
+        local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
+        local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then
           return found
         end
@@ -538,7 +583,8 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST/*.dll',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST/*.dll',
         }
-        local found = newestArtefact(patterns)
+        local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
+        local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then
           return found
         end
@@ -562,7 +608,8 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
           root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
         }
-        local found = newestArtefact(patterns)
+        local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
+        local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then
           return found
         end
@@ -590,7 +637,8 @@ function M.setup()
           root .. '/Builds/Ninja/Debug/**/*.clap',
           root .. '/Builds/Ninja/Release/**/*.clap',
         }
-        local found = newestArtefact(patterns)
+        local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
+        local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then
           return found
         end
