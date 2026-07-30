@@ -21,7 +21,7 @@
     "command": "~/.carol/bin/carol-statusline.sh"
   },
   "enabledPlugins": {},
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "showTurnDuration": false,
