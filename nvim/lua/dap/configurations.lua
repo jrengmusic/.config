@@ -122,13 +122,11 @@ local FORMAT_ALIAS = { App = 'Standalone' }
 
 -- Read the real FORMATS list straight out of the framework's PluginBuilder.cmake
 -- — text only, no cmake process, so this can never surface a configure/build
--- error. The project's own CMakeLists.txt names its framework modules dir via
--- FRAMEWORK_MODULES_PATH (e.g. jreng-filter-strip/CMakeLists.txt:40-41 sets it
--- to "___lib___"); the framework root is one directory above the project
--- (CMakeLists.txt:37, "${CMAKE_CURRENT_SOURCE_DIR}/.."). PluginBuilder.cmake's
--- FORMATS line (e.g. kuassa/___lib___/cmake/PluginBuilder.cmake:154) is the
--- actual, single source of truth juce_add_plugin() itself will use — read
--- directly rather than duplicated as a lookup table here.
+-- error. Only resolves for frameworks whose PluginBuilder.cmake FORMATS line
+-- is literal tokens (e.g. jam/cmake/PluginBuilder.cmake:407, 'FORMATS VST3
+-- AU Standalone'). KANJUT's (kuassa/___lib___/cmake/PluginBuilder.cmake:154)
+-- forwards a variable — 'FORMATS ${PARAMS_FORMATS}' — so this returns nil for
+-- kuassa projects and detectFormatsFromMetadata below is tried instead.
 local function detectFormatsFromPluginBuilder(root)
   local cmakeFile = root .. '/CMakeLists.txt'
   if vim.fn.filereadable(cmakeFile) ~= 1 then
@@ -173,6 +171,39 @@ local function detectFormatsFromPluginBuilder(root)
   return #formats > 0 and formats or nil
 end
 
+-- KANJUT-framework projects declare formats as data, not CMake text: the
+-- project's own Source/layout/metadata.md 'formats' row (e.g.
+-- jreng-filter-strip/Source/layout/metadata.md:16, 'formats | VST VST3 AU
+-- AAX Standalone') is parsed at configure time into PARAMS_FORMATS by
+-- Metadata.cmake:3-15 (table_parse against that same file, field
+-- 'formats=PARAMS_FORMATS') before being forwarded through
+-- PluginBuilder.cmake's FORMATS argument. Read directly — same text-only,
+-- zero-subprocess contract as detectFormatsFromPluginBuilder above.
+local function detectFormatsFromMetadata(root)
+  local metadataFile = root .. '/Source/layout/metadata.md'
+  if vim.fn.filereadable(metadataFile) ~= 1 then
+    return nil
+  end
+
+  local is_windows = vim.fn.has('win32') == 1
+  for _, line in ipairs(vim.fn.readfile(metadataFile)) do
+    local cell = line:match('^|%s*formats%s*|%s*([^|]-)%s*|')
+    if cell then
+      local formats, seen = {}, {}
+      for token in cell:gmatch('%a[%a%d]*') do
+        local fmt = FORMAT_ALIAS[token] or token
+        if KNOWN_PLUGIN_FORMATS[fmt] and not (fmt == 'AU' and is_windows) and not seen[fmt] then
+          seen[fmt] = true
+          table.insert(formats, fmt)
+        end
+      end
+      return #formats > 0 and formats or nil
+    end
+  end
+
+  return nil
+end
+
 -- A pure-app project declares its target with AppBuilder.cmake's _App
 -- suffix straight in its own CMakeLists.txt (e.g. end/CMakeLists.txt:82,
 -- 'TARGET_NAME END_App') — the only format such a build produces is the
@@ -192,16 +223,16 @@ end
 -- Derive buildable formats — text-only, synchronous, zero subprocess.
 -- CMake is never invoked here: the picker only stores configuration
 -- (.nvim-dap-config); configure/build runs later inside
--- build-debug.{bat,sh}, driven by the stored format. A project whose
--- CMakeLists resolves neither an _App target nor a framework
--- PluginBuilder.cmake FORMATS line is reported as an error — no live
--- cmake enumeration.
+-- build-debug.{bat,sh}, driven by the stored format. A project resolving
+-- none of _App target, framework PluginBuilder.cmake FORMATS line, or
+-- Source/layout/metadata.md 'formats' row is reported as an error — no
+-- live cmake enumeration.
 function M.detectAvailableFormats(callback)
   local root = vim.fn.getcwd()
-  local formats = detectAppTarget(root) or detectFormatsFromPluginBuilder(root)
+  local formats = detectAppTarget(root) or detectFormatsFromPluginBuilder(root) or detectFormatsFromMetadata(root)
   if not formats then
     vim.notify(
-      'Cannot determine formats: no _App target or PluginBuilder FORMATS resolvable from ' .. root .. '/CMakeLists.txt',
+      'Cannot determine formats: no _App target, PluginBuilder FORMATS, or metadata.md formats row resolvable for ' .. root,
       vim.log.levels.ERROR
     )
     return
