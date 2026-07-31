@@ -1,4 +1,8 @@
 {
+  "env": {
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6[1m]"
+  },
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -15,7 +19,6 @@
       "Bash(git checkout --*)"
     ]
   },
-  "model": "fable",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
@@ -25,6 +28,5 @@
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "showTurnDuration": false,
-  "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true
 }
