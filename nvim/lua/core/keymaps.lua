@@ -18,7 +18,7 @@
 --   nvim/doc/KEYMAPS.md
 --
 -- Edit the lexicon file, never this file.
--- LEXICON: sha256:3c8d172f3060d446dcee6ca50e387e825a97f8ff7a9ae7152d004247984e37c7
+-- LEXICON: sha256:173c2013e3820b0187160ed9b22ab7a05478cd4dfcc423fc455a76be59bd0ac5
 local M = {}
 
 function M.setup()
@@ -125,7 +125,7 @@ function M.setupDap()
   vim.keymap.set('n', '<leader>dt', build.terminateAndNotify, { desc = 'DAP: Terminate + close DAW/App' })
   vim.keymap.set('n', '<leader>br', build.buildReleaseAndRun, { desc = 'DAP: Build release + run' })
   vim.keymap.set('n', '<leader>bb', build.buildDebugAndRun, { desc = 'DAP: Build debug + run' })
-  vim.keymap.set('n', '<leader>bR', build.buildReleaseOnly, { desc = 'DAP: Build release only (no run)' })
+  vim.keymap.set('n', '<leader>bR', build.buildReleaseOnly, { desc = 'DAP: Build release only, notarize + sign (no run)' })
   vim.keymap.set('n', '<leader>bB', build.buildDebugOnly, { desc = 'DAP: Build debug only (no run)' })
   vim.keymap.set('n', '<leader>bc', build.cleanBuild, { desc = 'DAP: Clean build' })
   vim.keymap.set('n', '<leader>bk', build.cleanOnly, { desc = 'DAP: Clean' })

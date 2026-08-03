@@ -224,9 +224,9 @@ end
 -- buildFormat resolves the DAW/plugin format, builds it, and hands the
 -- resolved cfg to onBuilt — copy-to-system-dir always happens inside the
 -- build script itself, so onBuilt only ever decides post-build action
--- (launch, or just notify). Notarize/codesign is dropped: nvim always
--- builds with 'nonotarize'.
-local function buildFormat(scheme, onBuilt)
+-- (launch, or just notify). notarize defaults falsy — build+run/debug
+-- paths always pass 'nonotarize'; only buildReleaseOnly opts in.
+local function buildFormat(scheme, onBuilt, notarize)
   vim.cmd('silent! wa')
 
   local dapConfig = require('dap.configurations')
@@ -306,7 +306,9 @@ local function buildFormat(scheme, onBuilt)
   end
 
   local function args_base(format)
-    return {script, root, scheme, format, 'nonotarize'}
+    local args = {script, root, scheme, format}
+    if not notarize then table.insert(args, 'nonotarize') end
+    return args
   end
 
   -- One path: resolve the format (cached .nvim-dap-config, or the picker
@@ -365,10 +367,10 @@ local function runBuildAndLaunch(scheme)
   end)
 end
 
-local function runBuildOnly(scheme)
+local function runBuildOnly(scheme, notarize)
   buildFormat(scheme, function(cfg)
     vim.notify('Built!', vim.log.levels.INFO, { timeout = 1500 })
-  end)
+  end, notarize)
 end
 
 -- clean-build.sh removes only the Builds tree. clangd's CDB and index
@@ -432,7 +434,7 @@ function M.buildDebugOnly()
 end
 
 function M.buildReleaseOnly()
-  killDapThen(function() runBuildOnly('Release') end)
+  killDapThen(function() runBuildOnly('Release', true) end)
 end
 
 function M.cleanBuild()

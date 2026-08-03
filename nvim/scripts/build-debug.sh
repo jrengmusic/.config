@@ -72,7 +72,8 @@ RAM_JOBS=$(( (TOTAL_RAM_GB - RAM_RESERVE_GB) / RAM_PER_JOB_GB ))
 [ "$RAM_JOBS" -lt 1 ] && RAM_JOBS=1
 BUILD_JOBS=$(( RAM_JOBS < HALF_CORES ? RAM_JOBS : HALF_CORES ))
 echo "Parallel jobs: $BUILD_JOBS (cores/2=$HALF_CORES, ram-capped=$RAM_JOBS)"
-JAM_NOTARIZE=$( [ "$NO_NOTARIZE" -eq 1 ] && echo OFF || echo ON ) cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" --parallel "$BUILD_JOBS" 2>&1 | cat
+NOTARIZE_VALUE=$( [ "$NO_NOTARIZE" -eq 1 ] && echo OFF || echo ON )
+JAM_NOTARIZE="$NOTARIZE_VALUE" KANJUT_NOTARIZE="$NOTARIZE_VALUE" cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" --parallel "$BUILD_JOBS" 2>&1 | cat
 
 echo "=========================================="
 echo "Copying $FORMAT to system directory..."

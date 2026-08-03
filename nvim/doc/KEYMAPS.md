@@ -270,7 +270,7 @@ in the Reference section below.
 | `<leader>dt` | n | @build.terminateAndNotify | | Terminate + close DAW/App |
 | `<leader>br` | n | @build.buildReleaseAndRun | | Build release + run |
 | `<leader>bb` | n | @build.buildDebugAndRun | | Build debug + run |
-| `<leader>bR` | n | @build.buildReleaseOnly | | Build release only (no run) |
+| `<leader>bR` | n | @build.buildReleaseOnly | | Build release only, notarize + sign (no run) |
 | `<leader>bB` | n | @build.buildDebugOnly | | Build debug only (no run) |
 | `<leader>bc` | n | @build.cleanBuild | | Clean build |
 | `<leader>bk` | n | @build.cleanOnly | | Clean |
