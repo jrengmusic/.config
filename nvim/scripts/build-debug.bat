@@ -100,30 +100,11 @@ echo Parallel jobs: %BUILD_JOBS% (cores/2=%HALF_CORES%, ram-capped=%RAM_JOBS%)
 cmake --build "%BUILD_DIR%" --config %SCHEME% --target %TARGET% --parallel %BUILD_JOBS%
 if errorlevel 1 ( echo Build FAILED & exit /b 1 )
 
-echo ==========================================
-echo Copying %FORMAT% to system directory...
-echo ==========================================
-
-if "%FORMAT%"=="VST3" (
-    for /d %%d in ("%BUILD_DIR%\*.vst3") do (
-        echo Copying %%~nxd...
-        xcopy /E /Y /I "%%d" "C:\Program Files\Common Files\VST3\%%~nxd" >nul
-        echo OK: %%~nxd
-    )
-)
-
-if "%FORMAT%"=="VST" (
-    for %%d in ("%BUILD_DIR%\*.dll") do (
-        echo Copying %%~nxd...
-        copy /Y "%%d" "C:\Program Files\Common Files\VST2\" >nul
-        echo OK: %%~nxd
-    )
-)
-
-if "%FORMAT%"=="Standalone" (
-    echo Standalone app built - no copy needed.
-)
-
+:: Copy-to-system-directory is owned by PluginBuilder.cmake/AppBuilder.cmake
+:: POST_BUILD steps (JUCE's COPY_PLUGIN_AFTER_BUILD, plus AAX wraptool
+:: signing for Release) — never duplicated here. A second copy after
+:: cmake --build returns would re-copy the raw artifact straight from the
+:: Ninja build tree over cmake's already-placed system-path copy.
 echo ==========================================
 echo %FORMAT% (%SCHEME%) build complete.
 echo ==========================================

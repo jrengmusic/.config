@@ -75,58 +75,13 @@ echo "Parallel jobs: $BUILD_JOBS (cores/2=$HALF_CORES, ram-capped=$RAM_JOBS)"
 NOTARIZE_VALUE=$( [ "$NO_NOTARIZE" -eq 1 ] && echo OFF || echo ON )
 JAM_NOTARIZE="$NOTARIZE_VALUE" KANJUT_NOTARIZE="$NOTARIZE_VALUE" cmake --build "$BUILD_DIR" --config "$SCHEME" --target "$TARGET" --parallel "$BUILD_JOBS" 2>&1 | cat
 
-echo "=========================================="
-echo "Copying $FORMAT to system directory..."
-echo "=========================================="
-
-ARTEFACTS="$BUILD_DIR"
-
+# Copy-to-system-directory is owned by PluginBuilder.cmake/AppBuilder.cmake
+# POST_BUILD steps (JUCE's COPY_PLUGIN_AFTER_BUILD, plus the QA-build +
+# sign + copy-signed-back chain for Release) — never duplicated here. A
+# second copy after cmake --build returns would re-copy the raw, unsigned
+# artifact straight from the Ninja build tree over cmake's already-signed
+# system-path copy.
 case "$FORMAT" in
-    VST3)
-        find "$ARTEFACTS" -name "*.vst3" -type d 2>/dev/null | while read -r plugin; do
-            name=$(basename "$plugin")
-            dest="$HOME/Library/Audio/Plug-Ins/VST3/$name"
-            rm -rf "$dest"
-            cp -R "$plugin" "$dest"
-            echo "✓ VST3: $name"
-        done
-        ;;
-    AU)
-        find "$ARTEFACTS" -name "*.component" -type d 2>/dev/null | while read -r plugin; do
-            name=$(basename "$plugin")
-            dest="$HOME/Library/Audio/Plug-Ins/Components/$name"
-            rm -rf "$dest"
-            cp -R "$plugin" "$dest"
-            echo "✓ AU: $name"
-        done
-        ;;
-    VST)
-        find "$ARTEFACTS" -name "*.vst" -type d 2>/dev/null | while read -r plugin; do
-            name=$(basename "$plugin")
-            dest="$HOME/Library/Audio/Plug-Ins/VST/$name"
-            rm -rf "$dest"
-            cp -R "$plugin" "$dest"
-            echo "✓ VST: $name"
-        done
-        ;;
-    AAX)
-        find "$ARTEFACTS" -name "*.aaxplugin" -type d 2>/dev/null | while read -r plugin; do
-            name=$(basename "$plugin")
-            dest="/Library/Application Support/Avid/Audio/Plug-Ins/$name"
-            rm -rf "$dest"
-            cp -R "$plugin" "$dest"
-            echo "✓ AAX: $name"
-        done
-        ;;
-    CLAP)
-        find "$ARTEFACTS" -name "*.clap" 2>/dev/null | while read -r plugin; do
-            name=$(basename "$plugin")
-            dest="$HOME/Library/Audio/Plug-Ins/CLAP/$name"
-            rm -rf "$dest"
-            cp -R "$plugin" "$dest"
-            echo "✓ CLAP: $name"
-        done
-        ;;
     Standalone)
         echo "✓ Standalone app built (no copy needed)"
         # macOS Tahoe+: re-sign with get-task-allow so codelldb (or any debugger)
