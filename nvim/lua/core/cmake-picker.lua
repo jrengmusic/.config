@@ -82,6 +82,12 @@ local function is_symlink_tree_stale()
     if source_mtime > tree_mtime then return true end
   end
 
+  local cast_dir = get_project_root() .. '/cast'
+  if vim.fn.isdirectory(cast_dir) == 1 then
+    local cast_mtime = vim.fn.getftime(cast_dir)
+    if cast_mtime > tree_mtime then return true end
+  end
+
   return false
 end
 
@@ -122,14 +128,16 @@ local function classify_file(file)
   if file:find('/Source/') then
     return 'Sources', 'Source'
   end
+  if file:find('/cast/') then
+    return 'Cast', 'cast'
+  end
   return 'Other', nil
 end
 
-local function scan_source_dir()
-  local source_dir = get_project_root() .. '/Source'
+local function scan_dir(root)
   local files = {}
 
-  if vim.fn.isdirectory(source_dir) ~= 1 then
+  if vim.fn.isdirectory(root) ~= 1 then
     return files
   end
 
@@ -145,8 +153,16 @@ local function scan_source_dir()
     end
   end
 
-  scan(source_dir)
+  scan(root)
   return files
+end
+
+local function scan_source_dir()
+  return scan_dir(get_project_root() .. '/Source')
+end
+
+local function scan_cast_dir()
+  return scan_dir(get_project_root() .. '/cast')
 end
 
 local function scan_module_dir(module_path)
@@ -190,10 +206,12 @@ local function generate_symlink_tree()
   vim.fn.mkdir(project_dir, 'p')
   vim.fn.mkdir(project_dir .. '/1 Source', 'p')
   vim.fn.mkdir(project_dir .. '/2 User Modules', 'p')
+  vim.fn.mkdir(project_dir .. '/3 Cast', 'p')
 
   local seen = {}
   local seen_modules = {}
   local source_root = cwd .. '/Source'
+  local cast_root = cwd .. '/cast'
 
   for _, entry in ipairs(data) do
     local file = entry.file
@@ -264,6 +282,27 @@ local function generate_symlink_tree()
         target_dir = project_dir .. '/1 Source/' .. subdir
       else
         target_dir = project_dir .. '/1 Source'
+      end
+      vim.fn.mkdir(target_dir, 'p')
+      local basename = vim.fn.fnamemodify(file, ':t')
+      local symlink = target_dir .. '/' .. basename
+      if vim.fn.filereadable(symlink) ~= 1 then
+        vim.fn.system({ 'ln', '-sf', file, symlink })
+      end
+    end
+  end
+
+  local cast_files = scan_cast_dir()
+  for _, file in ipairs(cast_files) do
+    if seen[file] == nil then
+      seen[file] = true
+      local rel = file:gsub('^' .. vim.pesc(cast_root) .. '/', '')
+      local subdir = vim.fn.fnamemodify(rel, ':h')
+      local target_dir
+      if subdir ~= '.' and subdir ~= '' then
+        target_dir = project_dir .. '/3 Cast/' .. subdir
+      else
+        target_dir = project_dir .. '/3 Cast'
       end
       vim.fn.mkdir(target_dir, 'p')
       local basename = vim.fn.fnamemodify(file, ':t')
@@ -379,6 +418,23 @@ function M.files()
     end
   end
 
+  -- Third-and-half pass: scan ALL Cast files (same as explorer)
+  local cast_files = scan_cast_dir()
+  for _, file in ipairs(cast_files) do
+    if seen[file] == nil then
+      seen[file] = true
+      local display = file:gsub('^' .. vim.pesc(cwd) .. '/', '')
+      table.insert(items, {
+        idx = #items + 1,
+        score = #items + 1,
+        text = 'cast/' .. display,
+        file = file,
+        module = 'Cast',
+        display = display,
+      })
+    end
+  end
+
   -- Fourth pass: add CMakeLists.txt from project root
   local cmake_file = cwd .. '/CMakeLists.txt'
   if vim.fn.filereadable(cmake_file) == 1 and seen[cmake_file] == nil then
@@ -397,17 +453,18 @@ function M.files()
     if a.module == b.module then
       return a.display < b.display
     end
-    -- Order: project (CMake/Source) > jam > lib > cium > juce > other
+    -- Order: project (CMake/Source/Cast) > jam > lib > cium > juce > other
     local MODULE_PRIORITY = {
       CMake = 1,
       Source = 2,
+      Cast = 3,
     }
     local function priority(mod)
       if MODULE_PRIORITY[mod] then return MODULE_PRIORITY[mod] end
       for i, prefix in ipairs(FRAMEWORK_PREFIXES) do
-        if mod:match('^' .. prefix .. '_') then return i + 2 end
+        if mod:match('^' .. prefix .. '_') then return i + 3 end
       end
-      return #FRAMEWORK_PREFIXES + 3
+      return #FRAMEWORK_PREFIXES + 4
     end
     local pa, pb = priority(a.module), priority(b.module)
     if pa ~= pb then return pa < pb end
@@ -448,6 +505,7 @@ local function find_symlink_for_file(real_file)
   local cwd = get_project_root()
   local project_dir = get_project_dir()
   local source_root = cwd .. '/Source'
+  local cast_root = cwd .. '/cast'
 
   local group, submodule = classify_file(real_file)
   if group == 'Sources' then
@@ -459,6 +517,19 @@ local function find_symlink_for_file(real_file)
       symlink = project_dir .. '/1 Source/' .. subdir .. '/' .. basename
     else
       symlink = project_dir .. '/1 Source/' .. basename
+    end
+    if vim.fn.filereadable(symlink) == 1 then
+      return symlink
+    end
+  elseif group == 'Cast' then
+    local rel = real_file:gsub('^' .. vim.pesc(cast_root) .. '/', '')
+    local subdir = vim.fn.fnamemodify(rel, ':h')
+    local basename = vim.fn.fnamemodify(real_file, ':t')
+    local symlink
+    if subdir ~= '.' and subdir ~= '' then
+      symlink = project_dir .. '/3 Cast/' .. subdir .. '/' .. basename
+    else
+      symlink = project_dir .. '/3 Cast/' .. basename
     end
     if vim.fn.filereadable(symlink) == 1 then
       return symlink
@@ -767,9 +838,18 @@ local function get_dirs()
 
   -- Source root covers all source files recursively
   local source_root = get_project_root() .. '/Source'
-  if vim.fn.isdirectory(source_root) == 1 then
+  local has_source = vim.fn.isdirectory(source_root) == 1
+  if has_source then
     seen_dirs[source_root] = true
     table.insert(dirs, source_root)
+  end
+
+  -- Cast root covers generated cast/*.md tables
+  local cast_root = get_project_root() .. '/cast'
+  local has_cast = vim.fn.isdirectory(cast_root) == 1
+  if has_cast then
+    seen_dirs[cast_root] = true
+    table.insert(dirs, cast_root)
   end
 
   -- One module_root per User Module (rg recurses into it)
@@ -792,7 +872,9 @@ local function get_dirs()
 
   -- Sort module dirs: jam first, then lib, cium, juce, other
   if #dirs > 1 then
-    local source = table.remove(dirs, 1)
+    local leading = {}
+    if has_source then table.insert(leading, table.remove(dirs, 1)) end
+    if has_cast then table.insert(leading, table.remove(dirs, 1)) end
     table.sort(dirs, function(a, b)
       local function dir_priority(d)
         for i, prefix in ipairs(FRAMEWORK_PREFIXES) do
@@ -804,7 +886,9 @@ local function get_dirs()
       if pa ~= pb then return pa < pb end
       return a < b
     end)
-    table.insert(dirs, 1, source)
+    for i = #leading, 1, -1 do
+      table.insert(dirs, 1, leading[i])
+    end
   end
 
   return #dirs > 0 and dirs or nil
