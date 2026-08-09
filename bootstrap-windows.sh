@@ -546,6 +546,18 @@ EOF
     info "Seeded settings.local.json with carol-marketplace → $WINDOWS_HOME/.carol"
 fi
 
+# CAROL output style — symlink from carol repo to ~/.claude/output-styles/
+mkdir -p "$WINDOWS_HOME/.claude/output-styles"
+STYLE_SRC="$WINDOWS_HOME/.carol/output-styles.md"
+STYLE_DST="$WINDOWS_HOME/.claude/output-styles/carol.md"
+if [[ -L "$STYLE_DST" && "$(readlink "$STYLE_DST")" == "$STYLE_SRC" ]]; then
+    info "CAROL output style symlink already correct"
+else
+    [[ -e "$STYLE_DST" && ! -L "$STYLE_DST" ]] && rm -f "$STYLE_DST"
+    ln -sf "$STYLE_SRC" "$STYLE_DST"
+    info "Symlinked CAROL output style → $STYLE_SRC"
+fi
+
 # Project CLAUDE.md — symlink CAROL.md as project-level instructions
 CAROL_MD_SRC="$WINDOWS_HOME/.carol/CAROL.md"
 CAROL_MD_DST="$WINDOWS_HOME/.config/CLAUDE.md"
