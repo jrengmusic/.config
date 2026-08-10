@@ -50,6 +50,7 @@ local COMMON_LIB_EXCLUDES = {
   '*/.DS_Store',
   '*/codebase-for-dummies/*',
   '*/automation/*',
+  '*/cast/template/*',
 }
 
 local VENDOR_DIR_NAMES = {
