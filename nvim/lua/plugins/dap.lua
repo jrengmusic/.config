@@ -7,7 +7,7 @@ return {
     { '<leader>br', desc = 'Build release and run' },
     { '<leader>bb', desc = 'Build debug and run' },
     { '<leader>bR', desc = 'Build release only' },
-    { '<leader>bB', desc = 'Build debug only' },
+    { '<leader>bn', desc = 'Build debug only' },
     { '<leader>bc', desc = 'Clean build' },
     { '<leader>bk', desc = 'Clean' },
     { '<F5>', desc = 'Configure project' },
