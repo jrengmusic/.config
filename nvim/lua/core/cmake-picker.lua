@@ -7,7 +7,7 @@ local _grep_fixed = true
 local SOURCE_EXTENSIONS = {
   'cpp', 'cc', 'c', 'mm', 'm', 'h', 'hpp', 'hxx', 'inl',
   'xml', 'svg', 'json', 'txt', 'md', 'cmake', 'html', 'css', 'lua',
-  'frag', 'vert',
+  'frag', 'vert', 'cast',
 }
 
 local EXCLUDE_EXTENSIONS = {
