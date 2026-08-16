@@ -125,7 +125,7 @@ end
   end
 
   -- mason-tool-installer: deduplicated list of LSPs + standalone tools
-  local tools = { 'stylua', 'prettier' }
+  local tools = { 'stylua' }
   vim.list_extend(tools, server_names)
   require('mason-tool-installer').setup({ ensure_installed = tools })
 

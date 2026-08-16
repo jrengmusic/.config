@@ -39,6 +39,43 @@ end
 -- locate .clangd without duplicating root-detection logic.
 M.get_project_root = get_project_root
 
+-- Resolves the pristine (unpatched) JUCE checkout using the exact
+-- sibling/cousin-of-framework-root rule jam's and KANJUT's BuildSetup.cmake
+-- apply when discovering JUCE_PATH: JUCE lives either as a sibling of the
+-- framework root or one level further up. The project root plays the
+-- framework root's part here — both are siblings under the same parent
+-- directory by convention (e.g. .../dev/end next to .../dev/jam).
+local function get_juce_path()
+  local parent = vim.fn.fnamemodify(get_project_root(), ':h')
+  local sibling = parent .. '/JUCE'
+  if vim.fn.filereadable(sibling .. '/CMakeLists.txt') == 1 then
+    return sibling
+  end
+  local cousin = vim.fn.fnamemodify(parent, ':h') .. '/JUCE'
+  if vim.fn.filereadable(cousin .. '/CMakeLists.txt') == 1 then
+    return cousin
+  end
+  return nil
+end
+
+-- Resolves the directory a discovered <prefix>_<name> submodule should be
+-- scanned from. JUCE is copied into an ephemeral OS-temp tree before
+-- patching (jam/kuassa BuildSetup.cmake PATCHED_JUCE_PATH) — CDB entries for
+-- juce_* submodules point there, not at the permanent checkout, and that
+-- tree is deleted and rebuilt on the next configure. Redirect juce_*
+-- submodules to the pristine JUCE_PATH so the picker shows editable,
+-- permanent source instead of a disposable copy.
+local function resolve_module_root(file, submodule)
+  local idx = file:find('/' .. submodule .. '/')
+  if idx == nil then return nil end
+  if submodule:match('^juce_') then
+    local juce_path = get_juce_path()
+    if juce_path == nil then return nil end
+    return juce_path .. '/modules/' .. submodule
+  end
+  return file:sub(1, idx + #submodule)
+end
+
 function M.find_compile_db()
   local root = get_project_root()
   local markers = vim.fs.find('compile_commands.json', {
@@ -243,7 +280,7 @@ local function generate_symlink_tree()
   for _, entry in ipairs(data) do
     local file = entry.file
     if file ~= nil and seen[file] == nil then
-      local skip = file:find('/Builds/') ~= nil or file:find('/juce-patched/') ~= nil
+      local skip = file:find('/Builds/') ~= nil
       if not skip then
         seen[file] = true
         local group, submodule = classify_file(file)
@@ -264,12 +301,9 @@ local function generate_symlink_tree()
             vim.fn.system({ 'ln', '-sf', file, symlink })
           end
         elseif group == 'User Modules' and submodule ~= nil then
-          local idx = file:find('/' .. submodule .. '/')
-          if idx ~= nil then
-            local module_root = file:sub(1, idx + #submodule)
-            if seen_modules[submodule] == nil then
-              seen_modules[submodule] = module_root
-            end
+          local module_root = resolve_module_root(file, submodule)
+          if module_root ~= nil and seen_modules[submodule] == nil then
+            seen_modules[submodule] = module_root
           end
         end
       end
@@ -393,7 +427,7 @@ function M.files()
       for i, entry in ipairs(data) do
         local file = entry.file
         if file ~= nil and seen[file] == nil then
-          local skip = file:find('/Builds/') ~= nil or file:find('/juce-patched/') ~= nil
+          local skip = file:find('/Builds/') ~= nil
           if not skip then
             seen[file] = true
             local group, submodule = classify_file(file)
@@ -409,22 +443,24 @@ function M.files()
                 display = display,
               })
             elseif group == 'User Modules' and submodule ~= nil then
-              local idx = file:find('/' .. submodule .. '/')
-              if idx ~= nil then
-                local module_root = file:sub(1, idx + #submodule)
-                if seen_modules[submodule] == nil then
-                  seen_modules[submodule] = module_root
-                end
+              local module_root = resolve_module_root(file, submodule)
+              if module_root ~= nil and seen_modules[submodule] == nil then
+                seen_modules[submodule] = module_root
               end
-              local display = file:gsub('^' .. vim.pesc(cwd) .. '/', '')
-              table.insert(items, {
-                idx = i,
-                score = i,
-                text = submodule .. '/' .. display,
-                file = file,
-                module = submodule,
-                display = display,
-              })
+              -- JUCE's CDB entry always names the ephemeral patched copy
+              -- (see resolve_module_root) — the module scan below adds the
+              -- real files, so the ephemeral file itself is not an item.
+              if not submodule:match('^juce_') then
+                local display = file:gsub('^' .. vim.pesc(cwd) .. '/', '')
+                table.insert(items, {
+                  idx = i,
+                  score = i,
+                  text = submodule .. '/' .. display,
+                  file = file,
+                  module = submodule,
+                  display = display,
+                })
+              end
             end
           end
         end
@@ -925,12 +961,11 @@ local function get_dirs()
   local module_roots = {}
   for _, entry in ipairs(data) do
     local file = entry.file
-    if file ~= nil and not file:find('/Builds/') and not file:find('/juce-patched/') then
+    if file ~= nil and not file:find('/Builds/') then
       local group, submodule = classify_file(file)
       if group == 'User Modules' and submodule ~= nil then
-        local idx = file:find('/' .. submodule .. '/')
-        if idx ~= nil then
-          local module_root = file:sub(1, idx + #submodule)
+        local module_root = resolve_module_root(file, submodule)
+        if module_root ~= nil then
           module_roots[submodule] = module_root
           if seen_dirs[module_root] == nil then
             seen_dirs[module_root] = true
