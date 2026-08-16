@@ -19,7 +19,7 @@
       "Bash(git checkout --*)"
     ]
   },
-  "model": "opus",
+  "model": "sonnet",
   "statusLine": {
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
