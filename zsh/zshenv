@@ -1,0 +1,11 @@
+# Command Code — always launch in bypass (--yolo) in every zsh (interactive,
+# non-interactive, tmux, scripts). Deny rules and the PreToolUse destructive
+# command hook still gate blocked operations under bypass.
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  cmdc() { command cmdc --yolo "$@"; }
+else
+  cmd() { command cmd --yolo "$@"; }
+fi
+
+# CAROL CLI (carol, carolcmd) available in every shell
+export PATH="$HOME/.carol/bin:$PATH"
