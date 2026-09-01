@@ -24,6 +24,13 @@ local EXCLUDE_DIRS = { 'docs' }
 -- Used by classify_file (path → module name) and by sort priorities.
 local FRAMEWORK_PREFIXES = { 'jam', 'kuassa', 'iq', 'juce' }
 
+-- Project-root files that belong to no scanned directory tree. Each becomes a
+-- picker item under its own module label; the order here is the pick order.
+local ROOT_FILES = {
+  { name = 'project-info.md', module = 'Project' },
+  { name = 'CMakeLists.txt',  module = 'CMake'   },
+}
+
 -- Searches upward from cwd for CMakeLists.txt to find the project root.
 -- Falls back to cwd when none is found (e.g. nvim started outside the project).
 local function get_project_root()
@@ -76,10 +83,13 @@ local function resolve_module_root(file, submodule)
   return file:sub(1, idx + #submodule)
 end
 
+-- Builds/<Scheme>/compile_commands.json (cast's own ## toolchain rows) or
+-- the legacy Builds/Ninja/<Scheme>/compile_commands.json (build-debug.sh) —
+-- both are one downward recursive find from Builds/ itself.
 function M.find_compile_db()
   local root = get_project_root()
   local markers = vim.fs.find('compile_commands.json', {
-    path  = root .. '/Builds/Ninja',
+    path  = root .. '/Builds',
     limit = 1,
   })
   return #markers > 0 and markers[1] or nil
@@ -546,36 +556,39 @@ function M.files()
     end
   end
 
-  -- Fourth pass: add CMakeLists.txt from project root
-  local cmake_file = cwd .. '/CMakeLists.txt'
-  if vim.fn.filereadable(cmake_file) == 1 and seen[cmake_file] == nil then
-    seen[cmake_file] = true
-    table.insert(items, {
-      idx = #items + 1,
-      score = #items + 1,
-      text = 'CMakeLists.txt',
-      file = cmake_file,
-      module = 'CMake',
-      display = 'CMakeLists.txt',
-    })
+  -- Fourth pass: add project-root files (see ROOT_FILES)
+  for _, root_file in ipairs(ROOT_FILES) do
+    local path = cwd .. '/' .. root_file.name
+    if vim.fn.filereadable(path) == 1 and seen[path] == nil then
+      seen[path] = true
+      table.insert(items, {
+        idx = #items + 1,
+        score = #items + 1,
+        text = root_file.name,
+        file = path,
+        module = root_file.module,
+        display = root_file.name,
+      })
+    end
   end
 
   table.sort(items, function(a, b)
     if a.module == b.module then
       return a.display < b.display
     end
-    -- Order: project (CMake/Source/Cast) > jam > lib > cium > juce > other
+    -- Order: project (Project/CMake/Source/Cast) > jam > lib > cium > juce > other
     local MODULE_PRIORITY = {
-      CMake = 1,
-      Source = 2,
-      Cast = 3,
+      Project = 1,
+      CMake = 2,
+      Source = 3,
+      Cast = 4,
     }
     local function priority(mod)
       if MODULE_PRIORITY[mod] then return MODULE_PRIORITY[mod] end
       for i, prefix in ipairs(FRAMEWORK_PREFIXES) do
-        if mod:match('^' .. prefix .. '_') then return i + 3 end
+        if mod:match('^' .. prefix .. '_') then return i + 4 end
       end
-      return #FRAMEWORK_PREFIXES + 4
+      return #FRAMEWORK_PREFIXES + 5
     end
     local pa, pb = priority(a.module), priority(b.module)
     if pa ~= pb then return pa < pb end

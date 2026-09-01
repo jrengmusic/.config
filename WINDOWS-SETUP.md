@@ -216,7 +216,7 @@ JUCE explicitly rejects MinGW (`#error "MinGW is not supported"`), so builds req
 |---|---|---|
 | `build-debug.sh` | macOS | Build with clang via cmake+ninja |
 | `build-debug.bat` | Windows | vcvarsall.bat + clang-cl + cmake+ninja |
-| `clean-build.sh` | Both | Delete `Builds/Ninja/` (no compiler needed) |
+| `clean-build.sh` | Both | Delete `Builds/` (no compiler needed) |
 
 The `.bat` file:
 1. Calls `vcvarsall.bat x64` — sets up MSVC linker, headers, and libraries

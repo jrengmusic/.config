@@ -421,6 +421,26 @@ end
 -- DAP CONFIGURATIONS
 -- ============================================================================
 
+-- JUCE artefact discovery: cast-managed projects build into Builds/<Scheme>
+-- directly (project-info.md's ## toolchain rows); build-debug.sh/.bat's
+-- legacy layout nests one level deeper at Builds/Ninja/<Scheme> — same two
+-- layouts core/cmake-picker.lua's find_compile_db() searches. suffixFmt
+-- takes one %s for JUCE's own <Target>_artefacts/<Config>/... nesting when
+-- the artefact path repeats the scheme a second time (e.g. CLAP's flat
+-- Builds/<Scheme>/*.clap layout has no second occurrence — the extra
+-- scheme argument to format() is simply unused).
+local BUILD_DIR_PREFIXES = { '/Builds/Ninja/', '/Builds/' }
+
+local function artefactPatterns(root, suffixFmt)
+  local patterns = {}
+  for _, prefix in ipairs(BUILD_DIR_PREFIXES) do
+    for _, scheme in ipairs({ 'Debug', 'Release' }) do
+      table.insert(patterns, root .. prefix .. scheme .. suffixFmt:format(scheme))
+    end
+  end
+  return patterns
+end
+
 -- Helper to get DAW PID from config. Only valid for DAW-paired formats —
 -- the loaded config's own daw field is the SSOT (Standalone/App formats
 -- are saved with daw = '', per showDawFormatDialog's onFormatChosen).
@@ -483,24 +503,17 @@ function M.setup()
       program = function()
         local root = vim.fn.getcwd()
         -- JUCE standalone apps are in *_App_artefacts/Debug|Release/*.app or *.exe
-        local patterns = {
-          -- macOS: standalone-only projects (juce_add_gui_app)
-          root .. '/Builds/Ninja/Debug/**/*App_artefacts*/Debug/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*App_artefacts*/Release/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/*.app/Contents/MacOS/*',
-          -- macOS: plugin projects with Standalone among FORMATS (nested like VST3/AU/CLAP)
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/Standalone/*.app/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/Standalone/*.app/Contents/MacOS/*',
-          -- Windows: standalone-only projects
-          root .. '/Builds/Ninja/Debug/**/*App_artefacts*/Debug/*.exe',
-          root .. '/Builds/Ninja/Release/**/*App_artefacts*/Release/*.exe',
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/*.exe',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/*.exe',
-          -- Windows: plugin projects with Standalone among FORMATS
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/Standalone/*.exe',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/Standalone/*.exe',
-        }
+        local patterns = {}
+        -- macOS: standalone-only projects (juce_add_gui_app)
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*App_artefacts*/%s/*.app/Contents/MacOS/*'))
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/*.app/Contents/MacOS/*'))
+        -- macOS: plugin projects with Standalone among FORMATS (nested like VST3/AU/CLAP)
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/Standalone/*.app/Contents/MacOS/*'))
+        -- Windows: standalone-only projects
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*App_artefacts*/%s/*.exe'))
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/*.exe'))
+        -- Windows: plugin projects with Standalone among FORMATS
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/Standalone/*.exe'))
 
         local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
         local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
@@ -534,10 +547,7 @@ function M.setup()
         end
         -- Mac: attach mode, program is the plugin binary
         local root = vim.fn.getcwd()
-        local patterns = {
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST3/*.vst3/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST3/*.vst3/Contents/MacOS/*',
-        }
+        local patterns = artefactPatterns(root, '/**/*artefacts*/%s/VST3/*.vst3/Contents/MacOS/*')
         local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
         local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then return found end
@@ -553,11 +563,8 @@ function M.setup()
       pid = getDawPid,
       program = function()
         local root = vim.fn.getcwd()
-        local patterns = {
-          -- macOS only (no AU on Windows)
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AU/*.component/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AU/*.component/Contents/MacOS/*',
-        }
+        -- macOS only (no AU on Windows)
+        local patterns = artefactPatterns(root, '/**/*artefacts*/%s/AU/*.component/Contents/MacOS/*')
         local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
         local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then
@@ -575,14 +582,9 @@ function M.setup()
       pid = getDawPid,
       program = function()
         local root = vim.fn.getcwd()
-        local patterns = {
-          -- macOS
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST/*.vst/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST/*.vst/Contents/MacOS/*',
-          -- Windows
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/VST/*.dll',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/VST/*.dll',
-        }
+        local patterns = {}
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/VST/*.vst/Contents/MacOS/*'))
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/VST/*.dll'))
         local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
         local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then
@@ -600,14 +602,9 @@ function M.setup()
       pid = getDawPid,
       program = function()
         local root = vim.fn.getcwd()
-        local patterns = {
-          -- macOS
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AAX/*.aaxplugin/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AAX/*.aaxplugin/Contents/MacOS/*',
-          -- Windows
-          root .. '/Builds/Ninja/Debug/**/*artefacts*/Debug/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
-          root .. '/Builds/Ninja/Release/**/*artefacts*/Release/AAX/*.aaxplugin/Contents/x64/*.aaxplugin',
-        }
+        local patterns = {}
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/AAX/*.aaxplugin/Contents/MacOS/*'))
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*artefacts*/%s/AAX/*.aaxplugin/Contents/x64/*.aaxplugin'))
         local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
         local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then
@@ -629,14 +626,10 @@ function M.setup()
         -- not through JUCE's FORMATS artefact pipeline — it never lands under
         -- {TARGET}_artefacts/{Config}/CLAP/ like VST3/AU/AAX do. Output sits directly
         -- in the per-config build dir: Builds/Ninja/{Config}/{PRODUCT_NAME}.clap
-        local patterns = {
-          -- macOS
-          root .. '/Builds/Ninja/Debug/**/*.clap/Contents/MacOS/*',
-          root .. '/Builds/Ninja/Release/**/*.clap/Contents/MacOS/*',
-          -- Windows
-          root .. '/Builds/Ninja/Debug/**/*.clap',
-          root .. '/Builds/Ninja/Release/**/*.clap',
-        }
+        -- (or Builds/{Config} for cast-managed projects).
+        local patterns = {}
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*.clap/Contents/MacOS/*'))
+        vim.list_extend(patterns, artefactPatterns(root, '/**/*.clap'))
         local scheme = (M.loadDawConfig() or {}).scheme or 'Debug'
         local found = newestArtefact(filterPatternsByScheme(patterns, scheme))
         if found then

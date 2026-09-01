@@ -221,6 +221,86 @@ local function openLogWindow(height)
   return buf, win, appendLines
 end
 
+-- -1 (vim.fn.getftime's own "doesn't exist" value) when there's no
+-- compile_commands.json yet — a valid, comparable state on its own.
+local function compileDbMtime()
+  local compile_db = require('core.cmake-picker').find_compile_db()
+  return compile_db ~= nil and vim.fn.getftime(compile_db) or -1
+end
+
+-- Module-scope (not buildFormat-nested) so cast-managed projects
+-- (core/cast-build.lua) share the exact same job/log-window/errorformat/
+-- quickfix machinery instead of a second copy — the only project-shaped
+-- input is args, already fully generic.
+local function runBuildJob(args, onSuccess)
+  local traffic = require('core.traffic')
+  local log_buf, log_win, appendLines = openLogWindow(15)
+  -- Captured before the job spawns: build-debug.{bat,sh} only reconfigures
+  -- (regenerating compile_commands.json) when CMakeCache.txt/build.ninja
+  -- are absent — an ordinary incremental build leaves it untouched. Since
+  -- CMake configure always runs before compiling (never after), this mtime
+  -- has already settled to its post-build value by the time compilation
+  -- starts, whether that compilation goes on to succeed or fail.
+  local mtimeBefore = compileDbMtime()
+
+  local function on_exit(exit_code)
+    -- Runs on both success and failure: a failing compile after a clean
+    -- rebuild still reconfigured (fresh compile_commands.json) before the
+    -- first file ever failed to compile — the root CDB copy needs the
+    -- refresh regardless of whether compilation itself succeeded. An
+    -- ordinary incremental build (no reconfigure) leaves compileDbMtime()
+    -- unchanged and syncs nothing. clangd notices the refreshed copy by
+    -- itself (compilationDatabase.automaticReload) — no LSP restart.
+    if compileDbMtime() ~= mtimeBefore then
+      require('core.cmake-picker').syncClangdAsync()
+    end
+    if exit_code == 0 then
+      if vim.api.nvim_win_is_valid(log_win) then
+        vim.api.nvim_win_close(log_win, true)
+      end
+      onSuccess()
+    else
+      -- Highlights applied once, to a now-static buffer — never during
+      -- the live scroll (see openLogWindow).
+      if vim.api.nvim_buf_is_valid(log_buf) then
+        vim.bo[log_buf].modifiable = false
+        require('core.autocommands').applyOutputHighlights(log_buf)
+        vim.keymap.set('n', 'q', function()
+          if vim.api.nvim_win_is_valid(log_win) then
+            vim.api.nvim_win_close(log_win, true)
+          end
+        end, { buffer = log_buf, nowait = true })
+        -- Errors → quickfix, cursor lands on the first failing source
+        -- line (never inside the log window — that would swap the log
+        -- buffer out from under itself). :cn/:cp walk the rest.
+        vim.fn.setqflist({}, ' ', {
+          title = 'Build',
+          lines = vim.api.nvim_buf_get_lines(log_buf, 0, -1, false),
+          efm = BUILD_ERRORFORMAT,
+        })
+        local hasError = false
+        for _, item in ipairs(vim.fn.getqflist()) do
+          if item.valid == 1 then hasError = true end
+        end
+        if hasError then
+          if vim.api.nvim_get_current_win() == log_win then
+            vim.cmd('wincmd p')
+          end
+          vim.cmd('cfirst')
+        end
+      end
+      vim.notify('Build failed (exit ' .. exit_code .. ') — press q to close', vim.log.levels.ERROR)
+    end
+  end
+
+  traffic.spawn(traffic.STATE.BUILDING, args, { onLines = appendLines, onExit = on_exit })
+  bindAbort(log_buf, log_win)
+end
+
+-- Shared with core/cast-build.lua — the one job/log-window/errorformat/
+-- quickfix machine, not project-shaped beyond its args parameter.
+M.runBuildJob = runBuildJob
+
 -- buildFormat resolves the DAW/plugin format, builds it, and hands the
 -- resolved cfg to onBuilt — copy-to-system-dir always happens inside the
 -- build script itself, so onBuilt only ever decides post-build action
@@ -232,78 +312,6 @@ local function buildFormat(scheme, onBuilt, notarize)
   local dapConfig = require('dap.configurations')
   local root = vim.fn.getcwd()
   local script = buildScript()
-
-  -- -1 (vim.fn.getftime's own "doesn't exist" value) when there's no
-  -- compile_commands.json yet — a valid, comparable state on its own.
-  local function compileDbMtime()
-    local compile_db = require('core.cmake-picker').find_compile_db()
-    return compile_db ~= nil and vim.fn.getftime(compile_db) or -1
-  end
-
-  local function runBuildJob(args, onSuccess)
-    local traffic = require('core.traffic')
-    local log_buf, log_win, appendLines = openLogWindow(15)
-    -- Captured before the job spawns: build-debug.{bat,sh} only reconfigures
-    -- (regenerating compile_commands.json) when CMakeCache.txt/build.ninja
-    -- are absent — an ordinary incremental build leaves it untouched. Since
-    -- CMake configure always runs before compiling (never after), this mtime
-    -- has already settled to its post-build value by the time compilation
-    -- starts, whether that compilation goes on to succeed or fail.
-    local mtimeBefore = compileDbMtime()
-
-    local function on_exit(exit_code)
-      -- Runs on both success and failure: a failing compile after a clean
-      -- rebuild still reconfigured (fresh compile_commands.json) before the
-      -- first file ever failed to compile — the root CDB copy needs the
-      -- refresh regardless of whether compilation itself succeeded. An
-      -- ordinary incremental build (no reconfigure) leaves compileDbMtime()
-      -- unchanged and syncs nothing. clangd notices the refreshed copy by
-      -- itself (compilationDatabase.automaticReload) — no LSP restart.
-      if compileDbMtime() ~= mtimeBefore then
-        require('core.cmake-picker').syncClangdAsync()
-      end
-      if exit_code == 0 then
-        if vim.api.nvim_win_is_valid(log_win) then
-          vim.api.nvim_win_close(log_win, true)
-        end
-        onSuccess()
-      else
-        -- Highlights applied once, to a now-static buffer — never during
-        -- the live scroll (see openLogWindow).
-        if vim.api.nvim_buf_is_valid(log_buf) then
-          vim.bo[log_buf].modifiable = false
-          require('core.autocommands').applyOutputHighlights(log_buf)
-          vim.keymap.set('n', 'q', function()
-            if vim.api.nvim_win_is_valid(log_win) then
-              vim.api.nvim_win_close(log_win, true)
-            end
-          end, { buffer = log_buf, nowait = true })
-          -- Errors → quickfix, cursor lands on the first failing source
-          -- line (never inside the log window — that would swap the log
-          -- buffer out from under itself). :cn/:cp walk the rest.
-          vim.fn.setqflist({}, ' ', {
-            title = 'Build',
-            lines = vim.api.nvim_buf_get_lines(log_buf, 0, -1, false),
-            efm = BUILD_ERRORFORMAT,
-          })
-          local hasError = false
-          for _, item in ipairs(vim.fn.getqflist()) do
-            if item.valid == 1 then hasError = true end
-          end
-          if hasError then
-            if vim.api.nvim_get_current_win() == log_win then
-              vim.cmd('wincmd p')
-            end
-            vim.cmd('cfirst')
-          end
-        end
-        vim.notify('Build failed (exit ' .. exit_code .. ') — press q to close', vim.log.levels.ERROR)
-      end
-    end
-
-    traffic.spawn(traffic.STATE.BUILDING, args, { onLines = appendLines, onExit = on_exit })
-    bindAbort(log_buf, log_win)
-  end
 
   local function args_base(format)
     local args = {script, root, scheme, format}
@@ -420,21 +428,42 @@ end
 
 -- Keymap-facing entry points. killDapThen composition lives here — lexicon
 -- rows stay parameterless dotted references.
+--
+-- cast-managed projects (cast/CAST.md at cwd — see core/cast-build.lua)
+-- have no DAW/Standalone target to attach a debugger to, so every entry
+-- point below branches to a plain build+notify instead of killDapThen's
+-- DAP-session teardown and launch.
 
 function M.buildDebugAndRun()
-  killDapThen(function() runBuildAndLaunch('Debug') end)
+  if require('core.cast-build').isCastManaged(vim.fn.getcwd()) then
+    require('core.cast-build').build('Debug')
+  else
+    killDapThen(function() runBuildAndLaunch('Debug') end)
+  end
 end
 
 function M.buildReleaseAndRun()
-  killDapThen(function() runBuildAndLaunch('Release') end)
+  if require('core.cast-build').isCastManaged(vim.fn.getcwd()) then
+    require('core.cast-build').build('Release')
+  else
+    killDapThen(function() runBuildAndLaunch('Release') end)
+  end
 end
 
 function M.buildDebugOnly()
-  killDapThen(function() runBuildOnly('Debug') end)
+  if require('core.cast-build').isCastManaged(vim.fn.getcwd()) then
+    require('core.cast-build').build('Debug')
+  else
+    killDapThen(function() runBuildOnly('Debug') end)
+  end
 end
 
 function M.buildReleaseOnly()
-  killDapThen(function() runBuildOnly('Release', true) end)
+  if require('core.cast-build').isCastManaged(vim.fn.getcwd()) then
+    require('core.cast-build').build('Release')
+  else
+    killDapThen(function() runBuildOnly('Release', true) end)
+  end
 end
 
 function M.cleanBuild()

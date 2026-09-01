@@ -13,10 +13,10 @@ setlocal
 
 set ROOT=%~1
 if "%ROOT%"=="" set ROOT=.
-set BUILD_DIR=%ROOT%\Builds\Ninja
+set BUILD_DIR=%ROOT%\Builds
 
 echo ==========================================
-echo Cleaning Ninja build directory...
+echo Cleaning Builds directory...
 echo ==========================================
 
 :: Kill any dangling cmake/ninja instance still holding this project's build
