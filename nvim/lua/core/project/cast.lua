@@ -19,13 +19,16 @@ local DEBUGGER = 'whatdbg'
 -- The manifest contract: every table and every ## cmake key the AST is
 -- built from. A manifest missing any of them is not a project.
 local REQUIRED_TABLES = { 'index', 'project info', 'cmake', 'toolchain' }
-local REQUIRED_CMAKE_KEYS = { 'jucePath', 'userModulePath', 'productName', 'juceTargetFunction', 'bundleIdentifier' }
+local REQUIRED_CMAKE_KEYS = { 'jucePath', 'userModulePath', 'targetName', 'productName', 'juceTargetFunction', 'bundleIdentifier' }
 
 local is_windows = vim.fn.has('win32') == 1
 local PLATFORM = is_windows and 'win' or 'mac'
 
 -- JUCE's fixed per-format artefact layout. {artefacts} is
--- <buildDir>/<projectName>_artefacts/<buildType>, {name} the PRODUCT_NAME.
+-- <buildDir>/<targetName>_artefacts/<buildType> -- JUCE names the artefact
+-- directory after the CMake target, which the manifest declares separately
+-- from the product name it may not be a legal identifier for -- and {name}
+-- is the PRODUCT_NAME.
 -- A format without an entry for the host platform is not a target there.
 local FORMAT_LAYOUT = {
   Standalone = { kind = 'executable',
@@ -130,11 +133,11 @@ local function getLayouts(cmake, formats)
   return { { name = cmake.productName, layout = APPLICATION_LAYOUT[cmake.juceTargetFunction] } }
 end
 
-local function getProduct(layout, configurations, projectName, productName)
+local function getProduct(layout, configurations, targetName, productName)
   local product = {}
   for key, configuration in pairs(configurations) do
     product[key] = render(layout, {
-      artefacts = configuration.buildDir .. '/' .. projectName .. '_artefacts/' .. configuration.buildType,
+      artefacts = configuration.buildDir .. '/' .. targetName .. '_artefacts/' .. configuration.buildType,
       buildDir = configuration.buildDir,
       name = productName,
     })
@@ -142,7 +145,7 @@ local function getProduct(layout, configurations, projectName, productName)
   return product
 end
 
-local function getTargets(cmake, formats, configurations, projectName)
+local function getTargets(cmake, formats, configurations)
   local targets = {}
   for _, entry in ipairs(getLayouts(cmake, formats)) do
     local layout = entry.layout and entry.layout[PLATFORM]
@@ -151,7 +154,7 @@ local function getTargets(cmake, formats, configurations, projectName)
         name = entry.name,
         kind = entry.layout.kind,
         capabilities = vim.deepcopy(CAPABILITIES[entry.layout.kind]),
-        product = getProduct(layout, configurations, projectName, cmake.productName),
+        product = getProduct(layout, configurations, cmake.targetName, cmake.productName),
       }
     end
   end
@@ -206,14 +209,14 @@ local function getFlags(entry)
   return flags
 end
 
-local function getCompile(configurations, projectName)
+local function getCompile(configurations, targetName)
   local compile = {}
   for key, configuration in pairs(configurations) do
     local database = configuration.buildDir .. '/' .. COMPILE_DATABASE
     if vim.fn.filereadable(database) == 1 then
       local entries = vim.json.decode(table.concat(vim.fn.readfile(database), '\n'))
       assert(entries[1], 'cast: empty compile database ' .. database)
-      local juceHeader = configuration.buildDir .. '/' .. projectName .. '_artefacts/' .. JUCE_HEADER
+      local juceHeader = configuration.buildDir .. '/' .. targetName .. '_artefacts/' .. JUCE_HEADER
       compile[key] = {
         database = database,
         flags = getFlags(entries[1]),
@@ -282,8 +285,8 @@ function M.build(root, selection)
   local variables = getVariables(root, cmake, aliases)
 
   local configurations = getConfigurations(root, byHeading['toolchain'])
-  local targets = getTargets(cmake, byHeading['format'], configurations, info.projectName)
-  local compile = getCompile(configurations, info.projectName)
+  local targets = getTargets(cmake, byHeading['format'], configurations)
+  local compile = getCompile(configurations, cmake.targetName)
 
   return {
     sources = getSources(manifest, compile),

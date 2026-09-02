@@ -43,7 +43,6 @@ local BUILD_ERRORFORMAT = table.concat({
   [[%f:%l:%c: %trror: %m]],
   [[%f:%l:%c: %tarning: %m]],
 }, ',')
-local BUILD_GUARD_LISTENER_KEY = 'build_guard'
 local STANDALONE_PID_LISTENER_KEY = 'standalone_pid_capture'
 
 local function getProject()
@@ -51,21 +50,29 @@ local function getProject()
   return project.getOrCreate(project.getRoot())
 end
 
--- The project-state target a DAP config ran (configs are named after
--- their target — dap/launch.lua).
-local function getSessionTarget(config)
-  local project = config and getProject()
-  if project == nil then return nil end
+local function getTarget(project, name)
   for _, target in ipairs(project.targets) do
-    if target.name == config.name then return target end
+    if target.name == name then return target end
   end
   return nil
 end
 
+-- The project-state target a DAP config ran (configs are named after
+-- their target — dap/launch.lua).
+local function getSessionTarget(config)
+  local project = config and getProject()
+  if project then return getTarget(project, config.name) end
+  return nil
+end
+
+-- A target that launches on its own, with no host to pair with.
+local function isExecutable(target)
+  return target ~= nil and target.kind == 'executable'
+end
+
 -- A launch with no host to pair with: an executable target.
 function M.isStandaloneLaunch(config)
-  local target = getSessionTarget(config)
-  return target ~= nil and target.kind == 'executable'
+  return isExecutable(getSessionTarget(config))
 end
 
 -- A real host application (a DAW) gets a plain, graceful terminate — never
@@ -188,43 +195,55 @@ local function killStandalone()
   end
 end
 
--- SSOT is the DAP config that actually ran, captured before dap.terminate()
--- clears the session. The kill fires first, from the PID captured at
--- launch -- immediate, no waiting on dap.terminate()'s own DAP-protocol
--- round trip through whatdbg to release the debuggee.
+-- Kills what `target` launched: the PID captured at launch for an
+-- executable, the selected host application for a plugin.
+local function killTarget(target)
+  if target then
+    if isExecutable(target) then
+      killStandalone()
+    elseif getProject().selection.host ~= '' then
+      killHost(vim.fs.basename(getProject().selection.host))
+    end
+  end
+end
+
+-- What the last launch started, as a project-state target. A live session's
+-- own config names exactly what ran, so it answers whenever there is one;
+-- once the adapter is gone the state's selection is the only record left,
+-- and the process it started may well still be alive -- whatdbg exiting or
+-- the session disconnecting never terminated the debuggee.
+local function getLaunchedTarget()
+  local session = require('dap').session()
+  if session then return getSessionTarget(session.config) end
+  local project = getProject()
+  return project and getTarget(project, project.selection.target)
+end
+
+-- The kill fires first, from the PID captured at launch -- immediate, no
+-- waiting on dap.terminate()'s own DAP-protocol round trip through whatdbg
+-- to release the debuggee.
 local function terminateDap()
   local dap = require('dap')
   local dapui = require('dapui')
+  local target = getLaunchedTarget()
 
-  local session = dap.session()
-  local config = session and session.config
-  local target = getSessionTarget(config)
-  local isStandalone = M.isStandaloneLaunch(config)
-
-  if isStandalone then
-    killStandalone()
-  elseif target and getProject().selection.host ~= '' then
-    killHost(vim.fs.basename(getProject().selection.host))
-  end
+  killTarget(target)
 
   dap.terminate()
   dapui.close()
 
-  return isStandalone
+  return isExecutable(target)
 end
 
-local function killDapThen(continuation)
-  local dap = require('dap')
-
-  if dap.session() == nil then
-    continuation()
-  else
-    dap.listeners.after.terminate[BUILD_GUARD_LISTENER_KEY] = function()
-      dap.listeners.after.terminate[BUILD_GUARD_LISTENER_KEY] = nil
-      vim.defer_fn(continuation, DAP_TERMINATE_GRACE_MS)
-    end
-    terminateDap()
-  end
+-- Every build and clean entry point starts here: whatever the previous run
+-- left running is killed before the new one starts, so a rebuild never runs
+-- beside the process it is about to overwrite. The continuation is timed off
+-- the kill, never off the adapter's terminate response -- that response is
+-- the one thing a wedged adapter can withhold indefinitely, and a build that
+-- waits on it never starts at all.
+local function killRunningThen(continuation)
+  terminateDap()
+  vim.defer_fn(continuation, DAP_TERMINATE_GRACE_MS)
 end
 
 -- traffic.stop() both kills the job and clears its identity, so the job's
@@ -434,33 +453,33 @@ local function runClean(onDone)
   end
 end
 
--- Keymap-facing entry points. killDapThen composition lives here — lexicon
+-- Keymap-facing entry points. killRunningThen composition lives here — lexicon
 -- rows stay parameterless dotted references. One flow for every project:
 -- the project state decides what is built and launched, never the entry
 -- point.
 
 function M.buildDebugAndRun()
-  killDapThen(function() runBuildAndLaunch('Debug') end)
+  killRunningThen(function() runBuildAndLaunch('Debug') end)
 end
 
 function M.buildReleaseAndRun()
-  killDapThen(function() runBuildAndLaunch('Release') end)
+  killRunningThen(function() runBuildAndLaunch('Release') end)
 end
 
 function M.buildDebugOnly()
-  killDapThen(function() runBuildOnly('Debug') end)
+  killRunningThen(function() runBuildOnly('Debug') end)
 end
 
 function M.buildReleaseOnly()
-  killDapThen(function() runBuildOnly('Release') end)
+  killRunningThen(function() runBuildOnly('Release') end)
 end
 
 function M.cleanBuild()
-  killDapThen(function() runClean(function() runBuildAndLaunch('Debug') end) end)
+  killRunningThen(function() runClean(function() runBuildAndLaunch('Debug') end) end)
 end
 
 function M.cleanOnly()
-  killDapThen(runClean)
+  killRunningThen(runClean)
 end
 
 -- F5: pick what to launch — target (auto when the project has one), then
