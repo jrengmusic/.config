@@ -133,7 +133,6 @@ function M.pick(project, configuration, callback)
     local function save(host)
       local selection = { target = name, host = host, configuration = configuration or project.selection.configuration }
       local updated = require('core.project').setSelection(root, selection)
-      vim.notify('Selection saved: ' .. name .. (host ~= '' and (' + ' .. vim.fs.basename(host)) or ''))
       if callback then callback(updated.selection) end
     end
     if getTarget(project, name).kind == 'plugin' then

@@ -487,9 +487,7 @@ end
 function M.configureProject()
   local project = getProject()
   if project then
-    require('dap.launch').pick(project, nil, function()
-      vim.notify('bb  build debug + run\nbr  build release + run\nbn  build debug only\nbR  build release only')
-    end)
+    require('dap.launch').pick(project, nil, nil)
   else
     vim.notify('No project state here: a project needs project-info.md and cast/CAST.md', vim.log.levels.ERROR)
   end
