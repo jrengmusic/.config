@@ -46,8 +46,6 @@ local BUILD_ERRORFORMAT = table.concat({
 local BUILD_GUARD_LISTENER_KEY = 'build_guard'
 local STANDALONE_PID_LISTENER_KEY = 'standalone_pid_capture'
 
-local standalonePid = nil
-
 local function getProject()
   local project = require('core.project')
   return project.getOrCreate(project.getRoot())
@@ -70,12 +68,42 @@ function M.isStandaloneLaunch(config)
   return target ~= nil and target.kind == 'executable'
 end
 
--- Async capture: the powershell CIM query takes seconds to cold start —
--- vim.fn.system here blocked the main loop for its whole duration
--- (measured 3s), right after every Standalone launch. Polled: one shot at
--- +500ms returned nothing (measured pid=nil, process not yet queryable),
--- leaving Esc-terminate unable to kill the app.
-local function capturePid(cmd)
+-- A real host application (a DAW) gets a plain, graceful terminate — never
+-- force-killed on every debug session's end.
+local function killHost(name)
+  if is_windows then
+    vim.fn.jobstart({ 'taskkill', '/F', '/IM', name })
+  else
+    vim.fn.jobstart({ 'killall', name })
+  end
+end
+
+-- Matched by the process's own name (comm), not its full command line or
+-- path: a name match is exact and can't accidentally widen to catch a
+-- differently-invoked process sharing a path substring. Windows' PowerShell
+-- query matches the same way -- by -Name, not -ExecutablePath, since that
+-- WQL filter compares literal strings and the DAP config's forward-slash
+-- path never equals Win32's backslash ExecutablePath.
+local function getPidQuery(program)
+  local name = vim.fn.fnamemodify(program, ':t:r')
+  if is_windows then
+    return {
+      'powershell', '-NoProfile', '-Command',
+      string.format(
+        "(Get-Process -Name '%s' -ErrorAction SilentlyContinue | Select-Object -First 1).Id",
+        name
+      ),
+    }
+  end
+  return { 'pgrep', '-x', name }
+end
+
+-- Async capture at launch time, written straight into the project state
+-- (core/project.lua) rather than a local variable: terminate then reads it
+-- and kills immediately, never querying the OS or waiting on anything at
+-- terminate time -- dap.terminate()'s adapter round trip runs in parallel,
+-- never gating the kill.
+local function capturePid(root, cmd)
   local attempts = 0
   local function attempt()
     attempts = attempts + 1
@@ -84,7 +112,7 @@ local function capturePid(cmd)
       on_stdout = function(_, data)
         local pid = tonumber(vim.trim(table.concat(data, '\n')))
         if pid then
-          standalonePid = pid
+          require('core.project').setLaunchedPid(root, pid)
         elseif attempts < PID_CAPTURE_MAX_ATTEMPTS then
           vim.defer_fn(attempt, PID_CAPTURE_RETRY_MS)
         end
@@ -92,22 +120,6 @@ local function capturePid(cmd)
     })
   end
   attempt()
-end
-
--- Windows: match by process name, not path — a WQL ExecutablePath filter
--- compares literal strings, and the DAP config's forward-slash path never
--- equals Win32's backslash ExecutablePath.
-local function getPidQuery(program)
-  if is_windows then
-    return {
-      'powershell', '-NoProfile', '-Command',
-      string.format(
-        "(Get-Process -Name '%s' -ErrorAction SilentlyContinue | Select-Object -First 1).Id",
-        vim.fn.fnamemodify(program, ':t:r')
-      ),
-    }
-  end
-  return 'pgrep -f "' .. program .. '"'
 end
 
 -- Registers the launch listener that captures the executable's PID so
@@ -118,35 +130,68 @@ function M.registerDapListeners()
 
   dap.listeners.after.launch[STANDALONE_PID_LISTENER_KEY] = function(session, _)
     if M.isStandaloneLaunch(session.config) then
-      local program = session.config.program
-      vim.defer_fn(function() capturePid(getPidQuery(program)) end, PID_CAPTURE_DELAY_MS)
+      local root = getProject().manifest.root
+      vim.defer_fn(function() capturePid(root, getPidQuery(session.config.program)) end, PID_CAPTURE_DELAY_MS)
     end
   end
 end
 
+-- macOS: a process under active debugger control has its signals queued,
+-- not delivered, until the tracer (lldb's debugserver) resumes or detaches
+-- it -- SIGKILL included. debugserver is the debuggee's own direct parent
+-- (whatdbg -> debugserver -> debuggee), so it is found precisely by PPID,
+-- never by name (no blast radius on an unrelated debug session elsewhere).
+-- Killing debugserver forces the kernel to detach, which releases the
+-- already-queued SIGKILL on the debuggee immediately -- measured: dead
+-- before the very next process-table check, vs. up to several seconds
+-- waiting on whatdbg's own DAP-protocol terminate handling.
+local function getParentPid(pid)
+  local handle = io.popen('ps -o ppid= -p ' .. tostring(pid))
+  local output = handle and handle:read('*l')
+  if handle then handle:close() end
+  return output and tonumber(vim.trim(output)) or nil
+end
+
+-- macOS: the kernel process table and the Dock/LaunchServices "running
+-- application" registration (NSWorkspace/NSRunningApplication) are two
+-- separate subsystems -- kill -9 only ever touches the first. Apple's own
+-- -forceTerminate is documented to "remove the application from the Dock"
+-- as part of the call, which a raw external signal never does regardless of
+-- how fast or precisely it's aimed. Fire-and-forget, best effort: the
+-- process kill above is what actually guarantees termination; this clears
+-- the Dock entry in parallel.
+local function forceTerminateApp(bundleId)
+  if bundleId then
+    local jxa = string.format(
+      [[ObjC.import('AppKit'); var a = $.NSRunningApplication.runningApplicationsWithBundleIdentifier('%s'); for (var i = 0; i < a.count; i++) { a.objectAtIndex(i).forceTerminate(); }]],
+      bundleId
+    )
+    vim.fn.jobstart({ 'osascript', '-l', 'JavaScript', '-e', jxa })
+  end
+end
+
+-- Reads the PID captured at launch (project.selection.pid) and clears it
+-- once issued.
 local function killStandalone()
-  if standalonePid then
-    local pid = standalonePid
-    standalonePid = nil
+  local project = getProject()
+  local pid = project.selection.pid
+  if pid then
     if is_windows then
       vim.fn.jobstart({ 'taskkill', '/F', '/PID', tostring(pid) })
     else
+      local tracer = getParentPid(pid)
       vim.fn.jobstart({ 'kill', '-9', tostring(pid) })
+      if tracer then vim.fn.jobstart({ 'kill', '-9', tostring(tracer) }) end
+      forceTerminateApp(project.manifest.id)
     end
-  end
-end
-
-local function killHost(name)
-  if is_windows then
-    vim.fn.jobstart({ 'taskkill', '/F', '/IM', name })
-  else
-    vim.fn.jobstart({ 'killall', name })
+    require('core.project').setLaunchedPid(project.manifest.root, nil)
   end
 end
 
 -- SSOT is the DAP config that actually ran, captured before dap.terminate()
--- clears the session: an executable target kills its captured PID, a plugin
--- target kills the selected host.
+-- clears the session. The kill fires first, from the PID captured at
+-- launch -- immediate, no waiting on dap.terminate()'s own DAP-protocol
+-- round trip through whatdbg to release the debuggee.
 local function terminateDap()
   local dap = require('dap')
   local dapui = require('dapui')
@@ -155,14 +200,15 @@ local function terminateDap()
   local config = session and session.config
   local target = getSessionTarget(config)
   local isStandalone = M.isStandaloneLaunch(config)
-  dap.terminate()
-  dapui.close()
 
   if isStandalone then
     killStandalone()
   elseif target and getProject().selection.host ~= '' then
     killHost(vim.fs.basename(getProject().selection.host))
   end
+
+  dap.terminate()
+  dapui.close()
 
   return isStandalone
 end
@@ -271,19 +317,27 @@ local function showBuildFailure(log_buf, log_win, exit_code)
 end
 
 -- The one job/log-window/errorformat/quickfix machine; core/cast-build.lua
--- supplies the args. on_exit runs on both success and failure: a failing
--- compile after a clean rebuild still reconfigured (fresh
--- compile_commands.json) before the first file ever failed to compile —
--- the project state needs the re-parse regardless. Its listeners refresh
+-- supplies the args. reconfiguresProject names whether this job's target can
+-- have touched anything the project locator reads (project-info.md,
+-- Builds/, compile_commands.json) -- cast-build.lua's framework-manifest
+-- regen stage is pure codegen at the user-module root and never does, so it
+-- passes false to avoid a redundant reparse/ProjectChanged/.clangd-copy
+-- cycle ahead of the project build stage that actually reconfigures.
+-- on_exit reparses on both success and failure when reconfiguresProject is
+-- true: a failing compile after a clean rebuild still reconfigured (fresh
+-- compile_commands.json) before the first file ever failed to compile — the
+-- project state needs the re-parse regardless. Its listeners refresh
 -- .clangd and the root CDB copy; clangd notices the refreshed copy by
 -- itself (compilationDatabase.automaticReload).
-function M.runBuildJob(args, onSuccess)
+function M.runBuildJob(args, onSuccess, reconfiguresProject)
   local traffic = require('core.traffic')
   local log_buf, log_win, appendLines = openLogWindow(LOG_WINDOW_HEIGHT)
 
   local function on_exit(exit_code)
-    local project = require('core.project')
-    project.parse(project.getRoot())
+    if reconfiguresProject then
+      local project = require('core.project')
+      project.parse(project.getRoot())
+    end
     if exit_code == 0 then
       if vim.api.nvim_win_is_valid(log_win) then
         vim.api.nvim_win_close(log_win, true)

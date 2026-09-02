@@ -31,11 +31,11 @@ function M.build(project, argument, onSuccess)
   local frameworkManifest = project.dependencies.user.root .. '/' .. TOOLCHAIN_MANIFEST
 
   local function buildProject()
-    build.runBuildJob({ CAST_BINARY, TOOLCHAIN_MANIFEST, '--' .. argument }, onSuccess)
+    build.runBuildJob({ CAST_BINARY, TOOLCHAIN_MANIFEST, '--' .. argument }, onSuccess, true)
   end
 
   if vim.fn.filereadable(frameworkManifest) == 1 then
-    build.runBuildJob({ CAST_BINARY, frameworkManifest }, buildProject)
+    build.runBuildJob({ CAST_BINARY, frameworkManifest }, buildProject, false)
   else
     buildProject()
   end
