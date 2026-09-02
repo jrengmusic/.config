@@ -166,7 +166,7 @@ return {
         preset = {
           header = dashboard.header,
           keys = {
-            { icon = " ", key = "f", desc = "Find File", action = function() require('core.cmake-picker').files() end },
+            { icon = " ", key = "f", desc = "Find File", action = function() require('core.navigator').files() end },
             { icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
             { icon = " ", key = "g", desc = "Find Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
             { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },

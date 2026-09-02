@@ -1,30 +1,30 @@
 -- Custom formatting logic for C/C++
 local M = {}
 
--- Module-level so formatBuffer() can build the jobstart array
+local is_windows = vim.fn.has('win32') == 1
+
+-- The one JUCE style, shipped with the config on every machine.
+local STYLE_PATH = vim.fn.stdpath('config') .. '/clang-format/JUCE.clang-format'
+
+-- Windows: the LLVM clang-format Visual Studio installs. macOS: the first
+-- clang-format on PATH, then MacPorts' versioned name, then Homebrew's.
+local CLANG_FORMAT_WINDOWS = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\Llvm\\x64\\bin\\clang-format.exe'
+local CLANG_FORMAT_CANDIDATES_MAC = { 'clang-format', 'clang-format-mp-21', '/opt/homebrew/bin/clang-format' }
+
 local clangFormatBin
-local stylePath
+
+local function getClangFormat()
+  if is_windows then return CLANG_FORMAT_WINDOWS end
+  for _, candidate in ipairs(CLANG_FORMAT_CANDIDATES_MAC) do
+    if vim.fn.executable(candidate) == 1 then return candidate end
+  end
+  return CLANG_FORMAT_CANDIDATES_MAC[1]
+end
 
 function M.setup()
   vim.env.PATH = '/opt/homebrew/bin:/opt/local/bin:' .. vim.env.PATH
-
-  if vim.fn.has('win32') == 1 then
-    stylePath = 'C:\\Users\\jreng\\Documents\\Poems\\dev\\JUCE.clang-format'
-    clangFormatBin = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\Llvm\\x64\\bin\\clang-format.exe'
-  else
-    stylePath = '/Users/jreng/Documents/Poems/dev/JUCE.clang-format'
-    clangFormatBin = 'clang-format'
-
-    if vim.fn.executable('clang-format') == 1 then
-      clangFormatBin = 'clang-format'
-    elseif vim.fn.executable('clang-format-mp-21') == 1 then
-      clangFormatBin = 'clang-format-mp-21'
-    elseif vim.fn.executable('/opt/homebrew/bin/clang-format') == 1 then
-      clangFormatBin = '/opt/homebrew/bin/clang-format'
-    end
-  end
-
-  vim.g.clang_format_command = clangFormatBin .. ' --style=file:' .. stylePath
+  clangFormatBin = getClangFormat()
+  vim.g.clang_format_command = clangFormatBin .. ' --style=file:' .. STYLE_PATH
 end
 
 function M.formatBuffer()
@@ -42,7 +42,7 @@ function M.formatBuffer()
     -- already-line-split output in one call — identical async, non-blocking
     -- path on both platforms, no manual chunk-stitching needed.
     local output_lines = nil
-    vim.fn.jobstart({ clangFormatBin, '--style=file:' .. stylePath, tmpfile }, {
+    vim.fn.jobstart({ clangFormatBin, '--style=file:' .. STYLE_PATH, tmpfile }, {
       stdout_buffered = true,
       on_stdout = function(_, data)
         output_lines = data

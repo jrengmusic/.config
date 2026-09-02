@@ -1,6 +1,6 @@
 -- core/doxygen.lua
 -- Builds JUCE (HTML+XML+tagfile), library (HTML+XML), and project (XML only) doxygen docs.
--- Detects JAM vs KANJUT vs CIUM from project CMakeLists.txt.
+-- JUCE root and framework root come from the project state (core/project.lua).
 -- All lib docs built from unified ~/.config/nvim/doxygen/Doxyfile.lib template.
 -- Output: {lib}/docs/html/, {lib}/docs/xml/, {lib}/DOCS.html (root redirect)
 --
@@ -10,6 +10,9 @@
 local M = {}
 
 local is_windows = vim.fn.has('win32') == 1
+
+local DOT_MAX_NODES = 100
+local TERMINAL_HEIGHT = 15
 
 -- Half of logical cores, floor, minimum 1 — identical formula to the clangd
 -- `-j` cap (nvim/lua/lsp/clangd.lua), same vim.uv API on both platforms, so
@@ -83,60 +86,37 @@ local function normalize_path(path)
   return (path:gsub('\\', '/'):gsub('/$', ''))
 end
 
--- Fixed machine paths
-local HOME          = normalize_path(vim.fn.expand('~'))
-local JUCE_ROOT     = HOME .. '/Documents/Poems/JUCE'
-local JUCE_MODULES  = JUCE_ROOT .. '/modules'
-local JUCE_DOXY_DIR = JUCE_ROOT .. '/docs/doxygen'
-local JUCE_DOXYFILE = JUCE_DOXY_DIR .. '/Doxyfile'
+-- Registry lookup by the registry's own key (core/project.getRoot's
+-- normalisation), never this module's forward-slash normalizer.
+local function get_project(root)
+  local project = require('core.project')
+  return project.getOrCreate(root and vim.fs.normalize(root) or project.getRoot())
+end
 
+-- JUCE doc locations from the project state's JUCE root. JUCE runs from
+-- doxy_dir so its @INCLUDE = Doxyfile resolves.
+local function get_juce(project)
+  local juce_root = normalize_path(project.dependencies.juce.root)
+  return {
+    root     = juce_root,
+    modules  = juce_root .. '/modules',
+    doxy_dir = juce_root .. '/docs/doxygen',
+    doxyfile = juce_root .. '/docs/doxygen/Doxyfile',
+  }
+end
+
+-- The project root the docs are built for: the project state's, or cwd
+-- when nvim is not in a project (nothing to build then).
 function M.get_project_root()
-  local markers = vim.fs.find('CMakeLists.txt', {
-    upward = true,
-    path   = vim.fn.getcwd(),
-    limit  = 1,
-  })
-  local root = #markers > 0 and vim.fn.fnamemodify(markers[1], ':h') or vim.fn.getcwd()
-  return normalize_path(root)
+  local project = get_project()
+  return project and normalize_path(project.manifest.root) or normalize_path(vim.fn.getcwd())
 end
 
--- Substitutes the two CMake variable forms seen across project CMakeLists.txt
--- (${CMAKE_CURRENT_SOURCE_DIR} and $ENV{HOME}) with their resolved values.
-local function resolve_cmake_value(value, root)
-  value = value:gsub('%$%{CMAKE_CURRENT_SOURCE_DIR%}', root)
-  value = value:gsub('%$ENV%{HOME%}', HOME)
-  return value
-end
-
--- Returns lib root dir (e.g. .../jam, .../___lib___), or nil if undetected.
--- Three independent frameworks, three peer checks:
---   JAM     → marker JAM_ROOT                → parsed from set(JAM_ROOT "...")
---   CIUM    → ../___cium___/docs/Doxyfile    → ../___cium___
---   KANJUT  → marker FRAMEWORK_MODULES_PATH  → parsed from FRAMEWORK_PATH + FRAMEWORK_MODULES_PATH
--- Values are parsed rather than assumed at a fixed nesting depth — projects
--- nest at varying depths under dev/ and kuassa/ (e.g. dev/plugins/whelmed
--- sets JAM_ROOT two levels up, dev/end sets it one level up).
+-- The framework root the project builds against (dependencies.user.root),
+-- or nil outside a project.
 function M.detect_lib_root(root)
-  local cmake = root .. '/CMakeLists.txt'
-  local f = io.open(cmake, 'r')
-  if not f then return nil end
-  local content = f:read('*a')
-  f:close()
-
-  local jam_root = content:match('set%(%s*JAM_ROOT%s+"([^"]+)"%s*%)')
-  if jam_root then
-    return normalize_path(vim.fn.fnamemodify(resolve_cmake_value(jam_root, root), ':p'))
-  end
-  if vim.loop.fs_stat(root .. '/../___cium___/docs/Doxyfile') then
-    return normalize_path(vim.fn.fnamemodify(root .. '/../___cium___', ':p'))
-  end
-  local modules_path = content:match('set%(%s*FRAMEWORK_MODULES_PATH%s+"([^"]+)"%s*%)')
-  if modules_path then
-    local framework_path = content:match('set%(%s*FRAMEWORK_PATH%s+"([^"]+)"%s*%)') or '${CMAKE_CURRENT_SOURCE_DIR}/..'
-    local combined = resolve_cmake_value(framework_path, root) .. '/' .. modules_path
-    return normalize_path(vim.fn.fnamemodify(combined, ':p'))
-  end
-  return nil
+  local project = get_project(root)
+  return project and normalize_path(project.dependencies.user.root) or nil
 end
 
 -- Returns the relative path from absolute dir `from_dir` to absolute dir `to_dir`.
@@ -156,7 +136,7 @@ local function relpath(from_dir, to_dir)
 end
 
 -- Reads TEMPLATE_JUCE, substitutes __DOT_NUM_THREADS__, writes to a temp file.
--- Returns temp path. JUCE runs from JUCE_DOXY_DIR so @INCLUDE = Doxyfile
+-- Returns temp path. JUCE runs from juce.doxy_dir so @INCLUDE = Doxyfile
 -- resolves correctly.
 local function make_juce_doxyfile()
   local tf = io.open(TEMPLATE_JUCE, 'r')
@@ -173,23 +153,23 @@ local function make_juce_doxyfile()
 end
 
 -- Reads TEMPLATE_LIB, substitutes __MARKERS__, writes to a temp file. Returns temp path.
--- TAGFILES path: relative from {lib}/docs/ (cwd) to JUCE_ROOT, computed via relpath().
+-- TAGFILES path: relative from {lib}/docs/ (cwd) to the JUCE root, computed via relpath().
 -- HTML-side gets one extra '..': generated HTML pages live in {lib}/docs/html/, one level
 -- deeper than cwd, so doxygen resolves that half relative to the html/ output dir.
-local function make_lib_doxyfile(lib_root, name, brief)
+local function make_lib_doxyfile(juce, lib_root, name, brief)
   local tf = io.open(TEMPLATE_LIB, 'r')
   assert(tf, '[doxygen] Missing template: ' .. TEMPLATE_LIB)
   local content = tf:read('*a')
   tf:close()
 
-  local juce_rel = relpath(lib_root .. '/docs', JUCE_ROOT)
+  local juce_rel = relpath(lib_root .. '/docs', juce.root)
 
-  content = content:gsub('__JUCE_DOXYFILE__', JUCE_DOXYFILE)
+  content = content:gsub('__JUCE_DOXYFILE__', juce.doxyfile)
   content = content:gsub('__PROJECT_NAME__',  name)
   content = content:gsub('__PROJECT_BRIEF__', brief)
   content = content:gsub('__INPUT__',         lib_root)
   content = content:gsub('__TAGFILES__',      juce_rel .. '/docs/tagfile.xml=../' .. juce_rel .. '/docs/html')
-  content = content:gsub('__DOT_MAX_NODES__',    '100')
+  content = content:gsub('__DOT_MAX_NODES__',    tostring(DOT_MAX_NODES))
   content = content:gsub('__DOT_NUM_THREADS__',  tostring(dot_num_threads()))
   content = content:gsub('__EXCLUDE_PATTERNS__', format_exclude_patterns())
 
@@ -202,16 +182,20 @@ local function make_lib_doxyfile(lib_root, name, brief)
 end
 
 -- Derives name/brief/tmp Doxyfile from lib root dirname.
-local function make_lib_doxyfile_for(lib_root)
+local LIB_IDENTITY = {
+  jam        = { name = 'JAM',    brief = 'JRENG Architectural Modules' },
+  ___lib___  = { name = 'KANJUT', brief = 'Kuassa Audio Plugin Framework v2.0' },
+  ___cium___ = { name = 'CIUM',   brief = 'CIUM v1.0' },
+}
+
+local function make_lib_doxyfile_for(juce, lib_root)
   local tail = vim.fn.fnamemodify(lib_root, ':t')
-  if tail == 'jam'        then return make_lib_doxyfile(lib_root, 'JAM',    'JRENG Architectural Modules')         end
-  if tail == '___lib___'  then return make_lib_doxyfile(lib_root, 'KANJUT', 'Kuassa Audio Plugin Framework v2.0') end
-  if tail == '___cium___' then return make_lib_doxyfile(lib_root, 'CIUM',   'CIUM v1.0')                          end
-  return make_lib_doxyfile(lib_root, tail, tail)
+  local identity = LIB_IDENTITY[tail] or { name = tail, brief = tail }
+  return make_lib_doxyfile(juce, lib_root, identity.name, identity.brief)
 end
 
 -- Reads TEMPLATE_PROJECT, substitutes __INPUT__ and __TAGFILES__, writes to a temp file. Returns temp path.
-local function make_project_doxyfile(lib_root, root)
+local function make_project_doxyfile(juce, lib_root, root)
   local tf = io.open(TEMPLATE_PROJECT, 'r')
   assert(tf, '[doxygen] Missing template: ' .. TEMPLATE_PROJECT)
   local content = tf:read('*a')
@@ -219,7 +203,7 @@ local function make_project_doxyfile(lib_root, root)
 
   local proj_docs = root .. '/docs'
   local lib_rel   = relpath(proj_docs, lib_root)
-  local juce_rel  = relpath(proj_docs, JUCE_ROOT)
+  local juce_rel  = relpath(proj_docs, juce.root)
   local lib_tag   = lib_rel  .. '/docs/tagfile.xml=' .. lib_rel  .. '/docs/html'
   local juce_tag  = juce_rel .. '/docs/tagfile.xml=' .. juce_rel .. '/docs/html'
 
@@ -242,19 +226,19 @@ local function ensure_project_docs_dir(root)
 end
 
 local function newest_mtime(dir)
-  local stat = vim.loop.fs_stat(dir)
+  local stat = vim.uv.fs_stat(dir)
   if not stat then return 0 end
   local newest = stat.mtime.sec
-  local handle = vim.loop.fs_scandir(dir)
+  local handle = vim.uv.fs_scandir(dir)
   while handle do
-    local name, ftype = vim.loop.fs_scandir_next(handle)
+    local name, ftype = vim.uv.fs_scandir_next(handle)
     if not name then break end
     local path = dir .. '/' .. name
     if ftype == 'directory' then
       local sub = newest_mtime(path)
       if sub > newest then newest = sub end
     elseif ftype == 'file' and (name:match('%.h$') or name:match('%.cpp$') or name:match('%.mm$')) then
-      local s = vim.loop.fs_stat(path)
+      local s = vim.uv.fs_stat(path)
       if s and s.mtime.sec > newest then newest = s.mtime.sec end
     end
   end
@@ -262,12 +246,12 @@ local function newest_mtime(dir)
 end
 
 local function is_stale(src_dir, xml_stamp)
-  local stamp = vim.loop.fs_stat(xml_stamp)
+  local stamp = vim.uv.fs_stat(xml_stamp)
   if not stamp then return true end
   return newest_mtime(src_dir) > stamp.mtime.sec
 end
 
-local function run_in_terminal(juce_doxy_tmp, lib_doxy_tmp, lib_root, proj_doxy_tmp, proj_dir)
+local function run_in_terminal(juce, juce_doxy_tmp, lib_doxy_tmp, lib_root, proj_doxy_tmp, proj_dir)
   stop_active_job()
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     local buf = vim.api.nvim_win_get_buf(win)
@@ -276,25 +260,25 @@ local function run_in_terminal(juce_doxy_tmp, lib_doxy_tmp, lib_root, proj_doxy_
     end
   end
 
-  vim.cmd('botright 15split')
+  vim.cmd('botright ' .. TERMINAL_HEIGHT .. 'split')
   local term_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_current_buf(term_buf)
   local term_win = vim.api.nvim_get_current_win()
 
   local args = is_windows
     and { 'bash', SCRIPT,
-          juce_doxy_tmp or '', JUCE_DOXY_DIR, JUCE_ROOT,
+          juce_doxy_tmp or '', juce.doxy_dir, juce.root,
           lib_doxy_tmp  or '', lib_root      or '',
           proj_doxy_tmp or '', proj_dir      or '' }
     or  { SCRIPT,
-          juce_doxy_tmp or '', JUCE_DOXY_DIR, JUCE_ROOT,
+          juce_doxy_tmp or '', juce.doxy_dir, juce.root,
           lib_doxy_tmp  or '', lib_root      or '',
           proj_doxy_tmp or '', proj_dir      or '' }
 
   local function close_if_clean(code)
-    if juce_doxy_tmp then vim.loop.fs_unlink(juce_doxy_tmp) end
-    if lib_doxy_tmp  then vim.loop.fs_unlink(lib_doxy_tmp)  end
-    if proj_doxy_tmp then vim.loop.fs_unlink(proj_doxy_tmp) end
+    if juce_doxy_tmp then vim.uv.fs_unlink(juce_doxy_tmp) end
+    if lib_doxy_tmp  then vim.uv.fs_unlink(lib_doxy_tmp)  end
+    if proj_doxy_tmp then vim.uv.fs_unlink(proj_doxy_tmp) end
 
     if code ~= 0 then
       vim.notify('[doxygen] Failed (exit ' .. code .. ')', vim.log.levels.ERROR)
@@ -345,56 +329,56 @@ end
 
 -- Force clean rebuild of JUCE + library (HTML+XML) + project (XML).
 function M.build(root)
-  root = normalize_path(root or M.get_project_root())
-  local lib_root = M.detect_lib_root(root)
-  if not lib_root then
-    vim.notify('[doxygen] Cannot detect framework (no JAM_ROOT or FRAMEWORK_MODULES_PATH)', vim.log.levels.WARN)
-    return
+  local project = get_project(root)
+  if project then
+    root = normalize_path(project.manifest.root)
+    local lib_root = M.detect_lib_root(root)
+    local juce     = get_juce(project)
+    local juce_tmp = make_juce_doxyfile()
+    local lib_tmp  = make_lib_doxyfile_for(juce, lib_root)
+    local proj_tmp = make_project_doxyfile(juce, lib_root, root)
+    local proj_dir = ensure_project_docs_dir(root)
+    run_in_terminal(juce, juce_tmp, lib_tmp, lib_root, proj_tmp, proj_dir)
+  else
+    vim.notify('[doxygen] No project state here: a project needs project-info.md and cast/CAST.md', vim.log.levels.WARN)
   end
-  local juce_tmp = make_juce_doxyfile()
-  local lib_tmp  = make_lib_doxyfile_for(lib_root)
-  local proj_tmp = make_project_doxyfile(lib_root, root)
-  local proj_dir = ensure_project_docs_dir(root)
-  run_in_terminal(juce_tmp, lib_tmp, lib_root, proj_tmp, proj_dir)
 end
 
 -- Returns the three source trees build_incremental checks for staleness
--- (JUCE modules, framework lib, project Source), or nil if the project's
--- framework can't be detected. Lets callers (e.g. a file watcher) watch
--- exactly what build_incremental reads, without duplicating its knowledge
--- of JUCE_MODULES/lib_root/Source.
+-- (JUCE modules, framework lib, project Source), or nil outside a project.
+-- Lets callers (e.g. a file watcher) watch exactly what build_incremental
+-- reads, without duplicating its knowledge of juce.modules/lib_root/Source.
 function M.get_watch_dirs(root)
-  root = normalize_path(root or M.get_project_root())
-  local lib_root = M.detect_lib_root(root)
-  if not lib_root then return nil end
-  return { JUCE_MODULES, lib_root, root .. '/Source' }
+  local project = get_project(root)
+  if not project then return nil end
+  return { get_juce(project).modules, M.detect_lib_root(root), normalize_path(project.manifest.root) .. '/Source' }
 end
 
 -- Rebuild only what is stale. Called by the doxygen source-tree watcher
 -- (core/autocommands.lua), debounced — not tied to binary build completion.
-function M.build_incremental(root)
-  root = normalize_path(root or M.get_project_root())
+local function build_stale(project)
+  local root = normalize_path(project.manifest.root)
   local lib_root = M.detect_lib_root(root)
-  if not lib_root then return end
-
-  local juce_stale = is_stale(JUCE_MODULES, JUCE_ROOT .. '/docs/xml/index.xml')
+  local juce = get_juce(project)
+  local juce_stale = is_stale(juce.modules, juce.root .. '/docs/xml/index.xml')
   local lib_stale  = is_stale(lib_root,     lib_root  .. '/docs/xml/index.xml')
   local proj_stale = is_stale(root .. '/Source', root .. '/docs/xml/index.xml')
 
-  if not juce_stale and not lib_stale and not proj_stale then return end
+  if juce_stale or lib_stale or proj_stale then
+    run_in_terminal(
+      juce,
+      juce_stale and make_juce_doxyfile() or nil,
+      lib_stale  and make_lib_doxyfile_for(juce, lib_root) or nil,
+      lib_stale  and lib_root or '',
+      proj_stale and make_project_doxyfile(juce, lib_root, root) or nil,
+      proj_stale and ensure_project_docs_dir(root) or nil
+    )
+  end
+end
 
-  local juce_tmp = juce_stale and make_juce_doxyfile()            or nil
-  local lib_tmp  = lib_stale  and make_lib_doxyfile_for(lib_root) or nil
-  local proj_tmp = proj_stale and make_project_doxyfile(lib_root, root) or nil
-  local proj_dir = proj_stale and ensure_project_docs_dir(root)         or nil
-
-  run_in_terminal(
-    juce_tmp,
-    lib_tmp,
-    lib_stale  and lib_root  or '',
-    proj_tmp,
-    proj_dir
-  )
+function M.build_incremental(root)
+  local project = get_project(root)
+  if project then build_stale(project) end
 end
 
 return M

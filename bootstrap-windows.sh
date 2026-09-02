@@ -445,7 +445,7 @@ echo "    clangd.exe inside mason/packages (the mason/bin .cmd shim is not"
 echo "    spawnable directly) — see lua/lsp/clangd.lua"
 echo "  - Do NOT install cmake-language-server via Mason (requires python <3.14,"
 echo "    but MSYS2 ships 3.14+). It was installed via pipx in step 4d instead."
-echo "  - DAP adapter: codelldb on macOS, whatdbg on Windows"
+echo "  - DAP adapter: whatdbg on both platforms"
 echo "  - whatdbg reads PDB symbols via dbgeng.dll (supports DAW plugin attach)"
 
 # ============================================================================
@@ -623,8 +623,7 @@ Launch using the ${MSYSTEM} terminal shortcut for native toolchain.
 Key paths:
   Config repo:    ~/.config/
   nvim config:    ~/AppData/Local/nvim → ~/.config/nvim
-  Build scripts:  ~/.config/nvim/scripts/build-debug.bat (Windows)
-                  ~/.config/nvim/scripts/clean-build.sh  (cross-platform)
+  Build:          cast toolchain (~/.local/bin/cast, driven by nvim <leader>b*)
   CLI tools:      ~/.local/bin/ (oh-my-posh, zoxide, carol, END)
   Carol:          ~/.carol/bin/carol
   Claude Code:    npm global (@anthropic-ai/claude-code)

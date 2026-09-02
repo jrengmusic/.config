@@ -19,65 +19,86 @@ end
 -- and lazily rebuilds only what's stale. Not tied to binary build
 -- completion: sources change on every save, far more often than a build
 -- happens, so this is debounced long (DOXYGEN_WATCH_DEBOUNCE_MS) rather
--- than short like watchCompileDb — the debounce resets on every edit, so
+-- than short like core/project.lua's source watcher — the debounce resets on every edit, so
 -- it only fires once editing has been idle for the full window, and never
 -- interrupts an active editing burst. Recursive per-tree watch, since each
 -- tree is a real directory hierarchy (unlike compile_commands.json's single
 -- file). warnings/errors still surface via run_in_terminal's terminal split
 -- (core/doxygen.lua) — only the trigger point moved, not the output.
+local doxygenWatchers = {}
+
+local function stopDoxygenWatchers()
+  for _, handle in ipairs(doxygenWatchers) do
+    handle:stop()
+    handle:close()
+  end
+  doxygenWatchers = {}
+end
+
+-- Re-armed for every project the working directory moves to; the previous
+-- project's trees are released first.
 local function watchDoxygenSources()
+  stopDoxygenWatchers()
   local doxygen = require('core.doxygen')
   local root = doxygen.get_project_root()
   local watch_dirs = doxygen.get_watch_dirs(root)
-  if watch_dirs == nil then return end
+  if watch_dirs then
+    local debounce_timer = assert(vim.uv.new_timer())
+    doxygenWatchers = { debounce_timer }
 
-  local debounce_timer = assert(vim.uv.new_timer())
-  local watchers = {}
+    local function on_source_change(err)
+      if err == nil then
+        debounce_timer:stop()
+        debounce_timer:start(DOXYGEN_WATCH_DEBOUNCE_MS, 0, vim.schedule_wrap(function()
+          doxygen.build_incremental(root)
+        end))
+      end
+    end
 
-  local function on_source_change(err)
-    if err ~= nil then return end
-    debounce_timer:stop()
-    debounce_timer:start(DOXYGEN_WATCH_DEBOUNCE_MS, 0, vim.schedule_wrap(function()
-      doxygen.build_incremental(root)
-    end))
-  end
-
-  for _, dir in ipairs(watch_dirs) do
-    if vim.fn.isdirectory(dir) == 1 then
-      local watcher = assert(vim.uv.new_fs_event())
-      watcher:start(dir, { recursive = true }, on_source_change)
-      table.insert(watchers, watcher)
+    for _, dir in ipairs(watch_dirs) do
+      if vim.fn.isdirectory(dir) == 1 then
+        local watcher = assert(vim.uv.new_fs_event())
+        watcher:start(dir, { recursive = true }, on_source_change)
+        doxygenWatchers[#doxygenWatchers + 1] = watcher
+      end
     end
   end
-
-  vim.api.nvim_create_autocmd('VimLeavePre', {
-    once = true,
-    callback = function()
-      for _, watcher in ipairs(watchers) do watcher:stop() end
-      debounce_timer:stop()
-    end,
-    desc = 'Stop doxygen source-tree watchers before quitting',
-  })
 end
 
 function M.setup()
   truncateLspLog()
 
-  -- Sync the root CDB copy + .clangd on startup (covers a build that
-  -- happened while nvim was closed), then arm the doxygen source-tree
-  -- watcher. Build-triggered sync is wired directly into core/build.lua's
-  -- on_exit (deterministic: the build process itself signals completion).
-  -- clangd itself is never restarted for any of this — it hot-reloads the
-  -- root CDB copy on its own (see core/cmake-picker.syncClangd).
+  -- Listeners register before the project state loads: the first parse
+  -- already emits ProjectChanged.
+  require('core.clangd').setup()
+
+  -- Load the project state on startup (its ProjectChanged listeners write
+  -- .clangd and the root CDB copy -- covering a build that happened while
+  -- nvim was closed), then arm the doxygen source-tree watcher. A build
+  -- re-parses the state from core/build.lua's on_exit (deterministic: the
+  -- build process itself signals completion). clangd itself is never
+  -- restarted for any of this — it hot-reloads the root CDB copy on its
+  -- own (see core/clangd.lua).
   vim.api.nvim_create_autocmd('VimEnter', {
     once = true,
     callback = function()
       vim.schedule(function()
-        require('core.cmake-picker').syncClangd()
+        require('core.project').getOrCreate(require('core.project').getRoot())
         watchDoxygenSources()
       end)
     end,
-    desc = 'Sync .clangd on startup; watch doxygen sources for changes',
+    desc = 'Load the project state on startup; watch doxygen sources for changes',
+  })
+
+  -- The project state follows the working directory: a :cd into another
+  -- project root loads that project's state (a root without a manifest loads nothing).
+  vim.api.nvim_create_autocmd('DirChanged', {
+    pattern = 'global',
+    callback = function()
+      require('core.project').getOrCreate(require('core.project').getRoot())
+      watchDoxygenSources()
+    end,
+    desc = 'Load the project state for the new working directory; re-arm the doxygen watcher',
   })
 
   -- Stop any build/clean/doxygen job still running on quit. Nvim itself only
@@ -92,8 +113,10 @@ function M.setup()
     callback = function()
       require('core.traffic').stop()
       require('core.doxygen').stop_active_job()
+      require('core.project').stop()
+      stopDoxygenWatchers()
     end,
-    desc = 'Stop in-flight build/clean/doxygen jobs before quitting',
+    desc = 'Stop in-flight build/clean/doxygen jobs and every watcher before quitting',
   })
 
   -- Live keymap lexicon regen: saving KEYMAPS.md regenerates keymaps.lua

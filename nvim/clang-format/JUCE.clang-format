@@ -1,0 +1,164 @@
+# ==============================================================================
+# Clang-Format Version: 21 (LLVM/Clang 21)
+# ==============================================================================
+
+# General & Core Options
+DisableFormat: false
+ColumnLimit: 100
+DeriveLineEnding: false
+UseCRLF: false
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+NamespaceIndentation: None
+IndentPPDirectives: None
+IndentCaseLabels: true
+IndentGotoLabels: false
+IndentWrappedFunctionNames: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignArrayOfStructures: Left
+AlignConsecutiveMacros: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignTrailingComments: false
+
+# Brace Placement - Allman Style
+BreakBeforeBraces: Allman
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: false
+  AfterControlStatement: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterObjCDeclaration: true
+  AfterStruct: true
+  AfterUnion: true
+  AfterExternBlock: true
+  BeforeCatch: true
+  BeforeElse: true
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+# Line Breaking
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: true
+BreakBeforeInheritanceComma: true
+BreakInheritanceList: BeforeColon
+BreakConstructorInitializers: BeforeComma
+BreakConstructorInitializersBeforeComma: true
+BreakStringLiterals: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakAfterJavaFieldAnnotations: false
+
+# Function/Constructor Breaking
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllConstructorInitializersOnNextLine: false
+AllowAllArgumentsOnNextLine: true
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+
+# Compact vs Expanded Control Flow
+AllowShortFunctionsOnASingleLine: All
+AllowShortLambdasOnASingleLine: None
+AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# Bin Packing & Argument Layout
+BinPackArguments: false
+BinPackParameters: false
+PackConstructorInitializers: Never
+ExperimentalAutoDetectBinPacking: false
+
+# Array/Initializer List Formatting
+Cpp11BracedListStyle: false
+
+# Spacing Rules
+SpaceBeforeParens: NonEmptyParentheses
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: true
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+
+SpaceAfterCStyleCast: true
+SpaceAfterLogicalNot: true
+SpaceAfterTemplateKeyword: false
+
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+
+# Spaces in delimiters (v21 syntax)
+SpacesInParens: Never
+SpacesInSquareBrackets: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: true
+SpacesInConditionalStatement: false
+
+SpacesBeforeTrailingComments: 0
+
+# Penalties
+PenaltyBreakAssignment: 0
+PenaltyBreakBeforeFirstCallParameter: 0
+PenaltyBreakComment: 0
+PenaltyBreakFirstLessLess: 0
+PenaltyBreakString: 0
+PenaltyBreakTemplateDeclaration: 0
+PenaltyExcessCharacter: 80
+PenaltyReturnTypeOnItsOwnLine: 0
+
+# Includes & Sorting
+SortIncludes: false
+IncludeBlocks: Preserve
+IncludeIsMainRegex: ''
+IncludeIsMainSourceRegex: ''
+SortUsingDeclarations: false
+
+# Comments
+ReflowComments: false
+CommentPragmas: ''
+FixNamespaceComments: false
+
+# Namespaces & Macros
+CompactNamespaces: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+MacroBlockBegin: ''
+MacroBlockEnd: ''
+
+# Pointer Alignment (Global - applies to both C++ and ObjC)
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+# ==============================================================================
+# Language: Objective-C
+# ==============================================================================
+---
+Language: ObjC
+ObjCBinPackProtocolList: Auto
+ObjCBlockIndentWidth: 0
+ObjCSpaceAfterProperty: false
+ObjCSpaceBeforeProtocolList: false
+
+# ==============================================================================
+# Language: C++
+# ==============================================================================
+---
+Language: Cpp
+Standard: c++17

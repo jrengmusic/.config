@@ -1,6 +1,9 @@
 -- DAP UI configuration
 local M = {}
 
+-- The standalone window exists only once the app has created it.
+local STANDALONE_FLOAT_DELAY_MS = 1000
+
 function M.setup()
   local dap = require('dap')
   local dapui = require('dapui')
@@ -80,22 +83,18 @@ function M.setup()
   end
 
   -- Float standalone app windows into PaperWM floating layer (macOS only)
-  -- 'Launch Standalone' is the SSOT config name for a no-DAW launch (pure
-  -- app or a plugin project's Standalone format alike) — same signal used
-  -- in core/keymaps.lua's standalone-pid capture and terminateDap().
+  -- — same no-host signal core/build.lua's standalone-pid capture and
+  -- terminateDap() dispatch on.
   dap.listeners.after.launch.standalone_float = function(session, body)
-    if not is_mac then return end
-    if not session.config or session.config.name ~= 'Launch Standalone' then return end
-
-    local program = session.config.program
-    if type(program) == 'function' then program = program() end
-    if not program then return end
-
-    local appName = program:match('/([^/]+)%.app/') or program:match('/([^/]+)$')
-    if appName then
-      vim.defer_fn(function()
-        hs_call(string.format("require('debug-layout').floatStandaloneApp('%s')", appName))
-      end, 1000)
+    if is_mac and require('core.build').isStandaloneLaunch(session.config) then
+      local program = session.config.program
+      if type(program) == 'function' then program = program() end
+      local appName = program:match('/([^/]+)%.app/') or program:match('/([^/]+)$')
+      if appName then
+        vim.defer_fn(function()
+          hs_call(string.format("require('debug-layout').floatStandaloneApp('%s')", appName))
+        end, STANDALONE_FLOAT_DELAY_MS)
+      end
     end
   end
 
@@ -115,8 +114,10 @@ function M.setup()
   vim.api.nvim_set_hl(0, 'DapLogPoint', { fg = '#61afef' })
 
   -- Build orchestration listeners (standalone PID capture) must be live
-  -- before any launch, including manual dap.continue.
+  -- before any launch, including manual dap.continue. The project state's
+  -- DAP configurations are published here too, at dap load time.
   require('core.build').registerDapListeners()
+  require('dap.launch').setup()
 
   -- Setup keymaps
   require('core.keymaps').setupDap()

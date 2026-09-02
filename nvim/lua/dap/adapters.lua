@@ -1,50 +1,21 @@
--- DAP adapters configuration
+-- DAP adapters configuration: whatdbg on every platform -- standalone
+-- launch + host attach, one binary (dbgeng/PDB on Windows, liblldb/DWARF
+-- on macOS).
 local M = {}
+
+local is_windows = vim.fn.has('win32') == 1
+local WHATDBG = vim.fn.expand(is_windows and '~/.local/bin/whatdbg.exe' or '~/.local/bin/whatdbg')
 
 function M.setup()
   local dap = require('dap')
-  local is_windows = vim.fn.has('win32') == 1
-
-  if is_windows then
-    -- Windows standalone: GDB native DAP (proper GUI launch + stdout capture)
-    -- REPLACED BY WHATDBG — testing whatdbg as standalone adapter
-    -- local gdbPath = 'C:\\msys64\\mingw64\\bin\\gdb.exe'
-    --
-    -- if vim.fn.executable(gdbPath) == 1 then
-    --   dap.adapters.gdb = {
-    --     type = 'executable',
-    --     command = gdbPath,
-    --     args = {
-    --       '--nx',
-    --       '--interpreter=dap',
-    --       '--init-eval-command', 'set new-console on',
-    --       '--init-eval-command', 'set shell off',
-    --     },
-    --   }
-    -- end
-
-    -- Windows: whatdbg (dbgeng-based, reads PDB natively, tracks DLL loads)
-    local whatdbgPath = vim.fn.expand('~/.local/bin/whatdbg.exe')
-
-    if vim.fn.executable(whatdbgPath) == 1 then
-      dap.adapters.whatdbg = {
-        type = 'executable',
-        command = whatdbgPath,
-      }
-    end
+  if vim.fn.executable(WHATDBG) == 1 then
+    dap.adapters.whatdbg = {
+      type = 'executable',
+      command = WHATDBG,
+    }
   else
-    -- macOS: whatdbg (standalone adapter, same binary as Windows, no .exe)
-    local whatdbgPath = vim.fn.expand('~/.local/bin/whatdbg')
-
-    if vim.fn.executable(whatdbgPath) == 1 then
-      dap.adapters.whatdbg = {
-        type = 'executable',
-        command = whatdbgPath,
-      }
-    end
+    vim.notify('whatdbg not found at ' .. WHATDBG, vim.log.levels.WARN)
   end
-
-  return true
 end
 
 return M

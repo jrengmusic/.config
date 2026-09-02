@@ -18,7 +18,7 @@
 --   nvim/doc/KEYMAPS.md
 --
 -- Edit the lexicon file, never this file.
--- LEXICON: sha256:6d11384b9a4717a834f413e7a7931bedd46ada838e772e55fb11786d126d005c
+-- LEXICON: sha256:4a8b4aa28453b0e0d66ffdb0c9a846be6a1349f0ccdd550313ba6fb626befc0e
 local M = {}
 
 function M.setup()
@@ -54,12 +54,12 @@ function M.setup()
   vim.keymap.set('i', '<Esc>', actions.formatOnEsc, { desc = 'Format on exit insert mode', expr = true })
   vim.keymap.set('v', '<Esc>', actions.formatOnEsc, { desc = 'Format on exit visual mode', expr = true })
   vim.keymap.set('n', '<Esc><Esc>', actions.formatBufferByFiletype, { desc = 'Format buffer' })
-  vim.keymap.set('n', '<leader>ff', function() require('core.cmake-picker').files() end, { desc = 'Find files (cmake)' })
-  vim.keymap.set('n', '<leader>fx', function() require('core.cmake-picker').open_explorer() end, { desc = 'Project explorer (cmake)' })
-  vim.keymap.set('n', '<leader>fg', function() require('core.cmake-picker').grep() end, { desc = 'Find by grep (cmake)' })
-  vim.keymap.set('n', '<leader>fr', function() require('core.cmake-picker').replace_grep() end, { desc = 'Project grep+replace (cmake)' })
-  vim.keymap.set('n', '<leader>rg', function() require('core.cmake-picker').replace() end, { desc = 'Project replace (cmake)' })
-  vim.keymap.set('v', '<leader>rg', '"zy<Cmd>lua require("core.cmake-picker").replace(vim.fn.getreg("z"))<CR>', { desc = 'Project replace selection (cmake)' })
+  vim.keymap.set('n', '<leader>ff', function() require('core.navigator').files() end, { desc = 'Find files (project)' })
+  vim.keymap.set('n', '<leader>fx', function() require('core.navigator').open_explorer() end, { desc = 'Project explorer (project)' })
+  vim.keymap.set('n', '<leader>fg', function() require('core.navigator').grep() end, { desc = 'Find by grep (project)' })
+  vim.keymap.set('n', '<leader>fr', function() require('core.navigator').replace_grep() end, { desc = 'Project grep+replace (project)' })
+  vim.keymap.set('n', '<leader>rg', function() require('core.navigator').replace() end, { desc = 'Project replace (project)' })
+  vim.keymap.set('v', '<leader>rg', '"zy<Cmd>lua require("core.navigator").replace(vim.fn.getreg("z"))<CR>', { desc = 'Project replace selection (project)' })
   vim.keymap.set('n', '<leader>fb', function() actions.splitSyncOnce(); Snacks.picker.buffers() end, { desc = 'Find buffers' })
   vim.keymap.set('n', '<leader>fh', function() actions.splitSyncOnce(); Snacks.picker.help() end, { desc = 'Find help' })
   vim.keymap.set('n', '<leader>\\', function() Snacks.explorer.reveal() end, { desc = 'File explorer' })
@@ -122,10 +122,10 @@ function M.setupDap()
   vim.keymap.set('n', '<leader>du', dapui.toggle, { desc = 'DAP: Toggle UI' })
   vim.keymap.set('n', '<leader>de', dapui.eval, { desc = 'DAP: Evaluate expression' })
   vim.keymap.set('v', '<leader>de', dapui.eval, { desc = 'DAP: Evaluate selection' })
-  vim.keymap.set('n', '<leader>dt', build.terminateAndNotify, { desc = 'DAP: Terminate + close DAW/App' })
+  vim.keymap.set('n', '<leader>dt', build.terminateAndNotify, { desc = 'DAP: Terminate + close host/app' })
   vim.keymap.set('n', '<leader>br', build.buildReleaseAndRun, { desc = 'DAP: Build release + run' })
   vim.keymap.set('n', '<leader>bb', build.buildDebugAndRun, { desc = 'DAP: Build debug + run' })
-  vim.keymap.set('n', '<leader>bR', build.buildReleaseOnly, { desc = 'DAP: Build release only, notarize + sign (no run)' })
+  vim.keymap.set('n', '<leader>bR', build.buildReleaseOnly, { desc = 'DAP: Build release only (no run)' })
   vim.keymap.set('n', '<leader>bn', build.buildDebugOnly, { desc = 'DAP: Build debug only (no run)' })
   vim.keymap.set('n', '<leader>bc', build.cleanBuild, { desc = 'DAP: Clean build' })
   vim.keymap.set('n', '<leader>bk', build.cleanOnly, { desc = 'DAP: Clean' })

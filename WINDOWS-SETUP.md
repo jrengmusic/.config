@@ -93,7 +93,7 @@ Then restart MSYS2 and launch nvim to install Mason tools:
 
 Notes:
 - Do NOT install clangd via Mason on Windows. Use the system clangd from `winget install LLVM.LLVM`.
-- Do NOT install codelldb via Mason on Windows. whatdbg is installed by bootstrap.sh to `~/.local/bin/whatdbg.exe`.
+- The DAP adapter is whatdbg, installed by bootstrap.sh to `~/.local/bin/whatdbg.exe` — nothing DAP-related comes from Mason.
 
 ## What the Setup Script Does
 
@@ -204,27 +204,13 @@ nvim's `:terminal` on Windows uses `vim.o.shell` which defaults to `zsh.exe` (MS
 
 ### Build Pipeline
 
-JUCE explicitly rejects MinGW (`#error "MinGW is not supported"`), so builds require MSVC environment.
+JUCE explicitly rejects MinGW (`#error "MinGW is not supported"`), so builds require the MSVC environment.
 
-**Compiler**: `clang-cl` (from LLVM) — MSVC-compatible frontend that produces **DWARF** debug symbols, which codelldb/LLDB can read natively. This gives identical debugging experience to macOS.
-
-**Why not `cl.exe`?** MSVC produces PDB debug symbols. codelldb uses LLDB which has limited PDB support. By using clang-cl with `-gdwarf`, we get DWARF symbols on both platforms — same debugger, same behavior.
+**Compiler**: `cl.exe` (MSVC) producing **PDB** debug symbols, which whatdbg (dbgeng) reads natively.
 
 **Why not MinGW GCC?** JUCE hardcodes `#error "MinGW is not supported"`.
 
-| Script | Platform | Purpose |
-|---|---|---|
-| `build-debug.sh` | macOS | Build with clang via cmake+ninja |
-| `build-debug.bat` | Windows | vcvarsall.bat + clang-cl + cmake+ninja |
-| `clean-build.sh` | Both | Delete `Builds/` (no compiler needed) |
-
-The `.bat` file:
-1. Calls `vcvarsall.bat x64` — sets up MSVC linker, headers, and libraries
-2. Sets `CC`/`CXX` to `clang-cl` from `C:\Program Files\LLVM\bin\`
-3. Passes `-gdwarf /EHsc -fms-compatibility` flags
-4. Runs cmake + ninja
-
-**Known issue**: clang-cl 22.x has a regression with `auto x { expr }` brace initialization and JUCE's `Array` template `initializer_list` constructor (LLVM #136203/#138307). Workaround: use `auto x = expr` instead of `auto x { expr }` for JUCE container return values.
+The build is the cast toolchain on every platform: `cast cast/CAST.md --debug` (or `--no-sign`), driven by nvim's `<leader>b*` keymaps (`core/cast-build.lua`) from the project's `project-info.md ## toolchain` rows. nvim captures the `vcvarsall.bat x64` environment at startup (`core/options.lua`) so cmake/ninja/cl resolve for the child processes.
 
 ### LSP (clangd)
 
@@ -235,21 +221,21 @@ The `.bat` file:
 
 Mason's clangd on Windows is a `.cmd` wrapper that nvim can't execute directly. The system clangd from LLVM works.
 
-### DAP (codelldb / whatdbg)
+### DAP (whatdbg)
 
-macOS uses codelldb (Mason) with DWARF symbols from clang. Windows uses whatdbg — a dbgeng-based DAP adapter that reads MSVC PDB symbols natively. This means Windows builds use `cl.exe` (MSVC) directly, no `-gdwarf` workaround needed.
+whatdbg on both platforms — one adapter, identical DX: liblldb/DWARF on macOS, dbgeng/PDB on Windows. Targets, products, and the launch shape come from the project state (`core/project.lua` → `.project`); the selection (target + host) is picked once with `<F5>` or the first `<leader>bb`.
 
 **vsdbg (Microsoft's debugger) won't work** — it's licensed exclusively for VS Code and rejects nvim as a client.
 
 | | macOS | Windows |
 |---|---|---|
-| Adapter | codelldb (Mason) | whatdbg (`~/.local/bin/whatdbg.exe`) |
+| Adapter | whatdbg (`~/.local/bin/whatdbg`) | whatdbg (`~/.local/bin/whatdbg.exe`) |
 | Debug symbols | DWARF (clang) | PDB (cl.exe / MSVC) |
-| Process lookup | `pgrep -x 'DAW'` | `tasklist /FI "IMAGENAME eq DAW.exe"` |
-| Kill process | `killall DAW` | `taskkill /F /IM DAW` |
-| DAW launch delay | 2000ms | 3000ms |
-| Plugin formats | VST3, AU, VST, AAX | VST3, VST, AAX (no AU) |
-| DAW scan path | `/Applications/*.app` | `C:/Program Files/*/*.exe` |
+| Plugin request | attach to the running host | launch the host under the debugger |
+| Process lookup | `pgrep -x 'Host'` | `tasklist /FI "IMAGENAME eq Host.exe"` |
+| Kill process | `killall Host` | `taskkill /F /IM Host.exe` |
+| Plugin formats | Standalone, VST3, AU, VST, AAX, CLAP | Standalone, VST3, VST, AAX, CLAP (no AU) |
+| Host scan path | `/Applications/*.app` | `C:/Program Files/*/*.exe` |
 
 ### Paths
 
@@ -279,12 +265,14 @@ All keybindings work identically on macOS and Windows:
 
 | Key | Action |
 |---|---|
-| `<leader>bk` | Clean build directory |
-| `<leader>bb` | Build only |
-| `<leader>bc` | Clean + build |
-| `<leader>br` | Build + launch DAW + attach DAP |
-| `<F5>` | Configure DAP (format/DAW/scheme dialog) |
-| `<leader>dt` | Terminate DAP + kill DAW |
+| `<leader>bk` | Clean (every configuration's build directory) |
+| `<leader>bb` | Build debug + launch the selected target under whatdbg |
+| `<leader>bn` | Build debug only |
+| `<leader>bc` | Clean + build debug + launch |
+| `<leader>br` | Build release (no-sign) + launch / attach to host |
+| `<leader>bR` | Build release only |
+| `<F5>` | Pick the target (and host for a plugin) |
+| `<leader>dt` | Terminate DAP + kill the app / host |
 
 Terminal behavior on build:
 - **Success**: terminal auto-closes, LSP restarts
@@ -305,18 +293,24 @@ Terminal behavior on build:
 └── nvim/
     ├── lua/
     │   ├── core/
-    │   │   ├── keymaps.lua             # Build keymaps (OS-branched terminal)
-    │   │   └── options.lua             # Editor options
+    │   │   ├── project.lua             # Project state registry (.project materialisation)
+    │   │   ├── project/cast.lua        # cast locator: project-info.md + compile_commands.json → AST
+    │   │   ├── build.lua               # Build/launch flow over the state (<leader>b*)
+    │   │   ├── cast-build.lua          # cast toolchain job
+    │   │   ├── clangd.lua              # .clangd writer (project root + user-module root)
+    │   │   ├── keymaps.lua             # Generated from doc/KEYMAPS.md
+    │   │   └── options.lua             # Editor options (MSVC env capture on Windows)
     │   ├── dap/
-    │   │   └── configurations.lua      # DAP config (OS-branched DAW detection)
+    │   │   ├── adapters.lua            # whatdbg adapter (OS-branched binary name)
+    │   │   └── launch.lua              # DAP configurations + selection picker from the state
     │   ├── lsp/
     │   │   └── clangd.lua              # clangd config (OS-branched binary + query-driver)
     │   └── plugins/
     │       └── syntax.lua              # Treesitter config
+    ├── clang-format/
+    │   └── JUCE.clang-format           # The one C++ style, every machine
     └── scripts/
-        ├── build-debug.sh              # macOS build (clang + cmake + ninja)
-        ├── build-debug.bat             # Windows build (clang-cl + MSVC env + cmake + ninja)
-        └── clean-build.sh             # Clean (cross-platform, no compiler)
+        └── build-doxygen.sh            # Doxygen build (cross-platform, bash)
 
 ~/.zshrc → ~/.config/zsh/zshrc          # Symlink (same as macOS)
 ~/.zprofile → ~/.config/zsh/zprofile   # Symlink (same as macOS)
@@ -331,19 +325,16 @@ Terminal behavior on build:
 ## Troubleshooting
 
 ### "MinGW is not supported" error during build
-The build is using GCC instead of clang-cl. Make sure `leader bb`/`bc`/`br` uses `build-debug.bat` (not `.sh`). The `.bat` sets up MSVC env then uses clang-cl as the compiler.
-
-### `auto x { expr }` brace-init errors with clang-cl
-clang 22.x has a regression (LLVM #136203) where `auto x { expr }` with JUCE's `Array` template `initializer_list` constructor is incorrectly preferred over copy/move constructors. Workaround: use `auto x = expr` instead. This does NOT affect macOS clang.
+The build is using GCC instead of MSVC: nvim did not capture the `vcvarsall.bat x64` environment (`core/options.lua`, needs vswhere + Visual Studio installed). Launch nvim from the MSYSTEM terminal after a VS install.
 
 ### clangd not starting
 Mason's clangd is a `.cmd` file that nvim can't run. Install system clangd: `winget install LLVM.LLVM`. The config in `clangd.lua` auto-selects system clangd on Windows.
 
-### "DAW not running" error on `leader br`
-The DAW hasn't started within the 3-second delay. Either increase the delay in `keymaps.lua` or launch the DAW manually before running `leader br`.
+### "Host not running" error on `leader br`
+The host hasn't started within the attach delay (`LAUNCH_DELAY_MS` in `core/build.lua`). Either increase the delay or launch the host manually before running `leader br`.
 
 ### vsdbg / cppvsdbg won't work
-Microsoft's vsdbg debugger is licensed exclusively for VS Code. It validates the client and rejects nvim. Use codelldb with DWARF symbols instead.
+Microsoft's vsdbg debugger is licensed exclusively for VS Code. It validates the client and rejects nvim. whatdbg is the debugger on both platforms.
 
 ### `ls *.bat` doesn't find .bat files
 Zsh's `CASE_GLOB` is ON by default — glob matching is case-sensitive. On NTFS, filenames are case-preserving (e.g., stored as `FOO.BAT`), so `*.bat` won't match. The zshrc sets `unsetopt CASE_GLOB` in the Windows block to match NTFS case-insensitive behavior. macOS keeps case-sensitive globbing (HFS+ can be case-sensitive).

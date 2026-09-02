@@ -1,48 +1,44 @@
 -- core/cast-build.lua
--- Build orchestration for cast-managed projects: any project whose root
--- carries cast/CAST.md builds itself entirely through the `cast` CLI
--- (~/Documents/Poems/dev/cast) -- no build-debug.{sh,bat}, no DAP/DAW
--- launch, since cast projects generate their own self-sufficient
--- CMakeLists.txt and produce no Standalone/plugin target to attach a
--- debugger to.
+-- Build job: the project builds itself entirely through the `cast` CLI
+-- (~/Documents/Poems/dev/cast). What to launch afterwards is the project
+-- state's selection (core/project.lua, dap/launch.lua); this module only
+-- runs the toolchain and hands control back on success.
 --
--- The framework's own manifest (../jam/cast/CAST.md) is regenerated first,
--- unconditionally -- a project build never runs against stale generated
--- framework headers. It carries no ## toolchain table of its own, so this
--- run is codegen only (no configure/build step fires for it).
+-- The framework's own manifest (<user-module root>/cast/CAST.md) is
+-- regenerated first, unconditionally -- a project build never runs against
+-- stale generated framework headers. It carries no ## toolchain table of
+-- its own, so this run is codegen only (no configure/build step fires for
+-- it). A framework without a cast manifest has nothing to regenerate.
 local M = {}
 
 local is_windows = vim.fn.has('win32') == 1
 
 local CAST_BINARY = is_windows and 'cast.exe' or 'cast'
-local FRAMEWORK_MANIFEST = '../jam/cast/CAST.md'
-local PROJECT_MANIFEST = 'cast/CAST.md'
+local TOOLCHAIN_MANIFEST = require('core.project.cast').TOOLCHAIN_MANIFEST
 
--- Debug builds fast and unsigned; Release builds optimized and unsigned
--- (--no-sign) for local iteration. The fully signed/notarized/installed
--- default flow (bare `cast cast/CAST.md`, no toolchain argument) is a
--- deliberate manual step, never bound to a keymap.
-local TOOLCHAIN_ARGUMENT = {
+-- Keymap scheme -> ## toolchain argument (a configuration key in the
+-- project state). Debug builds fast and unsigned; Release builds optimized
+-- and unsigned (no-sign) for local iteration. The fully signed/notarized/
+-- installed default flow (bare `cast cast/CAST.md`, no toolchain argument)
+-- is a deliberate manual step, never bound to a keymap.
+M.TOOLCHAIN_ARGUMENT = {
   Debug = 'debug',
   Release = 'no-sign',
 }
 
-function M.isCastManaged(root)
-  return vim.fn.filereadable(root .. '/' .. PROJECT_MANIFEST) == 1
-end
-
-function M.build(scheme)
+function M.build(project, argument, onSuccess)
   local build = require('core.build')
-  local toolchainArgument = TOOLCHAIN_ARGUMENT[scheme]
+  local frameworkManifest = project.dependencies.user.root .. '/' .. TOOLCHAIN_MANIFEST
 
   local function buildProject()
-    build.runBuildJob(
-      { CAST_BINARY, PROJECT_MANIFEST, '--' .. toolchainArgument },
-      function() vim.notify('Built!', vim.log.levels.INFO, { timeout = 1500 }) end
-    )
+    build.runBuildJob({ CAST_BINARY, TOOLCHAIN_MANIFEST, '--' .. argument }, onSuccess)
   end
 
-  build.runBuildJob({ CAST_BINARY, FRAMEWORK_MANIFEST }, buildProject)
+  if vim.fn.filereadable(frameworkManifest) == 1 then
+    build.runBuildJob({ CAST_BINARY, frameworkManifest }, buildProject)
+  else
+    buildProject()
+  end
 end
 
 return M

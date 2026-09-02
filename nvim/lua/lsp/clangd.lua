@@ -1,48 +1,22 @@
 -- Clangd LSP configuration
 local M = {}
 
--- Cross-platform path comparison: Windows paths mix native backslashes with
--- the forward-slash paths .clangd's CompilationDatabase entries use — same
--- normalize-then-compare convention as core/actions.lua's jump-sync cwd check.
-local function normalizePath(path)
-  return path:gsub('\\', '/'):lower()
-end
-
--- Extracts CompilationDatabase: <dir> out of a .clangd file's CompileFlags
--- block. A framework repo (e.g. KANJUT at kuassa/___lib___) has its own
--- .clangd for version-control independence, but declares a CompilationDatabase
--- belonging to whichever plugin project actually builds it — that's what
--- clangdRootDir below reads to detect the split.
-local function readCompilationDatabaseDir(clangd_file)
-  for _, line in ipairs(vim.fn.readfile(clangd_file)) do
-    local db = line:match('^%s*CompilationDatabase:%s*(.-)%s*$')
-    if db then return db end
-  end
-  return nil
-end
-
 -- The default root_markers = {'.clangd', '.git'} treats every git repo as
 -- its own LSP root — correct for an independent project, wrong for a
--- framework repo whose .clangd points its CompilationDatabase at a
--- *different* repo's build directory (the only place it's ever actually
--- compiled). Left alone, that spawns a second clangd instance
--- background-indexing the same compile_commands.json in parallel with the
--- first, doubling indexing time and CPU contention. This resolves root_dir
--- to the CompilationDatabase's own project instead whenever the two
--- diverge, so one clangd instance answers for both trees.
+-- framework repo compiled only by the project that builds it. Left alone,
+-- that spawns a second clangd instance background-indexing the same
+-- compile_commands.json in parallel with the first, doubling indexing time
+-- and CPU contention. The project state (core/project.lua) answers this:
+-- a buffer under a loaded project or its user-module tree roots at that
+-- project, so one clangd instance answers for both trees. Anything else
+-- roots at its git repo.
 local function clangdRootDir(bufnr, on_dir)
-  local clangd_root = vim.fs.root(bufnr, '.clangd')
-  local own_root = clangd_root or vim.fs.root(bufnr, '.git')
-
-  if clangd_root then
-    local db_dir = readCompilationDatabaseDir(clangd_root .. '/.clangd')
-    if db_dir and normalizePath(db_dir):sub(1, #normalizePath(own_root)) ~= normalizePath(own_root) then
-      on_dir(vim.fs.root(db_dir, '.git') or db_dir)
-      return
-    end
+  local project = require('core.project').getProjectFor(vim.api.nvim_buf_get_name(bufnr))
+  if project then
+    on_dir(project.manifest.root)
+  else
+    on_dir(vim.fs.root(bufnr, '.git'))
   end
-
-  on_dir(own_root)
 end
 
 -- Mason's clangd package ships the official LLVM release binary on both
@@ -137,10 +111,10 @@ end
 -- Manual escape hatch (<leader>bi): stops every clangd client and re-triggers
 -- FileType on their buffers, which re-spawns clangd through the normal
 -- LspAttach path. Two situations this recovers that the automatic design
--- (core/traffic.lua, core/cmake-picker.syncClangd) does not cover on its
+-- (core/traffic.lua, core/clangd.lua) does not cover on its
 -- own: a client wedged after a crash/invalid-AST error, and forcing a full
 -- background-index sweep (clangd only re-checks shard staleness at its own
--- startup — see lsp/clangd.lua's --background-index-priority comment — so
+-- startup — see the --background-index-priority comment in M.setup — so
 -- "reindex everything now" has no LSP-level command, only a restart).
 function M.restart()
   local clients = vim.tbl_filter(function(c) return c.name == 'clangd' end, vim.lsp.get_clients())

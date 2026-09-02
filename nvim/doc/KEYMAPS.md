@@ -198,12 +198,12 @@ in the Reference section below.
 | `<Esc>` | i | @actions.formatOnEsc | expr | Format on exit insert mode |
 | `<Esc>` | v | @actions.formatOnEsc | expr | Format on exit visual mode |
 | `<Esc><Esc>` | n | @actions.formatBufferByFiletype | | Format buffer |
-| `<leader>ff` | n | core.cmake-picker.files() | | Find files (cmake) |
-| `<leader>fx` | n | core.cmake-picker.open_explorer() | | Project explorer (cmake) |
-| `<leader>fg` | n | core.cmake-picker.grep() | | Find by grep (cmake) |
-| `<leader>fr` | n | core.cmake-picker.replace_grep() | | Project grep+replace (cmake) |
-| `<leader>rg` | n | core.cmake-picker.replace() | | Project replace (cmake) |
-| `<leader>rg` | v | `"zy<Cmd>lua require("core.cmake-picker").replace(vim.fn.getreg("z"))<CR>` | | Project replace selection (cmake) |
+| `<leader>ff` | n | core.navigator.files() | | Find files (project) |
+| `<leader>fx` | n | core.navigator.open_explorer() | | Project explorer (project) |
+| `<leader>fg` | n | core.navigator.grep() | | Find by grep (project) |
+| `<leader>fr` | n | core.navigator.replace_grep() | | Project grep+replace (project) |
+| `<leader>rg` | n | core.navigator.replace() | | Project replace (project) |
+| `<leader>rg` | v | `"zy<Cmd>lua require("core.navigator").replace(vim.fn.getreg("z"))<CR>` | | Project replace selection (project) |
 | `<leader>fb` | n | Snacks.picker.buffers() | sync | Find buffers |
 | `<leader>fh` | n | Snacks.picker.help() | sync | Find help |
 | `<leader>\` | n | Snacks.explorer.reveal() | | File explorer |
@@ -267,10 +267,10 @@ in the Reference section below.
 | `<leader>du` | n | dapui.toggle | | Toggle UI |
 | `<leader>de` | n | dapui.eval | | Evaluate expression |
 | `<leader>de` | v | dapui.eval | | Evaluate selection |
-| `<leader>dt` | n | @build.terminateAndNotify | | Terminate + close DAW/App |
+| `<leader>dt` | n | @build.terminateAndNotify | | Terminate + close host/app |
 | `<leader>br` | n | @build.buildReleaseAndRun | | Build release + run |
 | `<leader>bb` | n | @build.buildDebugAndRun | | Build debug + run |
-| `<leader>bR` | n | @build.buildReleaseOnly | | Build release only, notarize + sign (no run) |
+| `<leader>bR` | n | @build.buildReleaseOnly | | Build release only (no run) |
 | `<leader>bn` | n | @build.buildDebugOnly | | Build debug only (no run) |
 | `<leader>bc` | n | @build.cleanBuild | | Clean build |
 | `<leader>bk` | n | @build.cleanOnly | | Clean |

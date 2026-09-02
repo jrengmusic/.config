@@ -6,7 +6,7 @@
 --
 -- LSP is deliberately absent from this machine: clangd runs continuously
 -- for the whole session. Its compilation database lives at the project
--- root (core/cmake-picker.syncClangd) so the index shards sit outside
+-- root (core/clangd.lua) so the index shards sit outside
 -- Builds/ — a clean can't destroy them or race clangd's file handles, and
 -- clangd hot-reloads a reconfigured CDB by itself. Nothing here ever needs
 -- to stop or restart an LSP client.

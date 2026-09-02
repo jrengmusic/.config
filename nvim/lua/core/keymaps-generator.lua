@@ -42,85 +42,76 @@ local BANNER = [[
 -- Edit the lexicon file, never this file.
 ]]
 
--- | a | b | c | → { 'a', 'b', 'c' } (inner pipes never occur in the lexicon)
-local function splitRow(line)
-  local cells = {}
-  for cell in line:gmatch('|([^|]*)') do
-    cells[#cells + 1] = vim.trim(cell)
+-- Parses contract sections via the shared markdown-table reader. Returns
+-- groups (ordered) + per-group key rows, or nil + error message. Two
+-- passes — all groups, then all keys: sections — since table order no
+-- longer needs to be walked line-by-line to know which table a row
+-- belongs to.
+local function parse()
+  local tables = require('core.markdown-table').getTables(MD_PATH)
+  if not tables then
+    return nil, ('KEYMAPS.md: file not found: %s'):format(MD_PATH)
   end
-  return cells
-end
 
-local function isRuleRow(cells)
-  for _, c in ipairs(cells) do
-    if c ~= '' and not c:match('^:?%-+:?$') then return false end
+  local groups, groupsByName = {}, {}
+  local groupsTable
+  for _, candidate in ipairs(tables) do
+    if candidate.heading == 'groups' then groupsTable = candidate end
   end
-  return true
-end
+  if not groupsTable then
+    return nil, 'KEYMAPS.md: missing ## groups table'
+  end
 
--- Parses contract sections. Returns groups (ordered) + per-group key rows, or
--- nil + error message.
-local function parse(text)
-  local groups, groupsByName, currentKeys = {}, {}, nil
-  local lineNumber = 0
-
-  for line in (text .. '\n'):gmatch('(.-)\n') do
-    lineNumber = lineNumber + 1
-    local keysName = line:match('^## keys:%s*(%S+)')
-
-    if line:match('^## groups%s*$') then
-      currentKeys = 'groups'
-    elseif keysName then
-      if not groupsByName[keysName] then
-        return nil, ('KEYMAPS.md:%d: unknown group %q'):format(lineNumber, keysName)
+  for _, cells in ipairs(groupsTable.rows) do
+    local lineNumber = cells.line
+    local group = {
+      name = cells[GROUP_COLUMNS.name], func = cells[GROUP_COLUMNS.func],
+      invocation = cells[GROUP_COLUMNS.invocation], prefix = cells[GROUP_COLUMNS.prefix],
+      requires = cells[GROUP_COLUMNS.requires], parent = cells[GROUP_COLUMNS.parent],
+      guard = cells[GROUP_COLUMNS.guard], keys = {},
+    }
+    if group.parent == '' and not INVOCATIONS[group.invocation] then
+      return nil, ('KEYMAPS.md:%d: invalid invocation %q'):format(lineNumber, group.invocation)
+    end
+    if group.parent ~= '' and not groupsByName[group.parent] then
+      return nil, ('KEYMAPS.md:%d: unknown parent %q'):format(lineNumber, group.parent)
+    end
+    if group.parent ~= '' then
+      local supportsMethod = group.guard:match('^supports=(%S+)$')
+      local isClientGuard = group.guard:match('^client=%S+$') ~= nil
+      local isSupportsGuard = supportsMethod ~= nil and SUPPORTS_METHODS[supportsMethod] ~= nil
+      if not (isClientGuard or isSupportsGuard) then
+        return nil, ('KEYMAPS.md:%d: invalid guard %q'):format(lineNumber, group.guard)
       end
-      currentKeys = keysName
-    elseif line:match('^#') then
-      currentKeys = nil
-    elseif currentKeys and line:match('^|') then
-      local cells = splitRow(line)
-      if not isRuleRow(cells) and cells[1] ~= 'group' and cells[1] ~= 'key' then
-        if currentKeys == 'groups' then
-          local group = {
-            name = cells[GROUP_COLUMNS.name], func = cells[GROUP_COLUMNS.func],
-            invocation = cells[GROUP_COLUMNS.invocation], prefix = cells[GROUP_COLUMNS.prefix],
-            requires = cells[GROUP_COLUMNS.requires], parent = cells[GROUP_COLUMNS.parent],
-            guard = cells[GROUP_COLUMNS.guard], keys = {},
-          }
-          if group.parent == '' and not INVOCATIONS[group.invocation] then
-            return nil, ('KEYMAPS.md:%d: invalid invocation %q'):format(lineNumber, group.invocation)
+    end
+    groups[#groups + 1] = group
+    groupsByName[group.name] = group
+  end
+
+  for _, candidate in ipairs(tables) do
+    local keysName = candidate.heading:match('^keys:%s*(%S+)$')
+    if keysName then
+      if not groupsByName[keysName] then
+        return nil, ('KEYMAPS.md:%d: unknown group %q'):format(candidate.headingLine, keysName)
+      end
+      for _, cells in ipairs(candidate.rows) do
+        local lineNumber = cells.line
+        local keyCell = cells[KEY_COLUMNS.key]
+        local row = { key = keyCell:match('^`(.*)`$') or keyCell, mode = cells[KEY_COLUMNS.mode],
+                      action = cells[KEY_COLUMNS.action], opts = cells[KEY_COLUMNS.opts],
+                      desc = cells[KEY_COLUMNS.desc], line = lineNumber }
+        for token in row.opts:gmatch('[^,%s]+') do
+          if not OPTS_TOKENS[token] then
+            return nil, ('KEYMAPS.md:%d: invalid opts token %q'):format(lineNumber, token)
           end
-          if group.parent ~= '' and not groupsByName[group.parent] then
-            return nil, ('KEYMAPS.md:%d: unknown parent %q'):format(lineNumber, group.parent)
-          end
-          if group.parent ~= '' then
-            local supportsMethod = group.guard:match('^supports=(%S+)$')
-            local isClientGuard = group.guard:match('^client=%S+$') ~= nil
-            local isSupportsGuard = supportsMethod ~= nil and SUPPORTS_METHODS[supportsMethod] ~= nil
-            if not (isClientGuard or isSupportsGuard) then
-              return nil, ('KEYMAPS.md:%d: invalid guard %q'):format(lineNumber, group.guard)
-            end
-          end
-          groups[#groups + 1] = group
-          groupsByName[group.name] = group
-        else
-          local keyCell = cells[KEY_COLUMNS.key]
-          local row = { key = keyCell:match('^`(.*)`$') or keyCell, mode = cells[KEY_COLUMNS.mode],
-                        action = cells[KEY_COLUMNS.action], opts = cells[KEY_COLUMNS.opts],
-                        desc = cells[KEY_COLUMNS.desc], line = lineNumber }
-          for token in row.opts:gmatch('[^,%s]+') do
-            if not OPTS_TOKENS[token] then
-              return nil, ('KEYMAPS.md:%d: invalid opts token %q'):format(lineNumber, token)
-            end
-          end
-          local seen = groupsByName[currentKeys].keys
-          for _, existing in ipairs(seen) do
-            if existing.key == row.key and existing.mode == row.mode then
-              return nil, ('KEYMAPS.md:%d: duplicate %s-mode key %q in group %q'):format(lineNumber, row.mode, row.key, currentKeys)
-            end
-          end
-          seen[#seen + 1] = row
         end
+        local seen = groupsByName[keysName].keys
+        for _, existing in ipairs(seen) do
+          if existing.key == row.key and existing.mode == row.mode then
+            return nil, ('KEYMAPS.md:%d: duplicate %s-mode key %q in group %q'):format(lineNumber, row.mode, row.key, keysName)
+          end
+        end
+        seen[#seen + 1] = row
       end
     end
   end
@@ -338,7 +329,7 @@ function M.verify()
     if head and head:find('LEXICON: sha256:' .. hash, 1, true) then return end
   end
 
-  local groups, parseError = parse(text)
+  local groups, parseError = parse()
   if not groups then
     vim.notify('[keymaps-generator] ' .. parseError .. ' — keeping last-good keymaps.lua', vim.log.levels.ERROR)
     return

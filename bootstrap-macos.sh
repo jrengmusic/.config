@@ -332,7 +332,7 @@ info "nvim uses XDG_CONFIG_HOME (~/.config/nvim) by default on macOS"
 echo ""
 echo "Notes:"
 echo "  - Mason will auto-install LSP servers on first launch"
-echo "  - DAP adapter: codelldb (installed via Mason)"
+echo "  - DAP adapter: whatdbg (~/.local/bin/whatdbg)"
 
 # ============================================================================
 # 10. END terminal

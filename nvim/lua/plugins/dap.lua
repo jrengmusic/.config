@@ -15,12 +15,7 @@ return {
   cmd = { 'DapContinue', 'DapToggleBreakpoint' },
   deps = 'dap',
   setup = function()
-    local adaptersOk = require('dap.adapters').setup()
-    if not adaptersOk then
-      return
-    end
-
-    require('dap.configurations').setup()
+    require('dap.adapters').setup()
     require('dap.dapui_config').setup()
   end,
 }
