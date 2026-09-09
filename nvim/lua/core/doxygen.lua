@@ -57,8 +57,7 @@ local COMMON_LIB_EXCLUDES = {
 }
 
 local VENDOR_DIR_NAMES = {
-  '___sdk___',
-  '___SDK___',
+  'sdk',
   'freetype',
   'vma',
   'glm',
