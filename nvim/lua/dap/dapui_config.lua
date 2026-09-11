@@ -83,8 +83,7 @@ function M.setup()
   end
 
   -- Float standalone app windows into PaperWM floating layer (macOS only)
-  -- — same no-host signal core/build.lua's standalone-pid capture and
-  -- terminateDap() dispatch on.
+  -- — same no-host signal core/build.lua's terminateDap() dispatches on.
   dap.listeners.after.launch.standalone_float = function(session, body)
     if is_mac and require('core.build').isStandaloneLaunch(session.config) then
       local program = session.config.program
@@ -113,9 +112,9 @@ function M.setup()
   vim.api.nvim_set_hl(0, 'DapStoppedLine', { bg = '#2d3319' })
   vim.api.nvim_set_hl(0, 'DapLogPoint', { fg = '#61afef' })
 
-  -- Build orchestration listeners (standalone PID capture) must be live
-  -- before any launch, including manual dap.continue. The project state's
-  -- DAP configurations are published here too, at dap load time.
+  -- The host process-id listener must be live before any launch, including a
+  -- manual dap.continue. The project state's DAP configurations are published
+  -- here too, at dap load time.
   require('core.build').registerDapListeners()
   require('dap.launch').setup()
 

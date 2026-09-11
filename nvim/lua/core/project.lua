@@ -69,9 +69,7 @@ end
 
 -- A carried selection names only what the new document declares; a target
 -- or configuration the manifest no longer declares (renamed, or a legacy
--- format name) is dropped, never kept as dead state. pid is carried
--- unconditionally -- it names a currently-running process, not a manifest
--- fact, so it survives a reparse regardless of what the manifest declares.
+-- format name) is dropped, never kept as dead state.
 local function getDeclaredSelection(ast, selection)
   local targets = {}
   for _, target in ipairs(ast.targets) do targets[target.name] = true end
@@ -79,7 +77,6 @@ local function getDeclaredSelection(ast, selection)
     configuration = ast.configurations[selection.configuration] and selection.configuration or nil,
     target = targets[selection.target] and selection.target or nil,
     host = selection.host or '',
-    pid = selection.pid,
   }
 end
 
@@ -229,16 +226,6 @@ end
 function M.setSelection(root, selection)
   assert(registry[root], 'project: no state for ' .. root)
   return M.parse(root, selection)
-end
-
--- The launched process's PID, written directly into the current state and
--- persisted -- no reparse, no ProjectChanged: a PID is bookkeeping for
--- terminate to kill immediately, not a project fact any listener reacts to.
--- pid = nil clears it once the process is gone.
-function M.setLaunchedPid(root, pid)
-  local ast = assert(registry[root], 'project: no state for ' .. root)
-  ast.selection.pid = pid
-  writeIfDifferent(getStatePath(root), getText(ast))
 end
 
 -- The compile section clangd and the navigator follow: the selected

@@ -23,11 +23,6 @@ local M = {}
 local is_windows = vim.fn.has('win32') == 1
 
 local DAP_TERMINATE_GRACE_MS = 200
--- The freshly launched executable is not always visible to the OS process
--- query on the first attempt — poll until it appears.
-local PID_CAPTURE_DELAY_MS = 500
-local PID_CAPTURE_RETRY_MS = 500
-local PID_CAPTURE_MAX_ATTEMPTS = 10
 -- Host processes need a moment to come up before an attach; a plain launch
 -- only needs the build artefacts to settle.
 local LAUNCH_DELAY_MS = { launch = 1000, attach = 2000 }
@@ -43,7 +38,15 @@ local BUILD_ERRORFORMAT = table.concat({
   [[%f:%l:%c: %trror: %m]],
   [[%f:%l:%c: %tarning: %m]],
 }, ',')
-local STANDALONE_PID_LISTENER_KEY = 'standalone_pid_capture'
+local HOST_PID_LISTENER_KEY = 'host_pid_capture'
+
+-- The host application's process id, as the adapter itself reports it in the
+-- DAP `process` event -- the one authoritative source on both platforms: on
+-- macOS the session attaches to the host launchSelected spawned, on Windows
+-- whatdbg launches the host under the debugger. Never written to disk: the
+-- operating system reuses process ids, so a persisted one outlives its
+-- meaning and names an unrelated process on the next boot.
+local launchedHostPid = nil
 
 local function getProject()
   local project = require('core.project')
@@ -75,143 +78,61 @@ function M.isStandaloneLaunch(config)
   return isExecutable(getSessionTarget(config))
 end
 
--- A real host application (a DAW) gets a plain, graceful terminate — never
--- force-killed on every debug session's end.
-local function killHost(name)
+-- Force-quits the host by exact process id. Pid-exact is the whole point:
+-- `killall <name>` and `taskkill /IM <image>` match every running copy of
+-- that application, including ones started by hand outside any debug
+-- session, and that blast radius is what terminated an unrelated window.
+--
+-- macOS has no signal that clears the Dock/LaunchServices registration, so
+-- this calls the same NSRunningApplication API the Dock's own Force Quit
+-- uses. Two JXA details are load-bearing. The singular lookup is
+-- runningApplicationWithProcessIdentifier -- the plural, bundle-identifier
+-- form is the one that caused the incident. And JXA exposes a no-argument
+-- Objective-C method as a property, so `forceTerminate` carries no call
+-- parentheses; written as a call it raises TypeError. The nil test names its
+-- threat: the host may already have been quit by hand, which leaves the id
+-- registered to nothing.
+local function killHost(pid)
   if is_windows then
-    vim.fn.jobstart({ 'taskkill', '/F', '/IM', name })
+    vim.fn.jobstart({ 'taskkill', '/F', '/PID', tostring(pid) })
   else
-    vim.fn.jobstart({ 'killall', name })
-  end
-end
-
--- Matched by the process's own name (comm), not its full command line or
--- path: a name match is exact and can't accidentally widen to catch a
--- differently-invoked process sharing a path substring. Windows' PowerShell
--- query matches the same way -- by -Name, not -ExecutablePath, since that
--- WQL filter compares literal strings and the DAP config's forward-slash
--- path never equals Win32's backslash ExecutablePath.
-local function getPidQuery(program)
-  local name = vim.fn.fnamemodify(program, ':t:r')
-  if is_windows then
-    return {
-      'powershell', '-NoProfile', '-Command',
-      string.format(
-        "(Get-Process -Name '%s' -ErrorAction SilentlyContinue | Select-Object -First 1).Id",
-        name
-      ),
-    }
-  end
-  return { 'pgrep', '-x', name }
-end
-
--- Async capture at launch time, written straight into the project state
--- (core/project.lua) rather than a local variable: terminate then reads it
--- and kills immediately, never querying the OS or waiting on anything at
--- terminate time -- dap.terminate()'s adapter round trip runs in parallel,
--- never gating the kill.
-local function capturePid(root, cmd)
-  local attempts = 0
-  local function attempt()
-    attempts = attempts + 1
-    vim.fn.jobstart(cmd, {
-      stdout_buffered = true,
-      on_stdout = function(_, data)
-        local pid = tonumber(vim.trim(table.concat(data, '\n')))
-        if pid then
-          require('core.project').setLaunchedPid(root, pid)
-        elseif attempts < PID_CAPTURE_MAX_ATTEMPTS then
-          vim.defer_fn(attempt, PID_CAPTURE_RETRY_MS)
-        end
-      end,
-    })
-  end
-  attempt()
-end
-
--- Registers the launch listener that captures the executable's PID so
--- terminate can kill it. Called from dap/dapui_config.setup() at dap load
--- time — must be live before any launch, including manual dap.continue.
-function M.registerDapListeners()
-  local dap = require('dap')
-
-  dap.listeners.after.launch[STANDALONE_PID_LISTENER_KEY] = function(session, _)
-    if M.isStandaloneLaunch(session.config) then
-      local root = getProject().manifest.root
-      vim.defer_fn(function() capturePid(root, getPidQuery(session.config.program)) end, PID_CAPTURE_DELAY_MS)
-    end
-  end
-end
-
--- macOS: a process under active debugger control has its signals queued,
--- not delivered, until the tracer (lldb's debugserver) resumes or detaches
--- it -- SIGKILL included. debugserver is the debuggee's own direct parent
--- (whatdbg -> debugserver -> debuggee), so it is found precisely by PPID,
--- never by name (no blast radius on an unrelated debug session elsewhere).
--- Killing debugserver forces the kernel to detach, which releases the
--- already-queued SIGKILL on the debuggee immediately -- measured: dead
--- before the very next process-table check, vs. up to several seconds
--- waiting on whatdbg's own DAP-protocol terminate handling.
-local function getParentPid(pid)
-  local handle = io.popen('ps -o ppid= -p ' .. tostring(pid))
-  local output = handle and handle:read('*l')
-  if handle then handle:close() end
-  return output and tonumber(vim.trim(output)) or nil
-end
-
--- macOS: the kernel process table and the Dock/LaunchServices "running
--- application" registration (NSWorkspace/NSRunningApplication) are two
--- separate subsystems -- kill -9 only ever touches the first. Apple's own
--- -forceTerminate is documented to "remove the application from the Dock"
--- as part of the call, which a raw external signal never does regardless of
--- how fast or precisely it's aimed. Fire-and-forget, best effort: the
--- process kill above is what actually guarantees termination; this clears
--- the Dock entry in parallel.
-local function forceTerminateApp(bundleId)
-  if bundleId then
     local jxa = string.format(
-      [[ObjC.import('AppKit'); var a = $.NSRunningApplication.runningApplicationsWithBundleIdentifier('%s'); for (var i = 0; i < a.count; i++) { a.objectAtIndex(i).forceTerminate(); }]],
-      bundleId
+      [[ObjC.import('AppKit'); var host = $.NSRunningApplication.runningApplicationWithProcessIdentifier(%d); host.isNil() ? false : host.forceTerminate;]],
+      pid
     )
     vim.fn.jobstart({ 'osascript', '-l', 'JavaScript', '-e', jxa })
   end
 end
 
--- Reads the PID captured at launch (project.selection.pid) and clears it
--- once issued.
-local function killStandalone()
-  local project = getProject()
-  local pid = project.selection.pid
-  if pid then
-    if is_windows then
-      vim.fn.jobstart({ 'taskkill', '/F', '/PID', tostring(pid) })
-    else
-      local tracer = getParentPid(pid)
-      vim.fn.jobstart({ 'kill', '-9', tostring(pid) })
-      if tracer then vim.fn.jobstart({ 'kill', '-9', tostring(tracer) }) end
-      forceTerminateApp(project.manifest.id)
+-- Registers the listener that records the host's process id. Called from
+-- dap/dapui_config.setup() at dap load time -- must be live before any
+-- launch, including a manual dap.continue. An executable target needs no
+-- id: dap.terminate() stops and reaps the debuggee on its own.
+function M.registerDapListeners()
+  local dap = require('dap')
+
+  dap.listeners.after.event_process[HOST_PID_LISTENER_KEY] = function(session, body)
+    if not M.isStandaloneLaunch(session.config) then
+      launchedHostPid = body.systemProcessId
     end
-    require('core.project').setLaunchedPid(project.manifest.root, nil)
   end
 end
 
--- Kills what `target` launched: the PID captured at launch for an
--- executable, the selected host application for a plugin.
+-- Kills what `target` launched: the selected host application for a plugin.
+-- An executable target needs nothing here -- dap.terminate() stops and reaps
+-- the debuggee. A plugin's host is a separate application: launchSelected
+-- spawns it and the session attaches on macOS, while on Windows whatdbg
+-- launches it under the debugger (core/project/cast.lua, LAUNCH).
 local function killTarget(target)
-  if target then
-    if isExecutable(target) then
-      killStandalone()
-    elseif getProject().selection.host ~= '' then
-      killHost(vim.fs.basename(getProject().selection.host))
-    end
+  if target and not isExecutable(target) and launchedHostPid then
+    killHost(launchedHostPid)
+    launchedHostPid = nil
   end
 end
 
 -- What the last launch started, as a project-state target. A live session's
 -- own config names exactly what ran, so it answers whenever there is one;
--- once the adapter is gone the state's selection is the only record left,
--- and the process it started may well still be alive -- whatdbg exiting or
--- the session disconnecting never terminated the debuggee.
+-- once the adapter is gone the state's selection is the only record left.
 local function getLaunchedTarget()
   local session = require('dap').session()
   if session then return getSessionTarget(session.config) end
@@ -219,9 +140,11 @@ local function getLaunchedTarget()
   return project and getTarget(project, project.selection.target)
 end
 
--- The kill fires first, from the PID captured at launch -- immediate, no
--- waiting on dap.terminate()'s own DAP-protocol round trip through whatdbg
--- to release the debuggee.
+-- dap.terminate() sends the DAP terminate request -- whatdbg advertises
+-- supportsTerminateRequest, so nvim-dap takes that path and whatdbg stops
+-- and reaps the debuggee itself. The wait is bounded: nvim-dap closes the
+-- session on its own timeout, so a wedged adapter costs that timeout and
+-- nothing more.
 local function terminateDap()
   local dap = require('dap')
   local dapui = require('dapui')
@@ -236,11 +159,9 @@ local function terminateDap()
 end
 
 -- Every build and clean entry point starts here: whatever the previous run
--- left running is killed before the new one starts, so a rebuild never runs
--- beside the process it is about to overwrite. The continuation is timed off
--- the kill, never off the adapter's terminate response -- that response is
--- the one thing a wedged adapter can withhold indefinitely, and a build that
--- waits on it never starts at all.
+-- left running is terminated before the new one starts, so a rebuild never
+-- runs beside the process it is about to overwrite. The continuation is timed
+-- off the terminate call, never off the adapter's response.
 local function killRunningThen(continuation)
   terminateDap()
   vim.defer_fn(continuation, DAP_TERMINATE_GRACE_MS)
@@ -399,7 +320,16 @@ local function launchSelected(root)
   local configuration = require('dap.launch').getConfiguration(project, selection.target)
   if configuration.request == 'attach' then
     vim.notify('Built! Launching ' .. vim.fs.basename(selection.host) .. '...', vim.log.levels.INFO, { timeout = NOTIFY_TIMEOUT_MS })
-    vim.fn.jobstart({ selection.host })
+    -- The session must attach to the instance this call just started, never
+    -- to one already running. The configuration's own pid falls back to a
+    -- name match (dap/launch.lua getHostPid), and a name match resolves to
+    -- the oldest instance -- the host that was already open before the debug
+    -- session, which then gets both the debugger and, at terminate, the
+    -- force-quit. jobpid names the process this call created, so it is the
+    -- one source that cannot select the wrong instance. The name match stays
+    -- correct for the other entry point, where the host is started by hand
+    -- and a configuration is picked from dap.continue.
+    configuration.pid = vim.fn.jobpid(vim.fn.jobstart({ selection.host }))
   else
     vim.notify('Built! Launching ' .. selection.target .. '...', vim.log.levels.INFO, { timeout = NOTIFY_TIMEOUT_MS })
   end
