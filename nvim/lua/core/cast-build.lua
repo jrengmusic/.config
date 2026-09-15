@@ -4,7 +4,7 @@
 -- state's selection (core/project.lua, dap/launch.lua); this module only
 -- runs the toolchain and hands control back on success.
 --
--- The framework's own manifest (<user-module root>/cast/CAST.md) is
+-- The framework's own manifest (<user-module root>/cast/spell.md) is
 -- regenerated first, unconditionally -- a project build never runs against
 -- stale generated framework headers. It carries no ## toolchain table of
 -- its own, so this run is codegen only (no configure/build step fires for
@@ -19,7 +19,7 @@ local TOOLCHAIN_MANIFEST = require('core.project.cast').TOOLCHAIN_MANIFEST
 -- Keymap scheme -> ## toolchain argument (a configuration key in the
 -- project state). Debug builds fast and unsigned; Release builds optimized
 -- and unsigned (no-sign) for local iteration. The fully signed/notarized/
--- installed default flow (bare `cast cast/CAST.md`, no toolchain argument)
+-- installed default flow (bare `cast cast/spell.md`, no toolchain argument)
 -- is a deliberate manual step, never bound to a keymap.
 M.TOOLCHAIN_ARGUMENT = {
   Debug = 'debug',

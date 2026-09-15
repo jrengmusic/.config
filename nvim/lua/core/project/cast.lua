@@ -8,7 +8,7 @@ local M = {}
 
 local markdown = require('core.markdown-table')
 
-M.TOOLCHAIN_MANIFEST = 'cast/CAST.md'
+M.TOOLCHAIN_MANIFEST = 'cast/spell.md'
 
 local MANIFEST = 'project-info.md'
 local COMPILE_DATABASE = 'compile_commands.json'

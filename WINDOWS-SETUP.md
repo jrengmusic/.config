@@ -210,7 +210,7 @@ JUCE explicitly rejects MinGW (`#error "MinGW is not supported"`), so builds req
 
 **Why not MinGW GCC?** JUCE hardcodes `#error "MinGW is not supported"`.
 
-The build is the cast toolchain on every platform: `cast cast/CAST.md --debug` (or `--no-sign`), driven by nvim's `<leader>b*` keymaps (`core/cast-build.lua`) from the project's `project-info.md ## toolchain` rows. nvim captures the `vcvarsall.bat x64` environment at startup (`core/options.lua`) so cmake/ninja/cl resolve for the child processes.
+The build is the cast toolchain on every platform: `cast cast/spell.md --debug` (or `--no-sign`), driven by nvim's `<leader>b*` keymaps (`core/cast-build.lua`) from the project's `project-info.md ## toolchain` rows. nvim captures the `vcvarsall.bat x64` environment at startup (`core/options.lua`) so cmake/ninja/cl resolve for the child processes.
 
 ### LSP (clangd)
 

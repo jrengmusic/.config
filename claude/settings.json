@@ -27,9 +27,13 @@
     "command": "~/.carol/bin/carol-statusline.sh"
   },
   "enabledPlugins": {},
+  "outputStyle": "CAROL",
   "effortLevel": "high",
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
+  "timeFormat": "24-hour",
+  "editorMode": "normal",
+  "switchModelsOnFlag": false,
   "showTurnDuration": false,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true

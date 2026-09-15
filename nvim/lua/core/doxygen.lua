@@ -339,7 +339,7 @@ function M.build(root)
     local proj_dir = ensure_project_docs_dir(root)
     run_in_terminal(juce, juce_tmp, lib_tmp, lib_root, proj_tmp, proj_dir)
   else
-    vim.notify('[doxygen] No project state here: a project needs project-info.md and cast/CAST.md', vim.log.levels.WARN)
+    vim.notify('[doxygen] No project state here: a project needs project-info.md and cast/spell.md', vim.log.levels.WARN)
   end
 end
 

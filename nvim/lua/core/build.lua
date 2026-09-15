@@ -310,7 +310,7 @@ local function buildSelected(scheme, onBuilt)
       castBuild.build(project, argument, function() onBuilt(root) end)
     end)
   else
-    vim.notify('No project state here: a project needs project-info.md and cast/CAST.md', vim.log.levels.ERROR)
+    vim.notify('No project state here: a project needs project-info.md and cast/spell.md', vim.log.levels.ERROR)
   end
 end
 
@@ -379,7 +379,7 @@ local function runClean(onDone)
     require('core.project').parse(project.manifest.root)
     if onDone then onDone() end
   else
-    vim.notify('No project state here: a project needs project-info.md and cast/CAST.md', vim.log.levels.ERROR)
+    vim.notify('No project state here: a project needs project-info.md and cast/spell.md', vim.log.levels.ERROR)
   end
 end
 
@@ -419,7 +419,7 @@ function M.configureProject()
   if project then
     require('dap.launch').pick(project, nil, nil)
   else
-    vim.notify('No project state here: a project needs project-info.md and cast/CAST.md', vim.log.levels.ERROR)
+    vim.notify('No project state here: a project needs project-info.md and cast/spell.md', vim.log.levels.ERROR)
   end
 end
 
