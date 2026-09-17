@@ -10,7 +10,13 @@ local markdown = require('core.markdown-table')
 
 M.TOOLCHAIN_MANIFEST = 'cast/spell.md'
 
-local MANIFEST = 'project-info.md'
+-- The project marker: presence of this file at a root is what makes that
+-- root a cast-managed project (core/project.lua's getLocator reads it).
+-- cast/spell.md above is a different file with a different job -- the
+-- manifest the `cast` CLI itself builds from, which a framework root also
+-- carries (for its own codegen) without being an nvim project.
+M.MANIFEST = 'project-info.md'
+local MANIFEST = M.MANIFEST
 local COMPILE_DATABASE = 'compile_commands.json'
 local JUCE_HEADER = 'JuceLibraryCode/JuceHeader.h'
 local DEFAULT_ARGUMENT = 'default'

@@ -8,9 +8,9 @@ Identical DX to macOS across all machines. Config repo (`~/.config/`) is the sin
 Machine              OS              Terminal    Shell    Compiler
 ─────────────────────────────────────────────────────────────────
 iMac 5K 2015         macOS Monterey  kitty       zsh      clang (Xcode)
-iMac 5K 2015         Windows 10      END         zsh      cl.exe (MSVC)
+iMac 5K 2015         Windows 10      END         zsh      clang-cl (VS-bundled)
 MBP M4               macOS latest    kitty       zsh      clang (Xcode)
-MBP M4               Windows 11 UTM  END         zsh      cl.exe (MSVC)
+MBP M4               Windows 11 UTM  END         zsh      clang-cl (VS-bundled)
 ```
 
 ## Which MSYS2 Shell to Launch
@@ -30,7 +30,7 @@ MBP M4               Windows 11 UTM  END         zsh      cl.exe (MSVC)
 | `MSYS` | Script running only | No Windows toolchain. Avoid for dev work. |
 | `MINGW64` | x86_64 native dev | GCC toolchain. Our x64 choice. |
 | `UCRT64` | x86_64 (modern runtime) | Like MINGW64 but newer C runtime. Not needed here. |
-| `CLANG64` | x86_64 Clang toolchain | x64 but Clang-based. Not needed — we use MSVC for builds. |
+| `CLANG64` | x86_64 Clang toolchain | x64 but MSYS2's own Clang. Not needed — we use VS-bundled clang-cl for builds. |
 | `CLANGARM64` | ARM64 native dev | ARM64 Clang toolchain. Our ARM64 choice. |
 | `MINGW32` | 32-bit x86 | Legacy. Never use. |
 
@@ -54,8 +54,8 @@ Install these manually before running the setup script:
 1. **MSYS2** — https://www.msys2.org/ (install to `C:\msys64`)
    - On ARM64 Windows (UTM on Apple Silicon): install MSYS2 ARM64, then launch via **CLANGARM64** shortcut
    - On x64 Windows: install MSYS2 x64, launch via **MINGW64** shortcut
-2. **Visual Studio 2022+** — with "Desktop development with C++" workload (provides vcvarsall.bat, MSVC linker, headers)
-3. **LLVM** — `winget install LLVM.LLVM` (provides clang-cl compiler + clangd LSP)
+2. **Visual Studio 2022+** — with the "Desktop development with C++" workload AND the "C++ Clang tools for Windows" optional component (provides `clang-cl.exe`/`llvm-rc.exe` plus the MSVC STL/SDK they consume — `bootstrap-windows.sh` step 3 points `CC`/`CXX`/`RC` at these; no standalone LLVM for the build)
+3. **LLVM** — `winget install LLVM.LLVM` (provides clangd LSP only — not the build compiler)
 4. **Neovim** — `winget install Neovim.Neovim`
 5. **btop4win** — `winget install aristocratos.btop4win` (x64-only, runs under emulation on ARM64)
 
@@ -206,11 +206,11 @@ nvim's `:terminal` on Windows uses `vim.o.shell` which defaults to `zsh.exe` (MS
 
 JUCE explicitly rejects MinGW (`#error "MinGW is not supported"`), so builds require the MSVC environment.
 
-**Compiler**: `cl.exe` (MSVC) producing **PDB** debug symbols, which whatdbg (dbgeng) reads natively.
+**Compiler**: `clang-cl.exe` (VS-bundled) producing **PDB** debug symbols, which whatdbg (dbgeng) reads natively. clang-cl locates the MSVC STL and Windows SDK itself — no vcvarsall.bat activation needed.
 
 **Why not MinGW GCC?** JUCE hardcodes `#error "MinGW is not supported"`.
 
-The build is the cast toolchain on every platform: `cast cast/spell.md --debug` (or `--no-sign`), driven by nvim's `<leader>b*` keymaps (`core/cast-build.lua`) from the project's `project-info.md ## toolchain` rows. nvim captures the `vcvarsall.bat x64` environment at startup (`core/options.lua`) so cmake/ninja/cl resolve for the child processes.
+The build is the cast toolchain on every platform: `cast cast/spell.md --debug` (or `--no-sign`), driven by nvim's `<leader>b*` keymaps (`core/cast-build.lua`) from the project's `project-info.md ## toolchain` rows. `bootstrap-windows.sh` sets the permanent user `CC`/`CXX`/`RC` env vars and the VS-bundled CMake/Ninja user PATH entries once per machine, so cmake/ninja/clang-cl resolve for the child processes with no per-session capture.
 
 ### LSP (clangd)
 
@@ -230,7 +230,7 @@ whatdbg on both platforms — one adapter, identical DX: liblldb/DWARF on macOS,
 | | macOS | Windows |
 |---|---|---|
 | Adapter | whatdbg (`~/.local/bin/whatdbg`) | whatdbg (`~/.local/bin/whatdbg.exe`) |
-| Debug symbols | DWARF (clang) | PDB (cl.exe / MSVC) |
+| Debug symbols | DWARF (clang) | PDB (clang-cl) |
 | Plugin request | attach to the running host | launch the host under the debugger |
 | Process lookup | `pgrep -x 'Host'` | `tasklist /FI "IMAGENAME eq Host.exe"` |
 | Kill process | `killall Host` | `taskkill /F /IM Host.exe` |
@@ -299,7 +299,7 @@ Terminal behavior on build:
     │   │   ├── cast-build.lua          # cast toolchain job
     │   │   ├── clangd.lua              # .clangd writer (project root + user-module root)
     │   │   ├── keymaps.lua             # Generated from doc/KEYMAPS.md
-    │   │   └── options.lua             # Editor options (MSVC env capture on Windows)
+    │   │   └── options.lua             # Editor options (PATH augmentation)
     │   ├── dap/
     │   │   ├── adapters.lua            # whatdbg adapter (OS-branched binary name)
     │   │   └── launch.lua              # DAP configurations + selection picker from the state
@@ -325,7 +325,7 @@ Terminal behavior on build:
 ## Troubleshooting
 
 ### "MinGW is not supported" error during build
-The build is using GCC instead of MSVC: nvim did not capture the `vcvarsall.bat x64` environment (`core/options.lua`, needs vswhere + Visual Studio installed). Launch nvim from the MSYSTEM terminal after a VS install.
+The build is using GCC instead of clang-cl: `CC`/`CXX`/`RC` are not set, or MSYS2's `gcc` PATH entry precedes them. Re-run `bootstrap-windows.sh` (step 3 sets `CC`/`CXX`/`RC` via vswhere; needs Visual Studio with the C++ Clang tools installed) and restart the shell.
 
 ### clangd not starting
 Mason's clangd is a `.cmd` file that nvim can't run. Install system clangd: `winget install LLVM.LLVM`. The config in `clangd.lua` auto-selects system clangd on Windows.

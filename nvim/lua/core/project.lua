@@ -7,10 +7,10 @@
 -- event; none derives a project fact on its own.
 --
 -- Shape follows jam::Document: the base drives parse/validate/write/events,
--- a locator (core/project/<toolchain>.lua) supplies TOOLCHAIN_MANIFEST and
--- build(). A root with no locator manifest is not a project -- getOrCreate
--- returns nil and every project operation reports so. nvim's working
--- directory is the project: loading a root evicts every other.
+-- a locator (core/project/<toolchain>.lua) supplies MANIFEST (the project
+-- marker file) and build(). A root without that marker is not a project --
+-- getOrCreate returns nil silently, no locator runs, nothing is reported.
+-- nvim's working directory is the project: loading a root evicts every other.
 local M = {}
 
 local STATE_FILE = '.project'
@@ -32,7 +32,7 @@ end
 local function getLocator(root)
   for _, name in ipairs(LOCATORS) do
     local locator = require(name)
-    if vim.fn.filereadable(root .. '/' .. locator.TOOLCHAIN_MANIFEST) == 1 then
+    if vim.fn.filereadable(root .. '/' .. locator.MANIFEST) == 1 then
       return locator
     end
   end

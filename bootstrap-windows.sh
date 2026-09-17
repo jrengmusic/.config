@@ -97,7 +97,7 @@ fi
 step "0. Reset previous environment"
 
 # User env vars managed by this script
-MANAGED_USER_VARS=(MSYS MSYSTEM MSYS2_PATH_TYPE XDG_CONFIG_HOME CLAUDE_CODE_GIT_BASH_PATH)
+MANAGED_USER_VARS=(MSYS MSYSTEM MSYS2_PATH_TYPE XDG_CONFIG_HOME CLAUDE_CODE_GIT_BASH_PATH CC CXX RC)
 for var in "${MANAGED_USER_VARS[@]}"; do
     powershell.exe -Command "[System.Environment]::SetEnvironmentVariable('$var', \$null, 'User')" 2>/dev/null
 done
@@ -205,6 +205,54 @@ add_to_system_path() {
 add_to_system_path "C:\\msys64\\usr\\bin"
 add_to_system_path "C:\\msys64\\${MINGW_WIN_DIR}\\bin"
 add_to_system_path "$WIN_HOME\\.local\\bin"
+
+# cast toolchain (clang-cl) — Visual Studio provides clang-cl.exe/llvm-rc.exe
+# directly; no vcvarsall.bat activation needed (RFC.md, cast repo: byte-identical
+# builds from an activated vs. bare shell). VC/Tools/Llvm carries distinct
+# binaries per arch subfolder (x64/ARM64 are cross-targeted builds, not
+# copies of each other) — the subfolder is picked from $MSYSTEM, never
+# discovered generically, so a machine never silently gets the wrong one.
+add_to_user_path() {
+    local entry="$1"
+    local current
+    current=$(powershell.exe -Command "[System.Environment]::GetEnvironmentVariable('PATH', 'User')" | tr -d '\r')
+    if echo "$current" | grep -qi "$(echo "$entry" | sed 's/\\/\\\\/g')"; then
+        info "Already in user PATH: $entry"
+    else
+        powershell.exe -Command "[System.Environment]::SetEnvironmentVariable('PATH', [System.Environment]::GetEnvironmentVariable('PATH', 'User') + ';$entry', 'User')"
+        info "Added to user PATH: $entry"
+    fi
+}
+
+win_to_posix_path() {
+    echo "$1" | sed 's#\\#/#g' | sed -E 's#^([A-Za-z]):#/\L\1#'
+}
+
+case "$MSYSTEM" in
+    CLANGARM64) LLVM_ARCH_DIR="ARM64" ;;
+    MINGW64|UCRT64|*) LLVM_ARCH_DIR="x64" ;;
+esac
+
+VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+if [[ -f "$VSWHERE" ]]; then
+    VS_INSTALL_PATH=$("$VSWHERE" -latest -property installationPath | tr -d '\r')
+    if [[ -n "$VS_INSTALL_PATH" ]]; then
+        LLVM_BIN_DIR="$VS_INSTALL_PATH\\VC\\Tools\\Llvm\\$LLVM_ARCH_DIR\\bin"
+        if [[ -f "$(win_to_posix_path "$LLVM_BIN_DIR")/clang-cl.exe" ]]; then
+            set_win_env "CC" "$LLVM_BIN_DIR\\clang-cl.exe"
+            set_win_env "CXX" "$LLVM_BIN_DIR\\clang-cl.exe"
+            set_win_env "RC" "$LLVM_BIN_DIR\\llvm-rc.exe"
+            add_to_user_path "$VS_INSTALL_PATH\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+            add_to_user_path "$VS_INSTALL_PATH\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        else
+            warn "clang-cl.exe not found at $LLVM_BIN_DIR — CC/CXX/RC not set. Install the \"C++ Clang tools for Windows\" VS component. If this VS layout doesn't use a $LLVM_ARCH_DIR subfolder, update LLVM_ARCH_DIR in bootstrap-windows.sh."
+        fi
+    else
+        warn "vswhere found no Visual Studio installation — CC/CXX/RC not set. Install VS with the C++ workload (see step 12)."
+    fi
+else
+    warn "vswhere.exe not found — CC/CXX/RC not set. Install VS with the C++ workload (see step 12)."
+fi
 
 # ============================================================================
 # 4. Install MSYS2 packages
@@ -586,12 +634,12 @@ The following should be installed via winget or manually:
     (with "Desktop development with C++" workload)
 
 Visual Studio provides:
-  - cl.exe: MSVC compiler (produces PDB debug symbols)
-  - vcvarsall.bat: sets up MSVC compiler, linker, headers, and libs
-  - cmake + ninja: bundled with VS, used by build.bat
-  - JUCE rejects MinGW, so MSVC environment is required
+  - clang-cl.exe + llvm-rc.exe: the compiler and resource compiler (step 3
+    points CC/CXX/RC at these; they locate the MSVC STL/SDK themselves)
+  - cmake + ninja: bundled with VS, used by the cast toolchain and build.bat
+  - JUCE rejects MinGW, so the VS-provided C++ workload is required
 
-The build pipeline uses: cl.exe (compiler) + MSVC (linker/headers) + Ninja
+The build pipeline uses: clang-cl (compiler, produces PDB) + Ninja.
 Debug symbols are PDB format, read by whatdbg (dbgeng.dll DAP adapter).
 EOF
 
