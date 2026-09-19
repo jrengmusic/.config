@@ -29,12 +29,19 @@ local LAUNCH_DELAY_MS = { launch = 1000, attach = 2000 }
 local LOG_WINDOW_HEIGHT = 15
 local NOTIFY_TIMEOUT_MS = 1500
 
--- Both compiler dialects the toolchain produces: MSVC's
--- 'file(line): error C1234: msg' and clang/gcc's 'file:line:col: error: msg'.
+-- All three diagnostic dialects the toolchain produces: MSVC's
+-- 'file(line): error C1234: msg', clang-cl's MSVC-shaped-with-column
+-- 'file(line,col): error: msg', and clang/gcc's 'file:line:col: error: msg'.
+-- The clang-cl form carries a column inside the parentheses, so the plain
+-- MSVC pattern never matches it -- without its own entry every clang-cl
+-- diagnostic is invisible to the quickfix list. The comma is escaped:
+-- an unescaped one ends the pattern in an errorformat list.
 -- %t consumes the leading letter as the entry type (e/w).
 local BUILD_ERRORFORMAT = table.concat({
   [[%f(%l): %trror %m]],
   [[%f(%l): %tarning %m]],
+  [[%f(%l\,%c): %trror: %m]],
+  [[%f(%l\,%c): %tarning: %m]],
   [[%f:%l:%c: %trror: %m]],
   [[%f:%l:%c: %tarning: %m]],
 }, ',')
@@ -224,34 +231,57 @@ local function openLogWindow(height)
   return buf, win, appendLines
 end
 
--- Failure: highlights applied once, to a now-static buffer — never during
--- the live scroll (see openLogWindow). Errors → quickfix, cursor lands on
--- the first failing source line (never inside the log window — that would
--- swap the log buffer out from under itself). :cn/:cp walk the rest.
-local function showBuildFailure(log_buf, log_win, exit_code)
-  if vim.api.nvim_buf_is_valid(log_buf) then
-    vim.bo[log_buf].modifiable = false
-    require('core.autocommands').applyOutputHighlights(log_buf)
-    vim.keymap.set('n', 'q', function()
-      if vim.api.nvim_win_is_valid(log_win) then
-        vim.api.nvim_win_close(log_win, true)
-      end
-    end, { buffer = log_buf, nowait = true })
-    vim.fn.setqflist({}, ' ', {
-      title = 'Build',
-      lines = vim.api.nvim_buf_get_lines(log_buf, 0, -1, false),
-      efm = BUILD_ERRORFORMAT,
-    })
-    local hasError = false
-    for _, item in ipairs(vim.fn.getqflist()) do
-      if item.valid == 1 then hasError = true end
+-- Freezes the finished log: highlights applied once, to a now-static buffer
+-- — never during the live scroll (see openLogWindow). q closes the window.
+-- Diagnostics → quickfix, so :cn/:cp walk them whatever the exit code was;
+-- a clean build leaves an empty list behind, never the previous run's.
+local function showBuildResult(log_buf, log_win)
+  vim.bo[log_buf].modifiable = false
+  require('core.autocommands').applyOutputHighlights(log_buf)
+  vim.keymap.set('n', 'q', function()
+    if vim.api.nvim_win_is_valid(log_win) then
+      vim.api.nvim_win_close(log_win, true)
     end
-    if hasError then
-      if vim.api.nvim_get_current_win() == log_win then
-        vim.cmd('wincmd p')
-      end
-      vim.cmd('cfirst')
+  end, { buffer = log_buf, nowait = true })
+  vim.fn.setqflist({}, ' ', {
+    title = 'Build',
+    lines = vim.api.nvim_buf_get_lines(log_buf, 0, -1, false),
+    efm = BUILD_ERRORFORMAT,
+  })
+end
+
+-- Entries of one compiler dialect type in the list showBuildResult built:
+-- 'e' or 'w', as BUILD_ERRORFORMAT's %t consumes the leading letter.
+local function countEntries(entryType)
+  local count = 0
+  for _, item in ipairs(vim.fn.getqflist()) do
+    if item.valid == 1 and item.type == entryType then count = count + 1 end
+  end
+  return count
+end
+
+-- Success: a silent build closes the log at once. Warnings keep it open —
+-- a warning nobody sees is a warning the build swallowed.
+local function showBuildSuccess(log_win)
+  local warnings = countEntries('w')
+  if warnings > 0 then
+    vim.notify('Built with warnings (' .. warnings .. ') — press q to close', vim.log.levels.WARN)
+  else
+    if vim.api.nvim_win_is_valid(log_win) then
+      vim.api.nvim_win_close(log_win, true)
     end
+  end
+end
+
+-- Failure: cursor lands on the first failing source line (never inside the
+-- log window — that would swap the log buffer out from under itself).
+-- :cn/:cp walk the rest.
+local function showBuildFailure(log_win, exit_code)
+  if countEntries('e') + countEntries('w') > 0 then
+    if vim.api.nvim_get_current_win() == log_win then
+      vim.cmd('wincmd p')
+    end
+    vim.cmd('cfirst')
   end
   vim.notify('Build failed (exit ' .. exit_code .. ') — press q to close', vim.log.levels.ERROR)
 end
@@ -278,13 +308,15 @@ function M.runBuildJob(args, onSuccess, reconfiguresProject)
       local project = require('core.project')
       project.parse(project.getRoot())
     end
+    if vim.api.nvim_buf_is_valid(log_buf) then
+      showBuildResult(log_buf, log_win)
+    end
+
     if exit_code == 0 then
-      if vim.api.nvim_win_is_valid(log_win) then
-        vim.api.nvim_win_close(log_win, true)
-      end
+      showBuildSuccess(log_win)
       onSuccess()
     else
-      showBuildFailure(log_buf, log_win, exit_code)
+      showBuildFailure(log_win, exit_code)
     end
   end
 
