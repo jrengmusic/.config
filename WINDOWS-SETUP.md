@@ -134,6 +134,8 @@ Also adds to **Windows system PATH**:
 - `C:\msys64\mingw64\bin` (x64) or `C:\msys64\clangarm64\bin` (ARM64) — toolchain binaries
 - `C:\Users\<name>\.local\bin` — all tool symlinks (single PATH entry for everything)
 
+Also sets `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled` = `1`. ninja resolves dependency paths past 260 characters only with this switch on. Without it, those headers read as missing, and their objects rebuild on every build.
+
 ### 4. MSYS2 Packages
 
 Via `pacman` (prefix is `mingw-w64-x86_64-` on x64, `mingw-w64-clang-aarch64-` on ARM64):

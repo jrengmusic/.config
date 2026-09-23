@@ -206,6 +206,18 @@ add_to_system_path "C:\\msys64\\usr\\bin"
 add_to_system_path "C:\\msys64\\${MINGW_WIN_DIR}\\bin"
 add_to_system_path "$WIN_HOME\\.local\\bin"
 
+# ninja (longPathAware) resolves dependency paths past MAX_PATH only with this
+# switch on; without it those headers read as missing and their objects rebuild
+# on every build.
+LONG_PATHS_KEY='HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
+long_paths=$(powershell.exe -Command "(Get-ItemProperty -Path '$LONG_PATHS_KEY' -Name LongPathsEnabled).LongPathsEnabled" | tr -d '\r')
+if [[ "$long_paths" == "1" ]]; then
+    info "Already enabled: LongPathsEnabled"
+else
+    powershell.exe -Command "Set-ItemProperty -Path '$LONG_PATHS_KEY' -Name LongPathsEnabled -Value 1 -Type DWord"
+    info "Enabled: LongPathsEnabled"
+fi
+
 # cast toolchain (clang-cl) — Visual Studio provides clang-cl.exe/llvm-rc.exe
 # directly; no vcvarsall.bat activation needed (RFC.md, cast repo: byte-identical
 # builds from an activated vs. bare shell). VC/Tools/Llvm carries distinct
