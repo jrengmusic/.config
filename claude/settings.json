@@ -30,6 +30,11 @@
   "enabledPlugins": {},
   "outputStyle": "CAROL",
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-fable-5-1": {
+      "effortLevel": "high"
+    }
+  },
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "skipWorkflowUsageWarning": true,

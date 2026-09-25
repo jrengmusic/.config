@@ -291,7 +291,7 @@ function M.build(root, selection)
   local variables = getVariables(root, cmake, aliases)
 
   local configurations = getConfigurations(root, byHeading['toolchain'])
-  local targets = getTargets(cmake, byHeading['format'], configurations)
+  local targets = getTargets(cmake, byHeading['plugin format'], configurations)
   local compile = getCompile(configurations, cmake.targetName)
 
   return {

@@ -4,9 +4,9 @@
 -- semantics: nearest preceding `#`/`##` heading, matched case-insensitively)
 -- and parses both pipe tables and grid tables into { headers, rows }.
 --
--- Cells are single-line only -- JAM's grid-table multi-line cell
--- accumulation (used by CAST's own .cast manifests) is out of scope: no
--- current consumer (KEYMAPS.md, project-info.md) has multi-line cells.
+-- A grid table's body is a sequence of `|`-line groups separated by border
+-- lines. More than one group makes each group one row, its cells joined
+-- by newline across lines; exactly one group makes every line its own row.
 local M = {}
 
 -- Splits a table row on unescaped pipes. A backslash immediately before a
@@ -84,19 +84,49 @@ local function parseGridTable(lines, index)
     rowIndex = rowIndex + 1
   end
 
-  local rows = {}
+  local groups, group = {}, {}
   while lines[rowIndex] do
     local line = lines[rowIndex]
     if line:match('^|') then
-      local row = splitRow(line)
-      row.line = rowIndex
-      rows[#rows + 1] = row
+      group[#group + 1] = rowIndex
       rowIndex = rowIndex + 1
     elseif isGridBorder(line) then
+      if #group > 0 then
+        groups[#groups + 1] = group
+        group = {}
+      end
       rowIndex = rowIndex + 1
       if not (lines[rowIndex] and lines[rowIndex]:match('^|')) then break end
     else
       break
+    end
+  end
+  if #group > 0 then groups[#groups + 1] = group end
+
+  local rows = {}
+  if #groups > 1 then
+    for _, group in ipairs(groups) do
+      local row = {}
+      for lineNumber, lineIndex in ipairs(group) do
+        local cells = splitRow(lines[lineIndex])
+        for cellIndex, cell in ipairs(cells) do
+          if lineNumber == 1 then
+            row[cellIndex] = cell
+          elseif cell ~= '' then
+            row[cellIndex] = row[cellIndex] .. '\n' .. cell
+          end
+        end
+      end
+      row.line = group[1]
+      rows[#rows + 1] = row
+    end
+  else
+    for _, group in ipairs(groups) do
+      for _, lineIndex in ipairs(group) do
+        local row = splitRow(lines[lineIndex])
+        row.line = lineIndex
+        rows[#rows + 1] = row
+      end
     end
   end
 
