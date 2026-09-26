@@ -11,9 +11,7 @@
 -- it). A framework without a cast manifest has nothing to regenerate.
 local M = {}
 
-local is_windows = vim.fn.has('win32') == 1
-
-local CAST_BINARY = is_windows and 'cast.exe' or 'cast'
+local CAST_BINARY = require('core.project.cast').CAST_BINARY
 local TOOLCHAIN_MANIFEST = require('core.project.cast').TOOLCHAIN_MANIFEST
 
 -- Keymap scheme -> ## toolchain argument (a configuration key in the

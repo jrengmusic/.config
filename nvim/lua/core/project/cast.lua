@@ -8,6 +8,7 @@ local M = {}
 
 local markdown = require('core.markdown-table')
 
+M.CAST_BINARY = vim.fn.has('win32') == 1 and 'cast.exe' or 'cast'
 M.TOOLCHAIN_MANIFEST = 'cast/spell.md'
 
 -- The project marker: presence of this file at a root is what makes that

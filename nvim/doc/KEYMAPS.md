@@ -1,334 +1,263 @@
-# Neovim Keymaps Lexicon
+# Neovim Keymaps
 
 **This file is the single source of truth for every static keybinding.**
-It generates `nvim/lua/core/keymaps.lua`. Never edit the generated file —
-it carries a `GENERATED CODE — READ ONLY` banner and is overwritten
-wholesale on every regeneration.
+
+`cast` generates `nvim/lua/core/keymaps.lua` from the tables below.
+
+Never edit the generated file. It carries the CAST banner, and `cast` writes it on every run.
 
 ## How the System Works
 
 ```
-nvim/doc/KEYMAPS.md            (SSOT — you edit THIS)
+nvim/doc/KEYMAPS.md            (data: you edit THIS)
+nvim/cast/keymaps.cast         (shapes: the Lua text of each generated line)
+nvim/cast/spell.md             (manifest: one wiring row per generated function)
         │
-        │  core/keymaps-generator.lua
-        │  parse → validate → emit
+        │  cast nvim/cast/spell.md
         ▼
 nvim/lua/core/keymaps.lua      (generated, committed, read-only)
-        │                       banner carries sha256 of this file
         │  called by
         ▼
 init.lua / LspAttach / plugin setup tails / FileType-qf autocmd
         │  rows reference behavior in
         ▼
-core/actions.lua (@actions.*)   core/build.lua (@build.*)
+core/actions.lua (actions.*)   core/build.lua (build.*)
                  (hand-written function bodies)
 ```
 
 **Division of responsibility — bindings are vocabulary, bodies are behavior:**
-- A *binding* (key, mode, action reference, description, options) lives here,
-  as a table row. Changing keys, remapping, re-describing = edit this file only.
-- A *behavior* (a Lua function body) lives in `core/actions.lua` (editor
-  actions) or `core/build.lua` (build/DAP orchestration). New behavior = write
-  the function there first, then reference it here as `@actions.name` /
-  `@build.name`.
+
+- A _binding_ (key, mode, action, description, options) is a row in `## keys`. To change a key,
+  remap it, or describe it again, edit this file only.
+- A _behavior_ is a Lua function body. It lives in one of two modules:
+
+  - `core/actions.lua` — editor actions.
+  - `core/build.lua` — build and DAP orchestration.
+- For new behavior, write the function in its module first.
+- Then reference it in a row as `actions.name` or `build.name`.
 
 ### When Regeneration Happens
 
-1. **On save of this file** — `BufWritePost` autocmd
-   (`core/autocommands.lua`) runs the generator immediately and notifies.
-2. **At nvim launch** — `init.lua` calls
-   `require('core.keymaps-generator').verify()` before the first
-   `require('core.keymaps')`. It computes `sha256` of this file and compares
-   it against the `-- LEXICON: sha256:<hash>` line in the generated banner.
-   Match → no-op (<1ms). Mismatch (e.g. after `git pull` from another
-   machine) → regenerate.
-3. **Manually** — `:lua require('core.keymaps-generator').verify()`.
+1. **On save of this file.** A `BufWritePost` autocmd runs `cast` and shows a notice.
+2. The autocmd is in `core/autocommands.lua`.
+3. **Manually.** Run `cast ~/.config/nvim/cast/spell.md`.
+
+`keymaps.lua` is committed. `cast` output is deterministic, thus a pull from another machine brings
+the tables and the generated file together.
 
 ### Failure Contract
 
-Validation failure (unknown group, duplicate key+mode, bad `@ref`, invalid
-token) **never destroys the generated file**: the generator emits a loud
-`vim.notify` error naming the offending KEYMAPS.md line and keeps the
-last-good `keymaps.lua`. Nvim always starts with working keymaps. Fix the
-reported line, save, regeneration retries.
+A `cast` failure is fatal and names the file, the line, and the column. `cast` then writes no
+output, thus the last good `keymaps.lua` stays and nvim always starts with working keymaps. The
+notice shows the `cast` error line. Correct the reported cell, save, and the run repeats.
 
-### Contract vs Prose
+## Tables
 
-The generator consumes **only** two section shapes:
-- `## groups` — the group registry (exactly one)
-- `## keys: <group>` — binding rows for a declared group
+Three tables feed the generator: `## index`, `## requires`, and `## keys`. Each other heading and
+paragraph in this file is human documentation. `cast` formats this file to canonical markdown on
+each run.
 
-Every other heading and paragraph in this document — including everything
-below the `# Reference` divider — is human documentation, ignored by the
-parser. Prose may use tables freely; only tables under contract headings are
-parsed.
+### The index table
 
-## Schema Reference
+Aliases that `## keys` rows reference: the indents, the buffer scope, and the description prefixes.
 
-### `## groups` columns
+### The requires table
 
-| column | meaning | emitted as |
-|---|---|---|
-| `group` | unique id, referenced by `## keys: <group>` headers and `parent` | — |
-| `function` | public function name on the module | `function M.<name>(...)` — call sites live in init.lua / plugin tails / autocmds. Empty for subgroups (they emit inside their parent). |
-| `invocation` | `init` = called once from init.lua · `plugin` = called from a plugin's setup tail · `event` = takes an `event` argument; every row becomes buffer-local (`buffer = event.buf`) | `event` adds the parameter and buffer scoping |
-| `prefix` | prepended (with a space) to every row's desc | `desc = 'DAP: Step over'` |
-| `requires` | comma list of modules required at function top. `module as alias` renames the local (needed when the module path's last segment isn't a valid/wanted Lua name). Row action roots matching an alias resolve against that local instead of a lazy `require`. | `local dap = require('dap')` |
-| `parent` | makes this a subgroup: its rows emit inside the parent's function, under `guard` | — |
-| `guard` | subgroup condition. Vocabulary: `client=<name>` → `client.name == '<name>'` · `supports=inlayHint` → `client:supports_method(vim.lsp.protocol.Methods.textDocument_inlayHint)` | `if client and <condition> then … end` |
+`group | require`. Each row renders one `local <require>` line at the top of its group's function.
 
-### `## keys:` columns
+### The keys table
 
-| column | meaning |
-|---|---|
-| `key` | LHS, backtick-wrapped. Written as the *actual* key notation — the generator handles Lua string escaping (`` `<C-\><C-n>` `` emits `'<C-\\><C-n>'`). |
-| `mode` | single mode or comma list: `n` · `n,x` · `x,o` |
-| `action` | one of the four kinds below |
-| `opts` | comma list of tokens: `sync` · `expr` · `silent` (empty allowed) |
-| `desc` | human description; group prefix is prepended; empty allowed |
+| column    | meaning                                                                               |
+| --------- | ------------------------------------------------------------------------------------- |
+| `group`   | The function that the row belongs to. `nvim/cast/spell.md` selects rows by this cell. |
+| `indent`  | `@two` in a function body, `@four` inside an LSP guard.                               |
+| `lhs`     | The key, as a Lua string literal: `'<leader>ff'`.                                     |
+| `mode`    | The mode, as Lua: `'n'`, or `{ 'n', 'x' }` for more than one mode.                    |
+| `action`  | The right-hand side, as Lua, verbatim (see below).                                    |
+| `buffer`  | `@buffer` for a group that takes an `event` argument. The map is then buffer-local.   |
+| `prefix`  | The description prefix of the group: `@lsp`, `@dap`, `@ai`. Empty for no prefix.      |
+| `desc`    | The description.                                                                      |
+| `options` | `, expr = true` or `, silent = true`. Empty for no option.                            |
 
-### Action Kinds — exact resolution rules
+The `action` cell holds one of these forms:
 
-| # | you write | generator emits | rule |
-|---|---|---|---|
-| 1 | `` `<cmd>nohlsearch<CR>` `` | `'<cmd>nohlsearch<CR>'` | Backtick = literal RHS string, passed verbatim (escaped for Lua). |
-| 2 | `dap.step_over` | `dap.step_over` | Bare dotted (no parens) = direct function reference. Root **must** be a group `requires` alias or a known global (`vim`, `Snacks`) — anything else fails validation. |
-| 3a | `core.tui.tit()` | `function() require('core.tui').tit() end` | Call with non-required, non-global root: everything before the last dot is the module, lazily required inside a closure. |
-| 3b | `dap.repl.open()` | `function() dap.repl.open() end` | Call with a required root: field access on the already-required local. |
-| 3c | `Snacks.picker.buffers()` | `function() Snacks.picker.buffers() end` | Call with a global root: referenced directly, no require. |
-| 3d | `luasnip.jump(1)` | `function() require('luasnip').jump(1) end` | Arguments pass through verbatim — any Lua expression is legal (`vim.fn.input('Condition: ')`, `{ cwd = vim.fn.stdpath('config') }`). |
-| 4 | `@actions.smart_quit` | `actions.smart_quit` (+ auto `local actions = require('core.actions')`) | `@actions.*` / `@build.*` reference hand-written functions in `core/actions.lua` / `core/build.lua`. Existence is statically validated at generation — a typo fails loudly with the md line number. |
+| form                  | example                                                           |
+| --------------------- | ----------------------------------------------------------------- |
+| string literal        | `'<cmd>nohlsearch<CR>'`                                           |
+| function reference    | `actions.smart_quit`, `dap.step_over`, `vim.lsp.buf.hover`        |
+| call in a closure     | `function() require('core.tui').tit() end`                        |
+| split sync, then call | `function() actions.splitSyncOnce(); Snacks.picker.buffers() end` |
 
-### Opts Tokens
+A function reference needs its local in `## requires` (`actions`, `build`, `dap`), or a global root
+(`vim`, `Snacks`). A wrong name fails at nvim startup, when `vim.keymap.set` receives `nil`.
 
-| token | effect |
-|---|---|
-| `sync` | wraps the action in a closure prepended with `actions.splitSyncOnce()` — re-syncs the C++ header/source split after the jump lands |
-| `expr` | `expr = true` (action must return the keys to feed, e.g. `@actions.formatOnEsc`) |
-| `silent` | `silent = true` |
-
-### Validation (generation fails loudly on any of these)
-
-- `## keys:` header naming an undeclared group
-- duplicate key+mode within one group
-- `invocation`, `opts`, or `guard` token outside the fixed vocabularies
-- bare-dotted action whose root is neither required nor a known global
-- `@ref` naming a function that does not exist in its module
-- subgroup `parent` naming an undeclared group
+**Markdown escaping.** Cells follow markdown backslash escapes. Write a literal backslash as two
+backslashes, and a literal pipe as a backslash and a pipe.
 
 ### Recipes
 
-**Remap or re-describe a key** — edit its row. Save. Done.
+**Remap or describe a key again.** Edit its row. Save.
 
-**Add a binding to something that already exists** — one new row:
-```markdown
-| `<leader>xy` | n | Snacks.picker.commands() | sync | Find commands |
-```
+**Add a binding.** Add one row. Copy `group`, `indent`, `buffer`, and `prefix` from a row of the
+same group.
 
-**Add a binding needing new behavior** — write the body first, then the row:
-```lua
--- core/actions.lua
-function M.rotateColorscheme()
-  ...
-end
-```
-```markdown
-| `<leader>xz` | n | @actions.rotateColorscheme | | Rotate colorscheme |
-```
+**Add a binding that needs new behavior.** Write the function in `core/actions.lua` first. Then add
+a row with `actions.<name>` as the action. The group needs `actions` in `## requires`.
 
-**Add a whole new group** — one row in `## groups` (pick `invocation`; for
-`plugin`, add the `require('core.keymaps').<function>()` call at the owning
-plugin's setup tail), then its `## keys: <name>` section.
+**Add a group.**
+
+1. Add its rows to `## requires` and `## keys`.
+2. Add one wiring row to `nvim/cast/spell.md`.
+3. Call the new function from init.lua, a plugin setup tail, or an autocmd.
 
 ### Out of Scope (by design)
 
-Runtime buffer-local maps spawned by behavior — the build-terminal's
-abort-`<Esc>` and failure-`q` — belong to `core/build.lua`, not this lexicon.
-Plugin-internal mappings configured through plugin APIs (nvim-cmp's `<Tab>`,
-mini.surround's `sa`/`sd`/`sr`) live in their plugin specs and are documented
-in the Reference section below.
+Runtime buffer-local maps that behavior creates — the build terminal's abort-`<Esc>` and failure-`q`
+— belong to `core/build.lua`, not to this file. Plugin-internal mappings configured through plugin
+APIs (nvim-cmp's `<Tab>`, mini.surround's `sa`/`sd`/`sr`) live in their plugin specs, and the
+Reference section below documents them.
 
-## groups
+## index
 
-| group | function | invocation | prefix | requires | parent | guard |
-|---|---|---|---|---|---|---|
-| general | setup | init | | | | |
-| lsp | setupLsp | event | LSP: | | | |
-| lsp-clangd | | event | LSP: | | lsp | client=clangd |
-| lsp-inlay | | event | LSP: | | lsp | supports=inlayHint |
-| dap | setupDap | plugin | DAP: | dap,dapui | | |
-| minipairs | setupMiniPairs | plugin | | | | |
-| flash | setupFlash | plugin | | | | |
-| textobjects | setupTextobjects | plugin | | nvim-treesitter-textobjects.select as select | | |
-| snippets | setupSnippets | plugin | | snacks | | |
-| 99 | setup99 | plugin | 99: | | | |
-| qf | setupDiagnosticsQf | event | | | | |
+| alias   | symbol                    | format   |
+| ------- | ------------------------- | -------- |
+| @two    | U+0020U+0020              | fromUTF8 |
+| @four   | U+0020U+0020U+0020U+0020  | fromUTF8 |
+| @buffer | buffer = event.buf,U+0020 | fromUTF8 |
+| @lsp    | LSP:U+0020                | fromUTF8 |
+| @dap    | DAP:U+0020                | fromUTF8 |
+| @ai     | 99:U+0020                 | fromUTF8 |
 
-## keys: general
+## requires
 
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `<Esc>` | n | `<cmd>nohlsearch<CR>` | | Clear search highlights |
-| `<leader>q` | n | @actions.toggleDiagnosticList | | Toggle diagnostic list |
-| `<C-s>` | n | @actions.saveAllAndQuit | | Save all and quit |
-| `<C-c>` | n | @actions.smart_quit | | Quit with save/discard prompt |
-| `<leader>tt` | n | core.tui.tit() | | Open TIT (git TUI) |
-| `<leader>tc` | n | core.tui.cake() | | Open Cake TUI |
-| `<leader>bd` | n | core.doxygen.build() | | Build doxygen docs |
-| `<Esc><Esc>` | t | `<C-\><C-n>` | | Exit terminal mode |
-| `<leader>tx` | n | @actions.closeAllTerminals | | Close all terminal windows |
-| `<leader>rw` | n | `:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>` | | Replace word (exact) |
-| `<leader>rw` | v | `"hy:%s/\<<C-r>h\>/<C-r>h/gI<Left><Left><Left>` | | Replace selection (exact) |
-| `<leader>rc` | n | `:%s/<C-r><C-w>/<C-r><C-w>/gI<Left><Left><Left>` | | Replace word (contains) |
-| `<leader>rc` | v | `"hy:%s/<C-r>h/<C-r>h/gI<Left><Left><Left>` | | Replace selection (contains) |
-| `<leader>ss` | n | lsp.header-source.syncSplit() | | Sync header/source split |
-| `<leader>s\` | n | `<C-w>v` | | Split vertical |
-| `<leader>s-` | n | `<C-w>s` | | Split horizontal |
-| `<leader>s=` | n | `<C-w>=` | | Equal split sizes |
-| `<leader><Tab>` | n | `<C-w>o` | | Close other splits |
-| `<C-h>` | n | `<C-w><C-h>` | | Focus left window |
-| `<C-l>` | n | `<C-w><C-l>` | | Focus right window |
-| `<C-j>` | n | `<C-w><C-j>` | | Focus lower window |
-| `<C-k>` | n | `<C-w><C-k>` | | Focus upper window |
-| `<leader>x` | n | `<C-w>q` | | Close window |
-| `<leader>[` | n | @actions.jumpBackSynced | | Jump back (sync split) |
-| `<leader>]` | n | @actions.jumpForwardSynced | | Jump forward (sync split) |
-| `<leader>p` | n | `:pu<CR>` | | Paste below on new line |
-| `<leader>P` | n | `:pu!<CR>` | | Paste above on new line |
-| `<Esc>` | i | @actions.formatOnEsc | expr | Format on exit insert mode |
-| `<Esc>` | v | @actions.formatOnEsc | expr | Format on exit visual mode |
-| `<Esc><Esc>` | n | @actions.formatBufferByFiletype | | Format buffer |
-| `<leader>ff` | n | core.navigator.files() | | Find files (project) |
-| `<leader>fx` | n | core.navigator.open_explorer() | | Project explorer (project) |
-| `<leader>fg` | n | core.navigator.grep() | | Find by grep (project) |
-| `<leader>fr` | n | core.navigator.replace_grep() | | Project grep+replace (project) |
-| `<leader>rg` | n | core.navigator.replace() | | Project replace (project) |
-| `<leader>rg` | v | `"zy<Cmd>lua require("core.navigator").replace(vim.fn.getreg("z"))<CR>` | | Project replace selection (project) |
-| `<leader>fb` | n | Snacks.picker.buffers() | sync | Find buffers |
-| `<leader>fh` | n | Snacks.picker.help() | sync | Find help |
-| `<leader>\` | n | Snacks.explorer.reveal() | | File explorer |
-| `<leader>fk` | n | Snacks.picker.keymaps() | | Find keymaps |
-| `<leader>fw` | n | Snacks.picker.grep_word() | sync | Find current word |
-| `<leader>fd` | n | Snacks.picker.diagnostics() | sync | Find diagnostics |
-| `<leader>fR` | n | Snacks.picker.resume() | sync | Find resume |
-| `<leader>f.` | n | Snacks.picker.recent() | sync | Find recent files |
-| `<leader>/` | n | Snacks.picker.lines() | | Search in buffer |
-| `<leader>f/` | n | Snacks.picker.grep_buffers() | sync | Find in open files |
-| `<leader>fn` | n | Snacks.picker.files({ cwd = vim.fn.stdpath('config') }) | sync | Find neovim files |
+| group       | require                                                |
+| ----------- | ------------------------------------------------------ |
+| general     | actions = require('core.actions')                      |
+| lsp         | actions = require('core.actions')                      |
+| dap         | actions = require('core.actions')                      |
+| dap         | build = require('core.build')                          |
+| dap         | dap = require('dap')                                   |
+| dap         | dapui = require('dapui')                               |
+| minipairs   | actions = require('core.actions')                      |
+| textobjects | select = require('nvim-treesitter-textobjects.select') |
+| snippets    | actions = require('core.actions')                      |
+| snippets    | snacks = require('snacks')                             |
 
-## keys: lsp
+## keys
 
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `gd` | n | lsp.header-source.smartDefinitionJump() | | Go to definition |
-| `gr` | n | Snacks.picker.lsp_references() | sync | Go to references |
-| `gI` | n | Snacks.picker.lsp_implementations() | sync | Go to implementation |
-| `gD` | n | vim.lsp.buf.declaration() | sync | Go to declaration |
-| `K` | n | vim.lsp.buf.hover | | Hover documentation |
-| `<leader>ds` | n | Snacks.picker.lsp_symbols() | sync | Document symbols |
-| `<leader>ws` | n | Snacks.picker.lsp_workspace_symbols() | sync | Workspace symbols |
-| `<leader>rn` | n | vim.lsp.buf.rename | | Rename symbol |
-| `<leader>ca` | n,x | vim.lsp.buf.code_action | | Code action |
-| `<leader>ls` | n | lsp.clangd.restart() | | Force clangd reindex + restart |
-
-## keys: lsp-clangd
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `gh` | n | `<cmd>ClangdSwitchSourceHeader<CR>` | | Switch header/source |
-| `<leader>cc` | n | lsp.cpp-stub.generateStub() | | Generate C++ definition stub |
-| `<leader>cv` | n | lsp.cpp-stub.generateAllStubs() | | Generate all missing C++ stubs |
-| `<leader>c/` | n | lsp.cpp-stub.toggleCommentPair() | | Toggle comment in header + cpp |
-
-## keys: lsp-inlay
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `<leader>th` | n | vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })) | | Toggle inlay hints |
-
-## keys: dap
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `<F5>` | n | @build.configureProject | | Configure project |
-| `<F10>` | n | dap.step_over | | Step over |
-| `<F11>` | n | dap.step_into | | Step into |
-| `<F12>` | n | dap.step_out | | Step out |
-| `<leader>db` | n | dap.toggle_breakpoint() | sync | Toggle breakpoint |
-| `<leader>dB` | n | dap.set_breakpoint(vim.fn.input('Condition: ')) | sync | Conditional breakpoint |
-| `<leader>dl` | n | dap.set_breakpoint(nil, nil, vim.fn.input('Log message: ')) | sync | Log point |
-| `<leader>dc` | n | dap.continue | | Continue |
-| `<leader>di` | n | dap.step_into | | Step into |
-| `<leader>do` | n | dap.step_over | | Step over |
-| `<leader>dx` | n | dap.step_out | | Step out |
-| `<leader>dp` | n | dap.pause | | Pause |
-| `<leader>dr` | n | dap.repl.open() | | Open REPL |
-| `<leader>dL` | n | dap.run_last | | Run last |
-| `<leader>du` | n | dapui.toggle | | Toggle UI |
-| `<leader>de` | n | dapui.eval | | Evaluate expression |
-| `<leader>de` | v | dapui.eval | | Evaluate selection |
-| `<leader>dt` | n | @build.terminateAndNotify | | Terminate + close host/app |
-| `<leader>br` | n | @build.buildReleaseAndRun | | Build release + run |
-| `<leader>bb` | n | @build.buildDebugAndRun | | Build debug + run |
-| `<leader>bR` | n | @build.buildReleaseOnly | | Build release only (no run) |
-| `<leader>bn` | n | @build.buildDebugOnly | | Build debug only (no run) |
-| `<leader>bc` | n | @build.cleanBuild | | Clean build |
-| `<leader>bk` | n | @build.cleanOnly | | Clean |
-
-## keys: minipairs
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `;` | i | @actions.jumpOutSemicolon | expr | Jump out of )/} and add ; |
-
-## keys: flash
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `s` | n,x,o | flash.jump() | | Flash |
-| `S` | n,x,o | flash.treesitter() | | Flash Treesitter |
-| `r` | o | flash.remote() | | Remote Flash |
-| `R` | o,x | flash.treesitter_search() | | Treesitter Search |
-| `<c-s>` | c | flash.toggle() | | Toggle Flash Search |
-
-## keys: textobjects
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `aF` | x,o | select.select_textobject('@function.outer', 'textobjects') | | around function |
-| `iF` | x,o | select.select_textobject('@function.inner', 'textobjects') | | inside function |
-| `aC` | x,o | select.select_textobject('@class.outer', 'textobjects') | | around class |
-| `iC` | x,o | select.select_textobject('@class.inner', 'textobjects') | | inside class |
-| `aL` | x,o | select.select_textobject('@loop.outer', 'textobjects') | | around loop |
-| `iL` | x,o | select.select_textobject('@loop.inner', 'textobjects') | | inside loop |
-| `aI` | x,o | select.select_textobject('@conditional.outer', 'textobjects') | | around if/conditional |
-| `iI` | x,o | select.select_textobject('@conditional.inner', 'textobjects') | | inside if/conditional |
-
-## keys: snippets
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `<C-l>` | i | luasnip.jump(1) | silent | Snippet jump forward |
-| `<C-h>` | i | luasnip.jump(-1) | silent | Snippet jump back |
-| `<C-e>` | i | @actions.cycleSnippetChoice | silent | Cycle snippet choice |
-| `<leader>fs` | n | snacks.picker.snippets() | | Snippet picker |
-| `<C-v>` | i | snacks.picker.snippets() | | Snippet picker (insert mode) |
-
-## keys: 99
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `<leader>9f` | n | 99.fill_in_function() | | Fill function |
-| `<leader>9v` | v | 99.visual() | | Visual AI |
-| `<leader>9s` | n | 99.stop_all_requests() | | Stop requests |
-
-## keys: qf
-
-| key | mode | action | opts | desc |
-|---|---|---|---|---|
-| `<CR>` | n | `<CR>` | silent | Jump to diagnostic |
-| `q` | n | `<cmd>lclose<CR>` | silent | Close diagnostic list |
-| `p` | n | `<CR><C-w>p` | silent | Preview diagnostic |
+| group       | indent | lhs             | mode              | action                                                                                              | buffer  | prefix | desc                                | options         |
+| ----------- | ------ | --------------- | ----------------- | --------------------------------------------------------------------------------------------------- | ------- | ------ | ----------------------------------- | --------------- |
+| general     | @two   | '<Esc>'         | 'n'               | '<cmd>nohlsearch<CR>'                                                                               |         |        | Clear search highlights             |                 |
+| general     | @two   | '<leader>q'     | 'n'               | actions.toggleDiagnosticList                                                                        |         |        | Toggle diagnostic list              |                 |
+| general     | @two   | '<C-s>'         | 'n'               | actions.saveAllAndQuit                                                                              |         |        | Save all and quit                   |                 |
+| general     | @two   | '<C-c>'         | 'n'               | actions.smart_quit                                                                                  |         |        | Quit with save/discard prompt       |                 |
+| general     | @two   | '<leader>tt'    | 'n'               | function() require('core.tui').tit() end                                                            |         |        | Open TIT (git TUI)                  |                 |
+| general     | @two   | '<leader>tc'    | 'n'               | function() require('core.tui').cake() end                                                           |         |        | Open Cake TUI                       |                 |
+| general     | @two   | '<leader>bd'    | 'n'               | function() require('core.doxygen').build() end                                                      |         |        | Build doxygen docs                  |                 |
+| general     | @two   | '<Esc><Esc>'    | 't'               | '<C-\\\\><C-n>'                                                                                     |         |        | Exit terminal mode                  |                 |
+| general     | @two   | '<leader>tx'    | 'n'               | actions.closeAllTerminals                                                                           |         |        | Close all terminal windows          |                 |
+| general     | @two   | '<leader>rw'    | 'n'               | ':%s/\\\\<<C-r><C-w>\\\\>/<C-r><C-w>/gI<Left><Left><Left>'                                          |         |        | Replace word (exact)                |                 |
+| general     | @two   | '<leader>rw'    | 'v'               | '"hy:%s/\\\\<<C-r>h\\\\>/<C-r>h/gI<Left><Left><Left>'                                               |         |        | Replace selection (exact)           |                 |
+| general     | @two   | '<leader>rc'    | 'n'               | ':%s/<C-r><C-w>/<C-r><C-w>/gI<Left><Left><Left>'                                                    |         |        | Replace word (contains)             |                 |
+| general     | @two   | '<leader>rc'    | 'v'               | '"hy:%s/<C-r>h/<C-r>h/gI<Left><Left><Left>'                                                         |         |        | Replace selection (contains)        |                 |
+| general     | @two   | '<leader>ss'    | 'n'               | function() require('lsp.header-source').syncSplit() end                                             |         |        | Sync header/source split            |                 |
+| general     | @two   | '<leader>s\\\\' | 'n'               | '<C-w>v'                                                                                            |         |        | Split vertical                      |                 |
+| general     | @two   | '<leader>s-'    | 'n'               | '<C-w>s'                                                                                            |         |        | Split horizontal                    |                 |
+| general     | @two   | '<leader>s='    | 'n'               | '<C-w>='                                                                                            |         |        | Equal split sizes                   |                 |
+| general     | @two   | '<leader><Tab>' | 'n'               | '<C-w>o'                                                                                            |         |        | Close other splits                  |                 |
+| general     | @two   | '<C-h>'         | 'n'               | '<C-w><C-h>'                                                                                        |         |        | Focus left window                   |                 |
+| general     | @two   | '<C-l>'         | 'n'               | '<C-w><C-l>'                                                                                        |         |        | Focus right window                  |                 |
+| general     | @two   | '<C-j>'         | 'n'               | '<C-w><C-j>'                                                                                        |         |        | Focus lower window                  |                 |
+| general     | @two   | '<C-k>'         | 'n'               | '<C-w><C-k>'                                                                                        |         |        | Focus upper window                  |                 |
+| general     | @two   | '<leader>x'     | 'n'               | '<C-w>q'                                                                                            |         |        | Close window                        |                 |
+| general     | @two   | '<leader>['     | 'n'               | actions.jumpBackSynced                                                                              |         |        | Jump back (sync split)              |                 |
+| general     | @two   | '<leader>]'     | 'n'               | actions.jumpForwardSynced                                                                           |         |        | Jump forward (sync split)           |                 |
+| general     | @two   | '<leader>p'     | 'n'               | ':pu<CR>'                                                                                           |         |        | Paste below on new line             |                 |
+| general     | @two   | '<leader>P'     | 'n'               | ':pu!<CR>'                                                                                          |         |        | Paste above on new line             |                 |
+| general     | @two   | '<Esc>'         | 'i'               | actions.formatOnEsc                                                                                 |         |        | Format on exit insert mode          | , expr = true   |
+| general     | @two   | '<Esc>'         | 'v'               | actions.formatOnEsc                                                                                 |         |        | Format on exit visual mode          | , expr = true   |
+| general     | @two   | '<Esc><Esc>'    | 'n'               | actions.formatBufferByFiletype                                                                      |         |        | Format buffer                       |                 |
+| general     | @two   | '<leader>ff'    | 'n'               | function() require('core.navigator').files() end                                                    |         |        | Find files (project)                |                 |
+| general     | @two   | '<leader>fx'    | 'n'               | function() require('core.navigator').open_explorer() end                                            |         |        | Project explorer (project)          |                 |
+| general     | @two   | '<leader>fg'    | 'n'               | function() require('core.navigator').grep() end                                                     |         |        | Find by grep (project)              |                 |
+| general     | @two   | '<leader>fr'    | 'n'               | function() require('core.navigator').replace_grep() end                                             |         |        | Project grep+replace (project)      |                 |
+| general     | @two   | '<leader>rg'    | 'n'               | function() require('core.navigator').replace() end                                                  |         |        | Project replace (project)           |                 |
+| general     | @two   | '<leader>rg'    | 'v'               | '"zy<Cmd>lua require("core.navigator").replace(vim.fn.getreg("z"))<CR>'                             |         |        | Project replace selection (project) |                 |
+| general     | @two   | '<leader>fb'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.buffers() end                                     |         |        | Find buffers                        |                 |
+| general     | @two   | '<leader>fh'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.help() end                                        |         |        | Find help                           |                 |
+| general     | @two   | '<leader>\\\\'  | 'n'               | function() Snacks.explorer.reveal() end                                                             |         |        | File explorer                       |                 |
+| general     | @two   | '<leader>fk'    | 'n'               | function() Snacks.picker.keymaps() end                                                              |         |        | Find keymaps                        |                 |
+| general     | @two   | '<leader>fw'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.grep_word() end                                   |         |        | Find current word                   |                 |
+| general     | @two   | '<leader>fd'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.diagnostics() end                                 |         |        | Find diagnostics                    |                 |
+| general     | @two   | '<leader>fR'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.resume() end                                      |         |        | Find resume                         |                 |
+| general     | @two   | '<leader>f.'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.recent() end                                      |         |        | Find recent files                   |                 |
+| general     | @two   | '<leader>/'     | 'n'               | function() Snacks.picker.lines() end                                                                |         |        | Search in buffer                    |                 |
+| general     | @two   | '<leader>f/'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.grep_buffers() end                                |         |        | Find in open files                  |                 |
+| general     | @two   | '<leader>fn'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.files({ cwd = vim.fn.stdpath('config') }) end     |         |        | Find neovim files                   |                 |
+| lsp         | @two   | 'gd'            | 'n'               | function() require('lsp.header-source').smartDefinitionJump() end                                   | @buffer | @lsp   | Go to definition                    |                 |
+| lsp         | @two   | 'gr'            | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.lsp_references() end                              | @buffer | @lsp   | Go to references                    |                 |
+| lsp         | @two   | 'gI'            | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.lsp_implementations() end                         | @buffer | @lsp   | Go to implementation                |                 |
+| lsp         | @two   | 'gD'            | 'n'               | function() actions.splitSyncOnce(); vim.lsp.buf.declaration() end                                   | @buffer | @lsp   | Go to declaration                   |                 |
+| lsp         | @two   | 'K'             | 'n'               | vim.lsp.buf.hover                                                                                   | @buffer | @lsp   | Hover documentation                 |                 |
+| lsp         | @two   | '<leader>ds'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.lsp_symbols() end                                 | @buffer | @lsp   | Document symbols                    |                 |
+| lsp         | @two   | '<leader>ws'    | 'n'               | function() actions.splitSyncOnce(); Snacks.picker.lsp_workspace_symbols() end                       | @buffer | @lsp   | Workspace symbols                   |                 |
+| lsp         | @two   | '<leader>rn'    | 'n'               | vim.lsp.buf.rename                                                                                  | @buffer | @lsp   | Rename symbol                       |                 |
+| lsp         | @two   | '<leader>ca'    | { 'n', 'x' }      | vim.lsp.buf.code_action                                                                             | @buffer | @lsp   | Code action                         |                 |
+| lsp         | @two   | '<leader>ls'    | 'n'               | function() require('lsp.clangd').restart() end                                                      | @buffer | @lsp   | Force clangd reindex + restart      |                 |
+| lsp-clangd  | @four  | 'gh'            | 'n'               | '<cmd>ClangdSwitchSourceHeader<CR>'                                                                 | @buffer | @lsp   | Switch header/source                |                 |
+| lsp-clangd  | @four  | '<leader>cc'    | 'n'               | function() require('lsp.cpp-stub').generateStub() end                                               | @buffer | @lsp   | Generate C++ definition stub        |                 |
+| lsp-clangd  | @four  | '<leader>cv'    | 'n'               | function() require('lsp.cpp-stub').generateAllStubs() end                                           | @buffer | @lsp   | Generate all missing C++ stubs      |                 |
+| lsp-clangd  | @four  | '<leader>c/'    | 'n'               | function() require('lsp.cpp-stub').toggleCommentPair() end                                          | @buffer | @lsp   | Toggle comment in header + cpp      |                 |
+| lsp-inlay   | @four  | '<leader>th'    | 'n'               | function() vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })) end          | @buffer | @lsp   | Toggle inlay hints                  |                 |
+| dap         | @two   | '<F5>'          | 'n'               | build.configureProject                                                                              |         | @dap   | Configure project                   |                 |
+| dap         | @two   | '<F10>'         | 'n'               | dap.step_over                                                                                       |         | @dap   | Step over                           |                 |
+| dap         | @two   | '<F11>'         | 'n'               | dap.step_into                                                                                       |         | @dap   | Step into                           |                 |
+| dap         | @two   | '<F12>'         | 'n'               | dap.step_out                                                                                        |         | @dap   | Step out                            |                 |
+| dap         | @two   | '<leader>db'    | 'n'               | function() actions.splitSyncOnce(); dap.toggle_breakpoint() end                                     |         | @dap   | Toggle breakpoint                   |                 |
+| dap         | @two   | '<leader>dB'    | 'n'               | function() actions.splitSyncOnce(); dap.set_breakpoint(vim.fn.input('Condition: ')) end             |         | @dap   | Conditional breakpoint              |                 |
+| dap         | @two   | '<leader>dl'    | 'n'               | function() actions.splitSyncOnce(); dap.set_breakpoint(nil, nil, vim.fn.input('Log message: ')) end |         | @dap   | Log point                           |                 |
+| dap         | @two   | '<leader>dc'    | 'n'               | dap.continue                                                                                        |         | @dap   | Continue                            |                 |
+| dap         | @two   | '<leader>di'    | 'n'               | dap.step_into                                                                                       |         | @dap   | Step into                           |                 |
+| dap         | @two   | '<leader>do'    | 'n'               | dap.step_over                                                                                       |         | @dap   | Step over                           |                 |
+| dap         | @two   | '<leader>dx'    | 'n'               | dap.step_out                                                                                        |         | @dap   | Step out                            |                 |
+| dap         | @two   | '<leader>dp'    | 'n'               | dap.pause                                                                                           |         | @dap   | Pause                               |                 |
+| dap         | @two   | '<leader>dr'    | 'n'               | function() dap.repl.open() end                                                                      |         | @dap   | Open REPL                           |                 |
+| dap         | @two   | '<leader>dL'    | 'n'               | dap.run_last                                                                                        |         | @dap   | Run last                            |                 |
+| dap         | @two   | '<leader>du'    | 'n'               | dapui.toggle                                                                                        |         | @dap   | Toggle UI                           |                 |
+| dap         | @two   | '<leader>de'    | 'n'               | dapui.eval                                                                                          |         | @dap   | Evaluate expression                 |                 |
+| dap         | @two   | '<leader>de'    | 'v'               | dapui.eval                                                                                          |         | @dap   | Evaluate selection                  |                 |
+| dap         | @two   | '<leader>dt'    | 'n'               | build.terminateAndNotify                                                                            |         | @dap   | Terminate + close host/app          |                 |
+| dap         | @two   | '<leader>br'    | 'n'               | build.buildReleaseAndRun                                                                            |         | @dap   | Build release + run                 |                 |
+| dap         | @two   | '<leader>bb'    | 'n'               | build.buildDebugAndRun                                                                              |         | @dap   | Build debug + run                   |                 |
+| dap         | @two   | '<leader>bR'    | 'n'               | build.buildReleaseOnly                                                                              |         | @dap   | Build release only (no run)         |                 |
+| dap         | @two   | '<leader>bn'    | 'n'               | build.buildDebugOnly                                                                                |         | @dap   | Build debug only (no run)           |                 |
+| dap         | @two   | '<leader>bc'    | 'n'               | build.cleanBuild                                                                                    |         | @dap   | Clean build                         |                 |
+| dap         | @two   | '<leader>bk'    | 'n'               | build.cleanOnly                                                                                     |         | @dap   | Clean                               |                 |
+| minipairs   | @two   | ';'             | 'i'               | actions.jumpOutSemicolon                                                                            |         |        | Jump out of )/} and add ;           | , expr = true   |
+| flash       | @two   | 's'             | { 'n', 'x', 'o' } | function() require('flash').jump() end                                                              |         |        | Flash                               |                 |
+| flash       | @two   | 'S'             | { 'n', 'x', 'o' } | function() require('flash').treesitter() end                                                        |         |        | Flash Treesitter                    |                 |
+| flash       | @two   | 'r'             | 'o'               | function() require('flash').remote() end                                                            |         |        | Remote Flash                        |                 |
+| flash       | @two   | 'R'             | { 'o', 'x' }      | function() require('flash').treesitter_search() end                                                 |         |        | Treesitter Search                   |                 |
+| flash       | @two   | '<c-s>'         | 'c'               | function() require('flash').toggle() end                                                            |         |        | Toggle Flash Search                 |                 |
+| textobjects | @two   | 'aF'            | { 'x', 'o' }      | function() select.select_textobject('@function.outer', 'textobjects') end                           |         |        | around function                     |                 |
+| textobjects | @two   | 'iF'            | { 'x', 'o' }      | function() select.select_textobject('@function.inner', 'textobjects') end                           |         |        | inside function                     |                 |
+| textobjects | @two   | 'aC'            | { 'x', 'o' }      | function() select.select_textobject('@class.outer', 'textobjects') end                              |         |        | around class                        |                 |
+| textobjects | @two   | 'iC'            | { 'x', 'o' }      | function() select.select_textobject('@class.inner', 'textobjects') end                              |         |        | inside class                        |                 |
+| textobjects | @two   | 'aL'            | { 'x', 'o' }      | function() select.select_textobject('@loop.outer', 'textobjects') end                               |         |        | around loop                         |                 |
+| textobjects | @two   | 'iL'            | { 'x', 'o' }      | function() select.select_textobject('@loop.inner', 'textobjects') end                               |         |        | inside loop                         |                 |
+| textobjects | @two   | 'aI'            | { 'x', 'o' }      | function() select.select_textobject('@conditional.outer', 'textobjects') end                        |         |        | around if/conditional               |                 |
+| textobjects | @two   | 'iI'            | { 'x', 'o' }      | function() select.select_textobject('@conditional.inner', 'textobjects') end                        |         |        | inside if/conditional               |                 |
+| snippets    | @two   | '<C-l>'         | 'i'               | function() require('luasnip').jump(1) end                                                           |         |        | Snippet jump forward                | , silent = true |
+| snippets    | @two   | '<C-h>'         | 'i'               | function() require('luasnip').jump(-1) end                                                          |         |        | Snippet jump back                   | , silent = true |
+| snippets    | @two   | '<C-e>'         | 'i'               | actions.cycleSnippetChoice                                                                          |         |        | Cycle snippet choice                | , silent = true |
+| snippets    | @two   | '<leader>fs'    | 'n'               | function() snacks.picker.snippets() end                                                             |         |        | Snippet picker                      |                 |
+| snippets    | @two   | '<C-v>'         | 'i'               | function() snacks.picker.snippets() end                                                             |         |        | Snippet picker (insert mode)        |                 |
+| 99          | @two   | '<leader>9f'    | 'n'               | function() require('99').fill_in_function() end                                                     |         | @ai    | Fill function                       |                 |
+| 99          | @two   | '<leader>9v'    | 'v'               | function() require('99').visual() end                                                               |         | @ai    | Visual AI                           |                 |
+| 99          | @two   | '<leader>9s'    | 'n'               | function() require('99').stop_all_requests() end                                                    |         | @ai    | Stop requests                       |                 |
+| qf          | @two   | '<CR>'          | 'n'               | '<CR>'                                                                                              | @buffer |        | Jump to diagnostic                  | , silent = true |
+| qf          | @two   | 'q'             | 'n'               | '<cmd>lclose<CR>'                                                                                   | @buffer |        | Close diagnostic list               | , silent = true |
+| qf          | @two   | 'p'             | 'n'               | '<CR><C-w>p'                                                                                        | @buffer |        | Preview diagnostic                  | , silent = true |
 
 ---
 
@@ -337,6 +266,7 @@ in the Reference section below.
 ## Diagnostics
 
 ### Inline Diagnostics (Always Active)
+
 - **Virtual text** - Error messages at end of lines (`● error message`)
 - **Signs** - Gutter icons: `✘` (error), `▲` (warning), `⚑` (hint), `»` (info)
 - **Underlines** - Wavy lines under problematic code
@@ -356,27 +286,28 @@ Uses default mini.surround keys. **NOT** `<leader>s`.
 
 ### Custom Surroundings
 
-| Char | Surrounds With |
-|------|----------------|
-| `m` | `std::move (...)` |
-| `(` | `(...)` (no spaces) |
-| `)` | `(...)` (no spaces) |
+| Char | Surrounds With      |
+| ---- | ------------------- |
+| `m`  | `std::move (...)`   |
+| `(`  | `(...)` (no spaces) |
+| `)`  | `(...)` (no spaces) |
 
 ### Text Object Motions (mini.ai)
 
-| Motion | Captures |
-|--------|----------|
-| `iw` | word (`layout`) |
-| `iW` | WORD including dots (`layout.panel`) |
-| `_` | entire line (trimmed) |
-| `$` | to end of line |
-| `i}` | inside `{}` block |
-| `a}` | around `{}` block (includes braces) |
-| `if` | inside function call `()` |
-| `af` | around function call `()` |
+| Motion | Captures                             |
+| ------ | ------------------------------------ |
+| `iw`   | word (`layout`)                      |
+| `iW`   | WORD including dots (`layout.panel`) |
+| `_`    | entire line (trimmed)                |
+| `$`    | to end of line                       |
+| `i}`   | inside `{}` block                    |
+| `a}`   | around `{}` block (includes braces)  |
+| `if`   | inside function call `()`            |
+| `af`   | around function call `()`            |
 
-Treesitter textobjects (`iF`/`aF`/`iC`/`aC`/`iL`/`aL`/`iI`/`aI`) are contract
-rows — see `## keys: textobjects`.
+Treesitter textobjects are rows of group `textobjects` in the keys table.
+
+Their keys: `iF`, `aF`, `iC`, `aC`, `iL`, `aL`, `iI`, `aI`.
 
 ### Select Scope/Function Examples
 
@@ -392,58 +323,58 @@ vaFsam  →  select function, wrap with std::move
 
 ### Add Surround
 
-| Key | Action |
-|-----|--------|
-| `sa{motion}{char}` | Surround motion with char |
-| `saiw"` | Surround word with `"` |
-| `saW(` | Surround WORD with `()` → `(layout.panel)` |
-| `saWm` | Surround WORD with std::move → `std::move (layout.panel)` |
-| `sa_m` | Surround line with std::move |
-| `sa$}` | Surround to EOL with `{}` |
+| Key                | Action                                                    |
+| ------------------ | --------------------------------------------------------- |
+| `sa{motion}{char}` | Surround motion with char                                 |
+| `saiw"`            | Surround word with `"`                                    |
+| `saW(`             | Surround WORD with `()` → `(layout.panel)`                |
+| `saWm`             | Surround WORD with std::move → `std::move (layout.panel)` |
+| `sa_m`             | Surround line with std::move                              |
+| `sa$}`             | Surround to EOL with `{}`                                 |
 
 **In visual mode:** select text, then `sa{char}`
+
 - `viWsam` → select WORD, wrap with `std::move (...)`
 - `Vsam` → select line, wrap with `std::move (...)`
 
 ### Delete / Replace Surround
 
-| Key | Action |
-|-----|--------|
-| `sd{char}` | Delete surrounding char (`sd"`, `sd)`, `sdm`) |
-| `sr{old}{new}` | Replace surround (`sr"'`, `sr)]`, `srm(`) |
+| Key            | Action                                        |
+| -------------- | --------------------------------------------- |
+| `sd{char}`     | Delete surrounding char (`sd"`, `sd)`, `sdm`) |
+| `sr{old}{new}` | Replace surround (`sr"'`, `sr)]`, `srm(`)     |
 
 ## Insert Mode Helpers
 
-| Key | Owner | Action |
-|-----|-------|--------|
+| Key     | Owner                               | Action                               |
+| ------- | ----------------------------------- | ------------------------------------ |
 | `<Tab>` | nvim-cmp (`plugins/completion.lua`) | Completion navigation / fallback tab |
-| `;` | contract row (`## keys: minipairs`) | Jump out of `)` or `}` and add `;` |
+| `;`     | contract row (`## keys: minipairs`) | Jump out of `)` or `}` and add `;`   |
 
 **Example:** Type `func(arg` then `;` → `func(arg);`
 
 ## Snippets — Available Triggers
 
-| Trigger | Description |
-|---------|-------------|
-| `sep` | Separator comment `//==============` (returns to normal mode) |
-| `cls` | Class with leak detector |
-| `comp` | JUCE Component header declaration |
-| `leak` | JUCE leak detector macro with separator |
-| `juce` | Simple JUCE Component with inline implementations |
-| `fn` | Function definition with noexcept |
-| `loop` | Traditional for loop (int i {0}; i < N; ++i) |
-| `forr` | Range-based for loop (auto& item : container) |
-| `if` | If statement with braces |
-| `ife` | If-else statement |
-| `while` | While loop with braces |
-| `switch` | Switch statement with case/default |
-| `template` | Template function declaration |
-| `nam` | Namespace with decorative comments |
-| `sing` | Meyers Singleton complete class |
-| `unp` | `std::unique_ptr<type> name` |
-| `mku` | `std::make_unique<type>(args)` |
-| `mks` | `std::make_shared<type>(args)` |
-| `dbp` | Debug paint (magenta border) |
-| `mac` | `#if JUCE_MAC ... #endif` |
-| `win` | `#if JUCE_WINDOWS ... #endif` |
-
+| Trigger    | Description                                                   |
+| ---------- | ------------------------------------------------------------- |
+| `sep`      | Separator comment `//==============` (returns to normal mode) |
+| `cls`      | Class with leak detector                                      |
+| `comp`     | JUCE Component header declaration                             |
+| `leak`     | JUCE leak detector macro with separator                       |
+| `juce`     | Simple JUCE Component with inline implementations             |
+| `fn`       | Function definition with noexcept                             |
+| `loop`     | Traditional for loop (int i {0}; i < N; ++i)                  |
+| `forr`     | Range-based for loop (auto& item : container)                 |
+| `if`       | If statement with braces                                      |
+| `ife`      | If-else statement                                             |
+| `while`    | While loop with braces                                        |
+| `switch`   | Switch statement with case/default                            |
+| `template` | Template function declaration                                 |
+| `nam`      | Namespace with decorative comments                            |
+| `sing`     | Meyers Singleton complete class                               |
+| `unp`      | `std::unique_ptr<type> name`                                  |
+| `mku`      | `std::make_unique<type>(args)`                                |
+| `mks`      | `std::make_shared<type>(args)`                                |
+| `dbp`      | Debug paint (magenta border)                                  |
+| `mac`      | `#if JUCE_MAC ... #endif`                                     |
+| `win`      | `#if JUCE_WINDOWS ... #endif`                                 |

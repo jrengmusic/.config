@@ -14,8 +14,6 @@
 !claude/**
 !cli-proxy/
 !cli-proxy/**
-!echo/
-!echo/**
 !git/
 !git/**
 !hammerspoon/

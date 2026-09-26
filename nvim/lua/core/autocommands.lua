@@ -119,15 +119,28 @@ function M.setup()
     desc = 'Stop in-flight build/clean/doxygen jobs and every watcher before quitting',
   })
 
-  -- Live keymap lexicon regen: saving KEYMAPS.md regenerates keymaps.lua
-  -- immediately. Launch-time verify() in init.lua remains the backstop for
-  -- edits arriving via git pull from other machines.
+  -- Keymap regen: saving KEYMAPS.md runs cast on nvim/cast/spell.md, which
+  -- formats KEYMAPS.md and regenerates keymaps.lua from its tables. A cast
+  -- failure writes nothing, so the last-good keymaps.lua stays.
+  local configPath = vim.fn.stdpath('config'):gsub('\\', '/')
   vim.api.nvim_create_autocmd('BufWritePost', {
-    pattern = vim.fn.stdpath('config'):gsub('\\', '/') .. '/doc/KEYMAPS.md',
+    pattern = configPath .. '/doc/KEYMAPS.md',
     callback = function()
-      require('core.keymaps-generator').verify()
+      local diagnostics = {}
+      vim.fn.jobstart({ require('core.project.cast').CAST_BINARY, configPath .. '/cast/spell.md' }, {
+        stderr_buffered = true,
+        on_stderr = function(_, data) diagnostics = vim.tbl_filter(function(line) return line ~= '' end, data) end,
+        on_exit = function(_, exitCode)
+          if exitCode == 0 then
+            vim.cmd.checktime()
+            vim.notify('[keymaps] keymaps.lua regenerated from KEYMAPS.md', vim.log.levels.INFO)
+          else
+            vim.notify('[keymaps] ' .. table.concat(diagnostics, '\n') .. ' — keeping last-good keymaps.lua', vim.log.levels.ERROR)
+          end
+        end,
+      })
     end,
-    desc = 'Regenerate keymaps.lua from the KEYMAPS.md lexicon',
+    desc = 'Regenerate keymaps.lua from KEYMAPS.md through cast',
   })
 
   -- Filetype overrides
