@@ -6,7 +6,6 @@
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5"
   },
   "permissions": {
-    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(*)",
       "Read(*)",
@@ -20,7 +19,8 @@
     "deny": [
       "Bash(git reset --hard*)",
       "Bash(git checkout --*)"
-    ]
+    ],
+    "defaultMode": "bypassPermissions"
   },
   "model": "opus",
   "enableWorkflows": false,
@@ -38,6 +38,7 @@
   },
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
+  "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "showTurnDuration": false,
   "inputNeededNotifEnabled": true,

@@ -1,7 +1,10 @@
--- Custom formatting logic for C/C++
+-- Buffer formatting: clang-format for C/C++, cast for markdown, conform for
+-- every other filetype.
 local M = {}
 
 local is_windows = vim.fn.has('win32') == 1
+
+local CAST_BINARY = require('core.project.cast').CAST_BINARY
 
 -- The one JUCE style, shipped with the config on every machine.
 local STYLE_PATH = vim.fn.stdpath('config') .. '/clang-format/JUCE.clang-format'
@@ -27,12 +30,22 @@ function M.setup()
   vim.g.clang_format_command = clangFormatBin .. ' --style=file:' .. STYLE_PATH
 end
 
-function M.formatBuffer()
-  local filetype = vim.bo.filetype
-  if filetype ~= 'cpp' and filetype ~= 'c' and filetype ~= 'objc' and filetype ~= 'objcpp' then
-    return
+-- Replaces the buffer with a formatter's stdout, as jobstart delivers it.
+local function setBufferLines(output_lines)
+  -- jobstart appends a trailing empty string; drop it
+  if output_lines[#output_lines] == '' then
+    table.remove(output_lines)
   end
+  -- Strip embedded CR bytes (Windows pipe may produce CRLF)
+  for i, line in ipairs(output_lines) do
+    output_lines[i] = line:gsub('\r', '')
+  end
+  if vim.bo.modifiable then
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, output_lines)
+  end
+end
 
+function M.formatBuffer()
   vim.schedule(function()
     local tmpfile = vim.fn.tempname()
     vim.cmd('write! ' .. tmpfile)
@@ -49,17 +62,7 @@ function M.formatBuffer()
       end,
       on_exit = function(_, exit_code)
         if exit_code == 0 and output_lines and #output_lines > 0 then
-          -- jobstart appends a trailing empty string; drop it
-          if output_lines[#output_lines] == '' then
-            table.remove(output_lines)
-          end
-          -- Strip embedded CR bytes (Windows pipe may produce CRLF)
-          for i, line in ipairs(output_lines) do
-            output_lines[i] = line:gsub('\r', '')
-          end
-          if vim.bo.modifiable then
-            vim.api.nvim_buf_set_lines(0, 0, -1, false, output_lines)
-          end
+          setBufferLines(output_lines)
         elseif exit_code ~= 0 then
           vim.notify('clang-format failed (exit ' .. exit_code .. ')', vim.log.levels.ERROR)
         end
@@ -69,15 +72,55 @@ function M.formatBuffer()
   end)
 end
 
-function M.formatWithConform()
-  local filetype = vim.bo.filetype
-  if filetype == 'cpp' or filetype == 'c' or filetype == 'objc' or filetype == 'objcpp' then
-    return
-  end
+-- The buffer text goes to cast on stdin. --assume-filename starts cast's
+-- .cast-format search at the buffer's own directory, so every buffer gets
+-- its project's style, inside or outside a cast project.
+function M.formatMarkdown()
+  vim.schedule(function()
+    local output_lines = nil
+    local error_lines = nil
+    local job = vim.fn.jobstart({ CAST_BINARY, '--format', '--assume-filename=' .. vim.api.nvim_buf_get_name(0) }, {
+      stdout_buffered = true,
+      stderr_buffered = true,
+      on_stdout = function(_, data)
+        output_lines = data
+      end,
+      on_stderr = function(_, data)
+        error_lines = data
+      end,
+      on_exit = function(_, exit_code)
+        if exit_code == 0 and output_lines and #output_lines > 0 then
+          setBufferLines(output_lines)
+        elseif exit_code ~= 0 then
+          vim.notify(table.concat(error_lines, '\n'), vim.log.levels.ERROR)
+        end
+      end,
+    })
+    -- chansend joins list items with LF; the trailing '' gives the final LF.
+    local input_lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+    table.insert(input_lines, '')
+    vim.fn.chansend(job, input_lines)
+    vim.fn.chanclose(job, 'stdin')
+  end)
+end
 
+function M.formatWithConform()
   vim.schedule(function()
     require('conform').format({ async = true, lsp_format = 'fallback' })
   end)
+end
+
+local FORMATTERS = {
+  c = M.formatBuffer,
+  cpp = M.formatBuffer,
+  objc = M.formatBuffer,
+  objcpp = M.formatBuffer,
+  markdown = M.formatMarkdown,
+}
+
+function M.formatBufferByFiletype()
+  local format = FORMATTERS[vim.bo.filetype] or M.formatWithConform
+  format()
 end
 
 return M

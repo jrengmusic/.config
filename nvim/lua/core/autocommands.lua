@@ -175,27 +175,20 @@ function M.setup()
       if not vim.bo.modifiable or vim.bo.buftype ~= '' then
         return
       end
-      local filetype = vim.bo.filetype
-      if filetype == 'cpp' or filetype == 'c' or filetype == 'objc' or filetype == 'objcpp' then
-        vim.schedule(function()
-          require('core.formatting').formatBuffer()
-        end)
-      else
-        vim.schedule(function()
-          require('core.formatting').formatWithConform()
-        end)
-      end
+      vim.schedule(function()
+        require('core.formatting').formatBufferByFiletype()
+      end)
     end,
     desc = 'Format on mode change',
   })
 
-  -- Format C/C++ on save
+  -- Format C/C++ and markdown on save
   vim.api.nvim_create_autocmd('BufWritePre', {
-    pattern = { '*.cpp', '*.c', '*.h', '*.hpp', '*.objc', '*.objcpp', '*.mm' },
+    pattern = { '*.cpp', '*.c', '*.h', '*.hpp', '*.objc', '*.objcpp', '*.mm', '*.md' },
     callback = function()
-      require('core.formatting').formatBuffer()
+      require('core.formatting').formatBufferByFiletype()
     end,
-    desc = 'Format C/C++ on save',
+    desc = 'Format C/C++ and markdown on save',
   })
 
   -- Compiler-output highlighting for terminal buffers (doxygen's terminal

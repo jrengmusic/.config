@@ -155,19 +155,12 @@ function M.jumpForwardSynced()
   jumpSynced(1)
 end
 
--- Dispatches to the C++ clang-format path or conform by filetype.
 function M.formatBufferByFiletype()
-  local filetype = vim.bo.filetype
-  if filetype == 'cpp' or filetype == 'c' or filetype == 'objc' or filetype == 'objcpp' then
-    require('core.formatting').formatBuffer()
-  else
-    require('core.formatting').formatWithConform()
-  end
+  require('core.formatting').formatBufferByFiletype()
 end
 
 -- expr mapping: leave insert/visual mode, then format if the buffer was modified.
 function M.formatOnEsc()
-  local filetype = vim.bo.filetype
   local was_modified = vim.bo.modified
 
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
@@ -175,11 +168,7 @@ function M.formatOnEsc()
   -- Only format if buffer was actually modified
   if was_modified then
     vim.schedule(function()
-      if filetype == 'cpp' or filetype == 'c' or filetype == 'objc' or filetype == 'objcpp' then
-        require('core.formatting').formatBuffer()
-      else
-        require('core.formatting').formatWithConform()
-      end
+      require('core.formatting').formatBufferByFiletype()
     end)
   end
 
