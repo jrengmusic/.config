@@ -203,6 +203,7 @@ add_to_system_path() {
 }
 
 add_to_system_path "C:\\msys64\\usr\\bin"
+add_to_system_path "C:\\msys64\\mingw64\\bin"   # x64 nsis on all arches; prepended before the native dir so it never shadows it
 add_to_system_path "C:\\msys64\\${MINGW_WIN_DIR}\\bin"
 add_to_system_path "$WIN_HOME\\.local\\bin"
 
@@ -295,6 +296,7 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-fd"           # snacks.nvim file finder (find is disabled on Windows by snacks)
     "${PKG_PREFIX}-ripgrep"      # snacks.nvim grep search (<leader>fg)
     "${PKG_PREFIX}-jq"           # JSON processor (used by carol for settings.json merge)
+    mingw-w64-x86_64-nsis        # makensis; no clang-aarch64 build, runs under emulation on ARM64
 )
 
 for pkg in "${PACMAN_PKGS[@]}"; do
