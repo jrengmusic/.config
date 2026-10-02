@@ -16,9 +16,16 @@
       "WebFetch(*)",
       "WebSearch(*)"
     ],
+    "ask": [
+      "Bash(git restore*)"
+    ],
     "deny": [
-      "Bash(git reset --hard*)",
-      "Bash(git checkout --*)"
+      "Bash(git checkout*)",
+      "Bash(git switch*)",
+      "Bash(git reset*)",
+      "Bash(git stash*)",
+      "Bash(git clean*)",
+      "Bash(git branch -D*)"
     ]
   },
   "model": "opus",
@@ -72,7 +79,14 @@
   "enabledPlugins": {},
   "outputStyle": "CAROL",
   "effortLevel": "medium",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
-  "showTurnDuration": false
+  "showTurnDuration": false,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }
