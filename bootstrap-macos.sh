@@ -221,8 +221,8 @@ else
     warn "carol binary not found at $CAROL_TARGET"
 fi
 
-# carol subcommand symlinks (machine, oracle, surgeon)
-for cmd in machine oracle surgeon; do
+# carol subcommand symlinks (machine, oracle)
+for cmd in machine oracle; do
     CAROL_CMD_TARGET="$HOME/.carol/bin/$cmd"
     CAROL_CMD_LINK="$HOME/.local/bin/$cmd"
     if [[ -f "$CAROL_CMD_TARGET" ]]; then

@@ -20,7 +20,7 @@ MBP M4               Windows 11 UTM  END         zsh      clang-cl (VS-bundled)
 
 | Machine | CPU | Windows | MSYS2 Shell | `$MSYSTEM` |
 |---|---|---|---|---|
-| iMac 5K 2015 | Intel Core i5/i7 (x86_64) | Windows 10 | **MINGW64** | `MINGW64` |
+| iMac 5K 2015 | Intel Core i5/i7 (x86_64) | Windows 10 | **UCRT64** | `UCRT64` |
 | MBP M4 (UTM) | Apple M4 → ARM64 guest | Windows 11 ARM64 | **CLANGARM64** | `CLANGARM64` |
 
 **Why these and not the others:**
@@ -28,8 +28,8 @@ MBP M4               Windows 11 UTM  END         zsh      clang-cl (VS-bundled)
 | Environment | Use case | Notes |
 |---|---|---|
 | `MSYS` | Script running only | No Windows toolchain. Avoid for dev work. |
-| `MINGW64` | x86_64 native dev | GCC toolchain. Our x64 choice. |
-| `UCRT64` | x86_64 (modern runtime) | Like MINGW64 but newer C runtime. Not needed here. |
+| `UCRT64` | x86_64 native dev | GCC toolchain, modern C runtime. Our x64 choice. |
+| `MINGW64` | x86_64 (legacy runtime) | Deprecated by MSYS2 (2026-03-15); packages are being dropped. Do not use. |
 | `CLANG64` | x86_64 Clang toolchain | x64 but MSYS2's own Clang. Not needed — we use VS-bundled clang-cl for builds. |
 | `CLANGARM64` | ARM64 native dev | ARM64 Clang toolchain. Our ARM64 choice. |
 | `MINGW32` | 32-bit x86 | Legacy. Never use. |
@@ -37,7 +37,7 @@ MBP M4               Windows 11 UTM  END         zsh      clang-cl (VS-bundled)
 **How to launch the right shell:**
 
 After installing MSYS2, the Start Menu has shortcuts for each environment. Launch:
-- **iMac / any x64 machine** → `MSYS2 MINGW64`
+- **iMac / any x64 machine** → `MSYS2 UCRT64`
 - **MBP M4 UTM / any ARM64 machine** → `MSYS2 CLANGARM64`
 
 The shell sets `$MSYSTEM` automatically. The setup script reads `$MSYSTEM` to pick the right package prefix and paths — no manual configuration needed.
@@ -53,7 +53,7 @@ Install these manually before running the setup script:
 
 1. **MSYS2** — https://www.msys2.org/ (install to `C:\msys64`)
    - On ARM64 Windows (UTM on Apple Silicon): install MSYS2 ARM64, then launch via **CLANGARM64** shortcut
-   - On x64 Windows: install MSYS2 x64, launch via **MINGW64** shortcut
+   - On x64 Windows: install MSYS2 x64, launch via **UCRT64** shortcut
 2. **Visual Studio 2022+** — with the "Desktop development with C++" workload AND the "C++ Clang tools for Windows" optional component (provides `clang-cl.exe`/`llvm-rc.exe` plus the MSVC STL/SDK they consume — `bootstrap-windows.sh` step 3 points `CC`/`CXX`/`RC` at these; no standalone LLVM for the build)
 3. **LLVM** — `winget install LLVM.LLVM` (provides clangd LSP only — not the build compiler)
 4. **Neovim** — `winget install Neovim.Neovim`
@@ -72,7 +72,7 @@ Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, j
 MSYS2 ships without git or openssh. `install.sh` handles the bootstrap before `.config` exists.
 
 ```sh
-# 1. Launch MSYS2 (CLANGARM64 on ARM64, MINGW64 on x64)
+# 1. Launch MSYS2 (CLANGARM64 on ARM64, UCRT64 on x64)
 #    No Administrator needed for this step.
 
 # 2. Run install.sh (installs git + openssh, sets up SSH key, clones .config, chains to bootstrap.sh)
@@ -83,7 +83,7 @@ bash /c/Users/$(whoami)/.config/bootstrap.sh
 ```
 
 > bootstrap.sh must run as Administrator — it writes to system PATH.
-> Launch via **CLANGARM64** shortcut on ARM64 Windows, **MINGW64** on x64.
+> Launch via **CLANGARM64** shortcut on ARM64 Windows, **UCRT64** on x64.
 
 Then restart MSYS2 and launch nvim to install Mason tools:
 
@@ -109,7 +109,7 @@ This means `~` = `/c/Users/<name>` = `C:\Users\<name>`. SSH keys, config files, 
 
 ### 2. Native Symlinks
 
-Enables native Windows symlinks in the arch-specific ini (`/c/msys64/mingw64.ini` on x64, `/c/msys64/clangarm64.ini` on ARM64):
+Enables native Windows symlinks in the arch-specific ini (`/c/msys64/ucrt64.ini` on x64, `/c/msys64/clangarm64.ini` on ARM64):
 
 ```
 MSYS=winsymlinks:nativestrict
@@ -124,14 +124,14 @@ Sets these as **Windows user environment variables** (persistent across reboots)
 | Variable | Value | Purpose |
 |---|---|---|
 | `MSYS` | `winsymlinks:nativestrict` | Native symlinks everywhere |
-| `MSYSTEM` | `MINGW64` (x64) or `CLANGARM64` (ARM64) | Use correct toolchain for host arch |
+| `MSYSTEM` | `UCRT64` (x64) or `CLANGARM64` (ARM64) | Use correct toolchain for host arch |
 | `MSYS2_PATH_TYPE` | `inherit` | Inherit Windows PATH |
 | `XDG_CONFIG_HOME` | `C:\Users\<name>\.config` | nvim and tools use `~/.config/` as SSOT (same as macOS) |
 | `CLAUDE_CODE_GIT_BASH_PATH` | `C:\msys64\usr\bin\bash.exe` | Claude Code uses MSYS2 bash (no Git for Windows) |
 
 Also adds to **Windows system PATH**:
 - `C:\msys64\usr\bin` — zsh, git, unzip
-- `C:\msys64\mingw64\bin` (x64) or `C:\msys64\clangarm64\bin` (ARM64) — toolchain binaries
+- `C:\msys64\ucrt64\bin` (x64) or `C:\msys64\clangarm64\bin` (ARM64) — toolchain binaries
 - `C:\Users\<name>\.local\bin` — all tool symlinks (single PATH entry for everything)
 
 Also sets `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled` = `1`. ninja resolves dependency paths past 260 characters only with this switch on. Without it, those headers read as missing, and their objects rebuild on every build.
@@ -219,7 +219,7 @@ The build is the cast toolchain on every platform: `cast cast/spell.md --debug` 
 | | macOS | Windows |
 |---|---|---|
 | Binary | Mason's clangd | System clangd (winget LLVM) |
-| `--query-driver` | `/usr/bin/c++,/usr/bin/clang++` | `/mingw64/bin/g++` |
+| `--query-driver` | `/usr/bin/c++,/usr/bin/clang++` | `/ucrt64/bin/g++` |
 
 Mason's clangd on Windows is a `.cmd` wrapper that nvim can't execute directly. The system clangd from LLVM works.
 
@@ -321,7 +321,7 @@ Terminal behavior on build:
 ~/.local/bin/claude                     # Claude Code (npm global symlink)
 
 /c/msys64/etc/nsswitch.conf             # MSYS2: db_home: windows
-/c/msys64/mingw64.ini                   # MSYS2: native symlinks, MSYSTEM
+/c/msys64/ucrt64.ini                    # MSYS2: native symlinks, MSYSTEM
 ```
 
 ## Troubleshooting

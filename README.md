@@ -17,6 +17,6 @@ Change on any machine, push, pull everywhere. No daemon, no subscription, no bla
 curl -fsSL https://raw.githubusercontent.com/jrengmusic/.config/main/install.sh | bash
 ```
 
-Run from **MSYS2 CLANGARM64** (ARM64) or **MSYS2 MINGW64** (x64). No Administrator needed — the script auto-elevates for the parts that require it.
+Run from **MSYS2 CLANGARM64** (ARM64) or **MSYS2 UCRT64** (x64). No Administrator needed — the script auto-elevates for the parts that require it.
 
 See [WINDOWS-SETUP.md](WINDOWS-SETUP.md) for full details.

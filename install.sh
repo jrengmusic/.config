@@ -8,7 +8,7 @@
 # Supports:
 #   macOS ARM64  (MBP M4)          → Homebrew
 #   macOS x86_64 (iMac 5K 2015)    → MacPorts
-#   Windows x64  (Bootcamp, ROG)   → MSYS2/MINGW64
+#   Windows x64  (Bootcamp, ROG)   → MSYS2/UCRT64
 #   Windows ARM64 (UTM)            → MSYS2/CLANGARM64
 #
 # Fresh machine (no .config yet):

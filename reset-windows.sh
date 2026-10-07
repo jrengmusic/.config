@@ -3,13 +3,13 @@
 # reset.sh — Undo everything bootstrap.sh did
 # ============================================================================
 # Returns machine to blank MSYS2 + git state.
-# Run from MSYS2 MinGW64 or CLANGARM64 shell as Administrator:
+# Run from MSYS2 UCRT64 or CLANGARM64 shell as Administrator:
 #   bash ~/.config/reset.sh
 #
 # After running, only MSYS2 base + git remain. ~/.config/ is NOT deleted
 # (you need it to re-run setup).
 #
-# Supports x64 (MINGW64) and ARM64 (CLANGARM64). Architecture is auto-detected
+# Supports x64 (UCRT64) and ARM64 (CLANGARM64). Architecture is auto-detected
 # via PROCESSOR_ARCHITECTURE — uname -m is unreliable on ARM64 Windows.
 # ============================================================================
 set -e
@@ -56,9 +56,9 @@ case "$MSYSTEM" in
         PKG_PREFIX="mingw-w64-clang-aarch64"
         MINGW_WIN_DIR="clangarm64"
         ;;
-    MINGW64|UCRT64|*)
-        PKG_PREFIX="mingw-w64-x86_64"
-        MINGW_WIN_DIR="mingw64"
+    *)
+        PKG_PREFIX="mingw-w64-ucrt-x86_64"
+        MINGW_WIN_DIR="ucrt64"
         ;;
 esac
 
@@ -93,6 +93,7 @@ step "2. Remove managed system PATH entries"
 MANAGED_PATH_ENTRIES=(
     'C:\\msys64\\usr\\bin'
     'C:\\msys64\\mingw64\\bin'
+    'C:\\msys64\\ucrt64\\bin'
     'C:\\msys64\\clangarm64\\bin'
     "$WIN_HOME\\.local\\bin"
 )

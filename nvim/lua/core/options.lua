@@ -6,13 +6,13 @@ local M = {}
 -- The cast toolchain (core/cast-build.lua) resolves clang-cl/llvm-rc through
 -- the permanent user CC/CXX/RC environment variables and the VS-bundled
 -- CMake/Ninja PATH entries — set once per machine, no per-session capture.
--- MacPorts: /opt/local/bin | Homebrew: /opt/homebrew/bin | MSYS2: C:/msys64/mingw64/bin
+-- MacPorts: /opt/local/bin | Homebrew: /opt/homebrew/bin | MSYS2: C:/msys64/ucrt64/bin
 local function augment_path()
   local is_windows = vim.fn.has('win32') == 1
   local sep = is_windows and ';' or ':'
 
   local candidates = is_windows
-    and { 'C:/msys64/mingw64/bin', 'C:/msys64/usr/bin' }
+    and { 'C:/msys64/ucrt64/bin', 'C:/msys64/usr/bin' }
     or  { '/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin' }
 
   -- Windows: append, so the permanent PATH (VS-bundled CMake/Ninja) resolves

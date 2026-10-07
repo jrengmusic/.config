@@ -4,12 +4,12 @@
 # ============================================================================
 # Prerequisite: MSYS2 installed at C:\msys64
 #
-# Run from MSYS2 MinGW64 or CLANGARM64 shell as Administrator:
+# Run from MSYS2 UCRT64 or CLANGARM64 shell as Administrator:
 #   bash ~/.config/bootstrap.sh
 #
-# Supports x64 (MINGW64) and ARM64 (CLANGARM64).
+# Supports x64 (UCRT64) and ARM64 (CLANGARM64).
 # Architecture is auto-detected via PROCESSOR_ARCHITECTURE — uname -m is
-# unreliable on ARM64 Windows (MINGW64 always reports x86_64 via emulation).
+# unreliable on ARM64 Windows (x64 shells always report x86_64 via emulation).
 # ============================================================================
 set -e
 
@@ -56,7 +56,7 @@ info "Windows home: $WINDOWS_HOME"
 #
 # $MSYSTEM is the canonical method: MSYS2 and Git-for-Windows both use it.
 # Users launching CLANGARM64 terminal get MSYSTEM=CLANGARM64.
-# Users launching MINGW64 terminal get MSYSTEM=MINGW64.
+# Users launching UCRT64 terminal get MSYSTEM=UCRT64 (any non-ARM64 shell is pinned to it below).
 #
 # uname -s carries a -ARM64 suffix on ARM64 hardware (msys2-runtime PR#244),
 # which lets us warn users who are on ARM64 but launched the wrong shell.
@@ -67,15 +67,22 @@ case "$MSYSTEM" in
         PKG_PREFIX="mingw-w64-clang-aarch64"
         MINGW_DIR="/clangarm64"
         MINGW_WIN_DIR="clangarm64"
+        NSIS_PKG="mingw-w64-x86_64-nsis"   # no clang-aarch64 build; x64 package runs under emulation
+        NSIS_WIN_DIR="mingw64"
         BUN_ARCH="windows-aarch64"
         OMP_ARCH="arm64"
         ZOXIDE_PATTERN="aarch64-pc-windows-msvc"
         WHATDBG_ASSET="whatdbg-win-arm64"
         ;;
-    MINGW64|UCRT64|*)
-        PKG_PREFIX="mingw-w64-x86_64"
-        MINGW_DIR="/mingw64"
-        MINGW_WIN_DIR="mingw64"
+    *)
+        # x64 is always UCRT64, whichever shell launched the script: MSYS2
+        # deprecated MINGW64 (2026-03-15) and dropped fzf/jq/ripgrep/eza/bat/fd from it.
+        MSYSTEM="UCRT64"
+        PKG_PREFIX="mingw-w64-ucrt-x86_64"
+        MINGW_DIR="/ucrt64"
+        MINGW_WIN_DIR="ucrt64"
+        NSIS_PKG="${PKG_PREFIX}-nsis"
+        NSIS_WIN_DIR="ucrt64"
         BUN_ARCH="windows-x64"
         OMP_ARCH="amd64"
         ZOXIDE_PATTERN="x86_64-pc-windows-msvc"
@@ -108,6 +115,7 @@ info "Cleared user env vars: ${MANAGED_USER_VARS[*]}"
 MANAGED_PATH_ENTRIES=(
     'C:\\msys64\\usr\\bin'
     'C:\\msys64\\mingw64\\bin'
+    'C:\\msys64\\ucrt64\\bin'
     'C:\\msys64\\clangarm64\\bin'
     "$WIN_HOME\\.local\\bin"
 )
@@ -143,7 +151,7 @@ fi
 # ============================================================================
 step "2. MSYS2 ini files"
 
-# Arch-specific ini (mingw64.ini or clangarm64.ini) — native symlinks
+# Arch-specific ini (ucrt64.ini or clangarm64.ini) — native symlinks
 ARCH_INI="/c/msys64/${MSYSTEM,,}.ini"
 if grep -q "^MSYS=winsymlinks:nativestrict" "$ARCH_INI" 2>/dev/null; then
     info "Already set: MSYS=winsymlinks:nativestrict in ${MSYSTEM,,}.ini"
@@ -203,7 +211,7 @@ add_to_system_path() {
 }
 
 add_to_system_path "C:\\msys64\\usr\\bin"
-add_to_system_path "C:\\msys64\\mingw64\\bin"   # x64 nsis on all arches; prepended before the native dir so it never shadows it
+add_to_system_path "C:\\msys64\\${NSIS_WIN_DIR}\\bin"   # nsis dir; prepended before the native dir so it never shadows it
 add_to_system_path "C:\\msys64\\${MINGW_WIN_DIR}\\bin"
 add_to_system_path "$WIN_HOME\\.local\\bin"
 
@@ -243,7 +251,7 @@ win_to_posix_path() {
 
 case "$MSYSTEM" in
     CLANGARM64) LLVM_ARCH_DIR="ARM64" ;;
-    MINGW64|UCRT64|*) LLVM_ARCH_DIR="x64" ;;
+    *) LLVM_ARCH_DIR="x64" ;;
 esac
 
 VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
@@ -296,7 +304,7 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-fd"           # snacks.nvim file finder (find is disabled on Windows by snacks)
     "${PKG_PREFIX}-ripgrep"      # snacks.nvim grep search (<leader>fg)
     "${PKG_PREFIX}-jq"           # JSON processor (used by carol for settings.json merge)
-    mingw-w64-x86_64-nsis        # makensis; no clang-aarch64 build, runs under emulation on ARM64
+    "$NSIS_PKG"                  # makensis
 )
 
 for pkg in "${PACMAN_PKGS[@]}"; do
@@ -534,8 +542,8 @@ else
     info "Symlinked carol → $CAROL_TARGET"
 fi
 
-# carol subcommand symlinks (machine, oracle, surgeon)
-for cmd in machine oracle surgeon; do
+# carol subcommand symlinks (machine, oracle)
+for cmd in machine oracle; do
     CAROL_CMD_TARGET="$WINDOWS_HOME/.carol/bin/$cmd"
     CAROL_CMD_LINK="$WINDOWS_HOME/.local/bin/$cmd"
     if [[ -L "$CAROL_CMD_LINK" && "$(readlink "$CAROL_CMD_LINK")" == "$CAROL_CMD_TARGET" ]]; then
