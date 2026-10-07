@@ -85,7 +85,7 @@ The `action` cell holds one of these forms:
 | --------------------- | ----------------------------------------------------------------- |
 | string literal        | `'<cmd>nohlsearch<CR>'`                                           |
 | function reference    | `actions.smart_quit`, `dap.step_over`, `vim.lsp.buf.hover`        |
-| call in a closure     | `function() require('core.tui').tit() end`                        |
+| call in a closure     | `function() require('core.tui').cake() end`                       |
 | split sync, then call | `function() actions.splitSyncOnce(); Snacks.picker.buffers() end` |
 
 A function reference needs its local in `## requires` (`actions`, `build`, `dap`), or a global root
@@ -151,7 +151,6 @@ Reference section below documents them.
 | general     | @two   | '<leader>q'     | 'n'               | actions.toggleDiagnosticList                                                                        |         |        | Toggle diagnostic list              |                 |
 | general     | @two   | '<C-s>'         | 'n'               | actions.saveAllAndQuit                                                                              |         |        | Save all and quit                   |                 |
 | general     | @two   | '<C-c>'         | 'n'               | actions.smart_quit                                                                                  |         |        | Quit with save/discard prompt       |                 |
-| general     | @two   | '<leader>tt'    | 'n'               | function() require('core.tui').tit() end                                                            |         |        | Open TIT (git TUI)                  |                 |
 | general     | @two   | '<leader>tc'    | 'n'               | function() require('core.tui').cake() end                                                           |         |        | Open Cake TUI                       |                 |
 | general     | @two   | '<leader>bd'    | 'n'               | function() require('core.doxygen').build() end                                                      |         |        | Build doxygen docs                  |                 |
 | general     | @two   | '<Esc><Esc>'    | 't'               | '<C-\\\\><C-n>'                                                                                     |         |        | Exit terminal mode                  |                 |

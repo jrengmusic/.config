@@ -29,10 +29,6 @@ function M.open(cmd)
   vim.cmd('startinsert')
 end
 
-function M.tit()
-  M.open('tit')
-end
-
 function M.cake()
   M.open('cake')
 end

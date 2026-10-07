@@ -182,6 +182,7 @@ fi
 
 # zoxide — must be last
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)" && alias zi='__zoxide_zi'
+command -v cygpath &>/dev/null && __zoxide_pwd() { \command cygpath -w "$(\builtin pwd -L)"; }
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
