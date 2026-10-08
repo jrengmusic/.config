@@ -1,11 +1,6 @@
 {
-  "env": {
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": "claude-fable-5-1",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5"
-  },
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(*)",
       "Read(*)",
@@ -17,9 +12,7 @@
       "WebSearch(*)"
     ],
     "ask": [
-      "Bash(git restore*)"
-    ],
-    "deny": [
+      "Bash(git restore*)",
       "Bash(git checkout*)",
       "Bash(git switch*)",
       "Bash(git reset*)",
@@ -29,6 +22,29 @@
     ]
   },
   "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.carol/bin/carol-statusline.sh"
+  },
+  "enabledPlugins": {},
+  "env": {
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "claude-fable-5-1",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5"
+  },
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
+  "promptSuggestionEnabled": false,
+  "awaySummaryEnabled": false,
+  "showTurnDuration": false,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
+  "outputStyle": "CAROL",
   "hooks": {
     "SessionStart": [
       {
@@ -52,7 +68,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "AskUserQuestion|EnterPlanMode|ExitPlanMode",
+        "matcher": "AskUserQuestion|EnterPlanMode|ExitPlanMode|Agent|Task|Bash",
         "hooks": [
           {
             "type": "command",
@@ -71,22 +87,5 @@
         ]
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.carol/bin/carol-statusline.sh"
-  },
-  "enabledPlugins": {},
-  "outputStyle": "CAROL",
-  "effortLevel": "medium",
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "high"
-    }
-  },
-  "promptSuggestionEnabled": false,
-  "awaySummaryEnabled": false,
-  "showTurnDuration": false,
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  }
 }
