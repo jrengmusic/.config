@@ -101,10 +101,14 @@ local function getValuesByKey(parsedTable, keyHeader, valueHeader)
   return values
 end
 
+local function getValue(value, aliases)
+  return aliases[value] or value
+end
+
 -- A manifest path value as an absolute path: the @alias resolved, then
 -- every ${VARIABLE} / $ENV{NAME} reference.
 local function getPath(value, aliases, variables)
-  local text = aliases[value] or value
+  local text = getValue(value, aliases)
   text = text:gsub('%$ENV{([%w_]+)}', function(name) return os.getenv(name) or '' end)
   text = text:gsub('%${([%w_]+)}', function(name) return variables[name] or '' end)
   return vim.fn.simplify(text)
@@ -289,6 +293,9 @@ function M.build(root, selection)
 
   local aliases = getValuesByKey(byHeading['index'], 'alias', 'symbol')
   local info = getValuesByKey(byHeading['project info'], 'name', 'value')
+  cmake.productName = getValue(cmake.productName, aliases)
+  cmake.bundleIdentifier = getValue(cmake.bundleIdentifier, aliases)
+  info.projectName = getValue(info.projectName, aliases)
   local variables = getVariables(root, cmake, aliases)
 
   local configurations = getConfigurations(root, byHeading['toolchain'])
