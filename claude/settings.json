@@ -1,92 +1,43 @@
 {
-  "env": {
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": "claude-fable-5-1",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5"
-  },
-  "permissions": {
-    "allow": [
-      "Bash(*)",
-      "Read(*)",
-      "Write(*)",
-      "Edit(*)",
-      "Glob(*)",
-      "Grep(*)",
-      "WebFetch(*)",
-      "WebSearch(*)"
-    ],
-    "ask": [
-      "Bash(git restore*)",
-      "Bash(git checkout*)",
-      "Bash(git switch*)",
-      "Bash(git reset*)",
-      "Bash(git stash*)",
-      "Bash(git clean*)",
-      "Bash(git branch -D*)"
-    ],
-    "defaultMode": "bypassPermissions"
-  },
-  "model": "opus",
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"CAROL PROTOCOL ACTIVE — CAROL.md is loaded. Address the user as ARCHITECT. Be concise — no flattery, no emojis, no trailing summaries. Read @mentioned files, referenced paths, and project docs immediately, without asking. Never ask a question that a read can answer. Never assume. Never decide — correct course against CONTRACT. Before the plan locks, discuss before executing changes. After the lock, execute to the endpoint; a stop before it triggers CAROL.md Step Gate.\"}}'"
-          }
+    "permissions": {
+    "defaultMode" : "bypassPermissions",
+        "allow": [
+"Bash(*)","Read(*)","Write(*)","Edit(*)","Glob(*)","Grep(*)","WebFetch(*)","WebSearch(*)"
+        ],
+        "ask": [
+"Bash(git restore*)","Bash(git checkout*)","Bash(git switch*)","Bash(git reset*)","Bash(git stash*)","Bash(git clean*)","Bash(git branch -D*)"
         ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.carol/bin/hey-carol.sh"
-          }
+    },
+    "model"                             : "opus",
+    "inputNeededNotifEnabled"           : true,
+    "agentPushNotifEnabled"             : true,
+    "skipDangerousModePermissionPrompt" : true,
+    "modelSettings": {
+            "claude-opus-5-5"  : { "effortLevel": "high" },        "claude-fable-5-1" : { "effortLevel": "high" }
+    },
+    "statusLine": {
+        "type": "command",
+        "command": "~/.carol/bin/carol-statusline.sh"
+    },
+    "enabledPlugins": {},
+    "effortLevel": "medium",
+    "promptSuggestionEnabled": false,
+    "awaySummaryEnabled": false,
+    "showTurnDuration": false,
+    "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"CAROL PROTOCOL ACTIVE — CAROL.md is loaded. Address the user as ARCHITECT. Be concise — no flattery, no emojis, no trailing summaries. Read @mentioned files, referenced paths, and project docs immediately, without asking. Never ask a question that a read can answer. Never assume. Never decide — correct course against CONTRACT. Before the plan locks, discuss before executing changes. After the lock, execute to the endpoint; a stop before it triggers CAROL.md Step Gate.\"}}'"
+                    }
+                ]
+            }
         ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "AskUserQuestion|EnterPlanMode|ExitPlanMode|Agent|Task|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.carol/bin/hey-carol.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.carol/bin/hey-carol.sh"
-          }
-        ]
-      }
-    ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.carol/bin/carol-statusline.sh"
-  },
-  "enabledPlugins": {},
-  "outputStyle": "CAROL",
-  "effortLevel": "medium",
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "high"
-    }
-  },
-  "promptSuggestionEnabled": false,
-  "awaySummaryEnabled": false,
-  "showTurnDuration": false,
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
-  "skipDangerousModePermissionPrompt": true
+    },
+    "env": {
+"ANTHROPIC_DEFAULT_OPUS_MODEL"   : "claude-opus-5-5","ANTHROPIC_DEFAULT_FABLE_MODEL"  : "claude-fable-5-1","ANTHROPIC_DEFAULT_SONNET_MODEL" : "claude-sonnet-5-5","ANTHROPIC_DEFAULT_HAIKU_MODEL"  : "claude-haiku-5-5"
+    },
+    "outputStyle": "CAROL"
 }
