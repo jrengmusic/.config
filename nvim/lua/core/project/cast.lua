@@ -121,12 +121,13 @@ end
 local function getConfigurations(root, toolchain)
   local configurations = {}
   for _, record in ipairs(markdown.getRecords(toolchain)) do
-    if record.command == 'cmake' then
+    local buildDirectory = record.command == 'cmake' and record.flag:match('%-B%s+(%S+)')
+    if buildDirectory then
       local key = record.argument == '' and DEFAULT_ARGUMENT or record.argument
       configurations[key] = {
         argument = record.argument,
         buildType = record.flag:match('CMAKE_BUILD_TYPE=(%S+)'),
-        buildDir = vim.fn.simplify(root .. '/' .. record.flag:match('%-B%s+(%S+)')),
+        buildDir = vim.fn.simplify(root .. '/' .. buildDirectory),
       }
     end
   end
