@@ -178,6 +178,8 @@ step "6. Remove standalone tools and symlinks"
 
 rm -f "$WINDOWS_HOME/.local/bin/oh-my-posh.exe" && info "Removed oh-my-posh"
 rm -f "$WINDOWS_HOME/.local/bin/zoxide.exe" && info "Removed zoxide"
+rm -f "$WINDOWS_HOME/.local/bin/stylua.exe" && info "Removed stylua"
+rm -rf "$WINDOWS_HOME/.local/share/lua-language-server" && info "Removed lua-language-server"
 rm -f "$WINDOWS_HOME/.local/bin/bun" "$WINDOWS_HOME/.local/bin/bun.exe" && info "Removed bun symlinks"
 rm -f "$WINDOWS_HOME/.local/bin/carol" && info "Removed carol symlink"
 
@@ -211,7 +213,7 @@ rm -f "$WINDOWS_HOME/.zshrc" && info "Removed ~/.zshrc symlink"
 rm -f "$WINDOWS_HOME/.zprofile" && info "Removed ~/.zprofile symlink"
 
 # ============================================================================
-# 11. nvim data (lazy plugins, Mason tools, state)
+# 11. nvim data (lazy plugins, state)
 # ============================================================================
 step "11. Remove nvim data"
 

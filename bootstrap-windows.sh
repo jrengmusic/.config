@@ -300,7 +300,9 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-gcc"
     "${PKG_PREFIX}-python"
     "${PKG_PREFIX}-python-pip"   # required by pipx
-    "${PKG_PREFIX}-python-pipx"  # Mason uses pipx to install cmake-language-server
+    "${PKG_PREFIX}-python-pipx"  # installs cmake-language-server (step 4d)
+    "${PKG_PREFIX}-clang-tools-extra"  # clangd for nvim and Claude Code
+    "${PKG_PREFIX}-pyright"
     "${PKG_PREFIX}-fd"           # snacks.nvim file finder (find is disabled on Windows by snacks)
     "${PKG_PREFIX}-ripgrep"      # snacks.nvim grep search (<leader>fg)
     "${PKG_PREFIX}-jq"           # JSON processor (used by carol for settings.json merge)
@@ -356,10 +358,8 @@ else
 fi
 
 # ============================================================================
-# 4d. cmake-language-server (via pipx, not Mason)
+# 4d. cmake-language-server (via pipx — not in MSYS2 repos)
 # ============================================================================
-# Mason's cmake-language-server package requires python <3.14, but MSYS2 ships
-# python 3.14+. pipx installs into its own isolated venv, bypassing the check.
 # Binary lands at ~/.local/bin/cmake-language-server (already in PATH).
 step "4d. cmake-language-server"
 
@@ -435,6 +435,41 @@ else
     fi
 fi
 
+# stylua and lua-language-server — not in MSYS2 repos; x64 builds only, run under emulation on ARM64
+if [[ -f "$WINDOWS_HOME/.local/bin/stylua.exe" ]]; then
+    info "stylua already installed"
+else
+    warn "Downloading stylua..."
+    STYLUA_URL=$(curl -fsSL "https://api.github.com/repos/JohnnyMorganz/StyLua/releases/latest" \
+        | grep "browser_download_url.*stylua-windows-x86_64\.zip" | head -1 | cut -d '"' -f 4)
+    if [[ -n "$STYLUA_URL" ]]; then
+        curl -fsSL "$STYLUA_URL" -o /tmp/stylua.zip
+        unzip -o /tmp/stylua.zip stylua.exe -d "$WINDOWS_HOME/.local/bin/"
+        rm -f /tmp/stylua.zip
+        info "stylua installed"
+    else
+        error "Failed to find stylua release URL"
+    fi
+fi
+
+LUALS_DIR="$WINDOWS_HOME/.local/share/lua-language-server"
+if [[ -f "$LUALS_DIR/bin/lua-language-server.exe" ]]; then
+    info "lua-language-server already installed"
+else
+    warn "Downloading lua-language-server..."
+    LUALS_URL=$(curl -fsSL "https://api.github.com/repos/LuaLS/lua-language-server/releases/latest" \
+        | grep "browser_download_url.*win32-x64\.zip" | head -1 | cut -d '"' -f 4)
+    if [[ -n "$LUALS_URL" ]]; then
+        curl -fsSL "$LUALS_URL" -o /tmp/lua-language-server.zip
+        mkdir -p "$LUALS_DIR"
+        unzip -o /tmp/lua-language-server.zip -d "$LUALS_DIR"
+        rm -f /tmp/lua-language-server.zip
+        info "lua-language-server installed to $LUALS_DIR"
+    else
+        error "Failed to find lua-language-server release URL"
+    fi
+fi
+
 # ============================================================================
 # 5b. ~/.local/bin symlinks
 # ============================================================================
@@ -503,18 +538,14 @@ step "8. Neovim config"
 info "XDG_CONFIG_HOME is set → nvim uses ~/.config/nvim directly"
 
 # ============================================================================
-# 9. Neovim — Mason LSP/DAP tools
+# 9. Neovim — LSP/DAP tools
 # ============================================================================
-step "9. Neovim Mason tools"
+step "9. Neovim LSP tools"
 
-echo "After launching nvim, Mason will auto-install all LSP servers."
-echo ""
 echo "Notes:"
-echo "  - clangd comes from Mason on all platforms; nvim resolves the real"
-echo "    clangd.exe inside mason/packages (the mason/bin .cmd shim is not"
-echo "    spawnable directly) — see lua/lsp/clangd.lua"
-echo "  - Do NOT install cmake-language-server via Mason (requires python <3.14,"
-echo "    but MSYS2 ships 3.14+). It was installed via pipx in step 4d instead."
+echo "  - clangd, pyright: MSYS2 (step 4) — ${MINGW_DIR}/bin, shared by nvim and Claude Code"
+echo "  - cmake-language-server: pipx (step 4d)"
+echo "  - stylua, lua-language-server: GitHub releases (step 5)"
 echo "  - DAP adapter: whatdbg on both platforms"
 echo "  - whatdbg reads PDB symbols via dbgeng.dll (supports DAW plugin attach)"
 

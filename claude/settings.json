@@ -55,13 +55,14 @@
       "effortLevel": "high"
     },
     "claude-sonnet-5-5": {
-      "effortLevel": "high"
+      "effortLevel": "medium"
     }
   },
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "showTurnDuration": false,
+  "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true
 }

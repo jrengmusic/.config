@@ -19,22 +19,6 @@ local function clangdRootDir(bufnr, on_dir)
   end
 end
 
--- Mason's clangd package ships the official LLVM release binary on both
--- platforms. On macOS mason/bin/clangd is a plain symlink to it; on Windows
--- mason/bin/clangd.cmd is a batch shim libuv can't spawn directly, so the
--- real exe inside the versioned package directory is resolved instead.
--- Before mason-tool-installer's first install completes the glob is empty —
--- the shim path is returned as a placeholder and the next nvim start
--- resolves the real exe (same first-boot window the macOS path has).
-local function clangdBinary(is_windows)
-  if is_windows then
-    local exes = vim.fn.glob(vim.fn.stdpath('data') .. '/mason/packages/clangd/clangd_*/bin/clangd.exe', false, true)
-    if #exes > 0 then return exes[#exes] end
-    return vim.fn.stdpath('data') .. '/mason/bin/clangd'
-  end
-  return vim.fn.stdpath('data') .. '/mason/bin/clangd'
-end
-
   function M.setup(capabilities)
     local servers = {
     clangd = {
@@ -46,7 +30,7 @@ end
           or '--query-driver=/usr/bin/c++,/usr/bin/clang++'
         local index_jobs = math.max(1, math.floor(vim.uv.available_parallelism() / 2))
         return {
-          clangdBinary(is_windows),
+          'clangd',
           '--log=error',
           '--background-index',
           -- 'low', not 'background': background maps to Windows
@@ -72,40 +56,15 @@ end
           },
         },
       },
-      gopls = {},
-      zls = {},
-      ts_ls = {},
-    pyright = {},
-      -- cmake excluded: Mason requires python <3.14, MSYS2 ships 3.14+.
-      -- cmake-language-server is installed via pipx (step 4d in setup-windows.sh).
-      -- mason-lspconfig auto-enables it from PATH without Mason managing it.
+      pyright = {},
+      cmake = {},
     }
 
-  -- node-dependent servers: only include when node is in PATH
-  -- (Mason needs npm to install pyright and ts_ls)
-  local has_node = vim.fn.executable('node') == 1
-  if not has_node then
-    servers.ts_ls = nil
-    servers.pyright = nil
-  end
-
-  local server_names = vim.tbl_keys(servers)
-
-  -- Apply per-server config (cmd, capabilities, settings) via vim.lsp.config.
-  -- mason-lspconfig v2 dropped handlers; automatic_enable calls vim.lsp.enable()
-  -- which reads from vim.lsp.config. Config must be set before enable fires.
   for name, cfg in pairs(servers) do
     vim.lsp.config(name, vim.tbl_deep_extend('force', cfg, { capabilities = capabilities }))
   end
 
-  -- mason-tool-installer: deduplicated list of LSPs + standalone tools
-  local tools = { 'stylua' }
-  vim.list_extend(tools, server_names)
-  require('mason-tool-installer').setup({ ensure_installed = tools })
-
-  require('mason-lspconfig').setup({
-    ensure_installed = server_names,
-  })
+  vim.lsp.enable(vim.tbl_keys(servers))
 end
 
 -- Manual escape hatch (<leader>bi): stops every clangd client and re-triggers

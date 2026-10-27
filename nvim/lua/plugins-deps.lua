@@ -5,9 +5,6 @@ return {
     'MunifTanjim/nui.nvim',
   },
   lsp = {
-    'williamboman/mason.nvim',
-    'williamboman/mason-lspconfig.nvim',
-    'WhoIsSethDaniel/mason-tool-installer.nvim',
     'hrsh7th/cmp-nvim-lsp',
   },
   notify = {
@@ -20,7 +17,6 @@ return {
     },
   },
   dap = {
-    'jay-babu/mason-nvim-dap.nvim',
     {
       'rcarriga/nvim-dap-ui',
       dependencies = {
