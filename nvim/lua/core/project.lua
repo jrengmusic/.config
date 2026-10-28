@@ -228,10 +228,13 @@ function M.setSelection(root, selection)
   return M.parse(root, selection)
 end
 
--- The compile section clangd and the navigator follow: the selected
--- configuration once it has been built, otherwise the first built
+-- The compile section clangd and the navigator follow: a benchmark
+-- database wins when one exists (the first in key order); otherwise the
+-- selected configuration once it has been built, else the first built
 -- configuration in key order.
 function M.getCompile(ast)
+  local benchmarkKeys = getSortedKeys(ast.benchmarkCompile)
+  if benchmarkKeys[1] then return ast.benchmarkCompile[benchmarkKeys[1]] end
   local selected = ast.compile[ast.selection.configuration]
   if selected then return selected end
   local keys = getSortedKeys(ast.compile)

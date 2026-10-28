@@ -77,7 +77,7 @@ end
 
 -- A target that launches on its own, with no host to pair with.
 local function isExecutable(target)
-  return target ~= nil and target.kind == 'executable'
+  return target ~= nil and target.type == 'executable'
 end
 
 -- A launch with no host to pair with: an executable target.

@@ -22,6 +22,7 @@ local COMPILE_DATABASE = 'compile_commands.json'
 local JUCE_HEADER = 'JuceLibraryCode/JuceHeader.h'
 local DEFAULT_ARGUMENT = 'default'
 local DEBUGGER = 'whatdbg'
+local BENCHMARK_DIRECTORY = 'benchmark'
 
 -- The manifest contract: every table and every ## cmake key the AST is
 -- built from. A manifest missing any of them is not a project.
@@ -38,31 +39,31 @@ local PLATFORM = is_windows and 'win' or 'mac'
 -- is the PRODUCT_NAME.
 -- A format without an entry for the host platform is not a target there.
 local FORMAT_LAYOUT = {
-  Standalone = { kind = 'executable',
+  Standalone = { type = 'executable',
                  mac = '{artefacts}/Standalone/{name}.app/Contents/MacOS/{name}',
                  win = '{artefacts}/Standalone/{name}.exe' },
-  VST3 = { kind = 'plugin',
+  VST3 = { type = 'plugin',
            mac = '{artefacts}/VST3/{name}.vst3/Contents/MacOS/{name}',
            win = '{artefacts}/VST3/{name}.vst3/Contents/x86_64-win/{name}.vst3' },
-  AU = { kind = 'plugin',
+  AU = { type = 'plugin',
          mac = '{artefacts}/AU/{name}.component/Contents/MacOS/{name}' },
-  AAX = { kind = 'plugin',
+  AAX = { type = 'plugin',
           mac = '{artefacts}/AAX/{name}.aaxplugin/Contents/MacOS/{name}',
           win = '{artefacts}/AAX/{name}.aaxplugin/Contents/x64/{name}.aaxplugin' },
-  VST = { kind = 'plugin',
+  VST = { type = 'plugin',
           mac = '{artefacts}/VST/{name}.vst/Contents/MacOS/{name}',
           win = '{artefacts}/VST/{name}.dll' },
-  CLAP = { kind = 'plugin',
+  CLAP = { type = 'plugin',
            mac = '{buildDir}/{name}.clap/Contents/MacOS/{name}',
            win = '{buildDir}/{name}.clap' },
 }
 
 -- Non-plugin JUCE target functions produce exactly one artefact.
 local APPLICATION_LAYOUT = {
-  juce_add_console_app = { kind = 'executable',
+  juce_add_console_app = { type = 'executable',
                            mac = '{artefacts}/{name}',
                            win = '{artefacts}/{name}.exe' },
-  juce_add_gui_app = { kind = 'executable',
+  juce_add_gui_app = { type = 'executable',
                        mac = '{artefacts}/{name}.app/Contents/MacOS/{name}',
                        win = '{artefacts}/{name}.exe' },
 }
@@ -118,20 +119,48 @@ local function render(layout, values)
   return (layout:gsub('{(%w+)}', values))
 end
 
+local function getConfiguration(root, record)
+  local buildDirectory = record.command == 'cmake' and record.flag:match('%-B%s+(%S+)')
+  if buildDirectory then
+    return {
+      buildType = record.flag:match('CMAKE_BUILD_TYPE=(%S+)'),
+      buildDir = vim.fn.simplify(root .. '/' .. buildDirectory),
+    }
+  end
+  return nil
+end
+
 local function getConfigurations(root, toolchain)
   local configurations = {}
   for _, record in ipairs(markdown.getRecords(toolchain)) do
-    local buildDirectory = record.command == 'cmake' and record.flag:match('%-B%s+(%S+)')
-    if buildDirectory then
+    local configuration = getConfiguration(root, record)
+    if configuration then
       local key = record.argument == '' and DEFAULT_ARGUMENT or record.argument
-      configurations[key] = {
-        argument = record.argument,
-        buildType = record.flag:match('CMAKE_BUILD_TYPE=(%S+)'),
-        buildDir = vim.fn.simplify(root .. '/' .. buildDirectory),
-      }
+      configuration.argument = record.argument
+      configurations[key] = configuration
     end
   end
   return configurations
+end
+
+local function getBenchmarkConfigurations(root)
+  local configurations = {}
+  local benchmarkManifests = {}
+  local manifests = vim.fn.glob(root .. '/' .. BENCHMARK_DIRECTORY .. '/*.md', false, true)
+  table.sort(manifests)
+  for _, path in ipairs(manifests) do
+    local key = vim.fn.fnamemodify(path, ':t:r')
+    for _, parsedTable in ipairs(markdown.getTables(path)) do
+      if parsedTable.heading:lower() == 'toolchain' then
+        for _, record in ipairs(markdown.getRecords(parsedTable)) do
+          local configuration = getConfiguration(root, record)
+          if configuration then configurations[key] = configuration end
+        end
+      end
+    end
+    if configurations[key] then benchmarkManifests[#benchmarkManifests + 1] = path end
+  end
+  return configurations, benchmarkManifests
 end
 
 local function getLayouts(cmake, formats)
@@ -164,8 +193,8 @@ local function getTargets(cmake, formats, configurations)
     if layout then
       targets[#targets + 1] = {
         name = entry.name,
-        kind = entry.layout.kind,
-        capabilities = vim.deepcopy(CAPABILITIES[entry.layout.kind]),
+        type = entry.layout.type,
+        capabilities = vim.deepcopy(CAPABILITIES[entry.layout.type]),
         product = getProduct(layout, configurations, cmake.targetName, cmake.productName),
       }
     end
@@ -176,7 +205,7 @@ end
 local function getLaunch(targets)
   local launch = {}
   for _, target in ipairs(targets) do
-    launch[target.name] = vim.deepcopy(LAUNCH[target.kind])
+    launch[target.name] = vim.deepcopy(LAUNCH[target.type])
   end
   return launch
 end
@@ -239,17 +268,27 @@ local function getCompile(configurations, targetName)
   return compile
 end
 
--- Every file the AST was built from, once each: the manifest and each
--- distinct compile database (configurations may share a build directory).
-local function getSources(manifest, compile)
+-- Every file the AST was built from, once each: the manifest, each
+-- benchmark manifest, and each distinct compile database -- the
+-- configurations' first, then the benchmarks' (configurations may share a
+-- build directory).
+local function getSources(manifest, compile, benchmarkManifests, benchmarkCompile)
   local sources, seen = { manifest }, { [manifest] = true }
-  local keys = vim.tbl_keys(compile)
-  table.sort(keys)
-  for _, key in ipairs(keys) do
-    local database = compile[key].database
-    if not seen[database] then
-      seen[database] = true
-      sources[#sources + 1] = database
+  for _, path in ipairs(benchmarkManifests) do
+    if not seen[path] then
+      seen[path] = true
+      sources[#sources + 1] = path
+    end
+  end
+  for _, databases in ipairs({ compile, benchmarkCompile }) do
+    local keys = vim.tbl_keys(databases)
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+      local database = databases[key].database
+      if not seen[database] then
+        seen[database] = true
+        sources[#sources + 1] = database
+      end
     end
   end
   return sources
@@ -302,9 +341,11 @@ function M.build(root, selection)
   local configurations = getConfigurations(root, byHeading['toolchain'])
   local targets = getTargets(cmake, byHeading['plugin format'], configurations)
   local compile = getCompile(configurations, cmake.targetName)
+  local benchmarkConfigurations, benchmarkManifests = getBenchmarkConfigurations(root)
+  local benchmarkCompile = getCompile(benchmarkConfigurations, cmake.targetName)
 
   return {
-    sources = getSources(manifest, compile),
+    sources = getSources(manifest, compile, benchmarkManifests, benchmarkCompile),
     manifest = { root = root, name = info.projectName, version = info.versionString, id = cmake.bundleIdentifier },
     toolchain = { name = 'cast', manifest = M.TOOLCHAIN_MANIFEST },
     dependencies = {
@@ -315,6 +356,7 @@ function M.build(root, selection)
     targets = targets,
     launch = getLaunch(targets),
     compile = compile,
+    benchmarkCompile = benchmarkCompile,
     selection = selection,
   }
 end

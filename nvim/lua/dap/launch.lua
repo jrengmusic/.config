@@ -105,9 +105,9 @@ end
 
 local function getPickOrder(targets)
   local names = {}
-  for _, kind in ipairs(PICK_ORDER) do
+  for _, targetType in ipairs(PICK_ORDER) do
     for _, target in ipairs(targets) do
-      if target.kind == kind then names[#names + 1] = target.name end
+      if target.type == targetType then names[#names + 1] = target.name end
     end
   end
   return names
@@ -135,7 +135,7 @@ function M.pick(project, configuration, callback)
       local updated = require('core.project').setSelection(root, selection)
       if callback then callback(updated.selection) end
     end
-    if getTarget(project, name).kind == 'plugin' then
+    if getTarget(project, name).type == 'plugin' then
       pickHost(save)
     else
       save('')
@@ -146,7 +146,7 @@ end
 local function isComplete(project)
   local target = getTarget(project, project.selection.target)
   if target == nil then return false end
-  if target.kind == 'executable' then return true end
+  if target.type == 'executable' then return true end
   return project.selection.host ~= '' and vim.fn.filereadable(project.selection.host) == 1
 end
 
@@ -202,7 +202,7 @@ function M.getConfiguration(project, name)
   local root = project.manifest.root
   return vim.tbl_extend('error',
     { name = name, type = launch.adapter, request = launch.request, cwd = root, stopOnEntry = false },
-    PROGRAM[target.kind](root, name, launch.request))
+    PROGRAM[target.type](root, name, launch.request))
 end
 
 -- Publishes one DAP configuration per target, so dap.continue's own menu
