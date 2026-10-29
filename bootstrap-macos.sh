@@ -367,6 +367,17 @@ echo ""
 echo "END terminal config: ~/.config/end/end.lua"
 
 # ============================================================================
+# 11. scout kernel sampling (password-free)
+# ============================================================================
+step "11. scout kernel sampling"
+
+if [[ -f "$HOME/Documents/Poems/dev/scout/Builds/Release/scout_artefacts/Release/scout" ]]; then
+    bash "$HOME/.config/setup-scout.sh"
+else
+    warn "scout not built. Build it, then run: bash ~/.config/setup-scout.sh"
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 step "Setup complete"

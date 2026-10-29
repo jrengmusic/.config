@@ -710,6 +710,7 @@ fi
 echo ""
 echo "END terminal config is at ~/.config/end/end.lua"
 echo "Set program to launch zsh with --login for proper MSYS2 env."
+echo "scout kernel sampling: nothing to configure (admin terminal, UAC consent only)."
 
 # ============================================================================
 # Summary
