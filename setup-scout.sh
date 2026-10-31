@@ -2,7 +2,7 @@
 # ============================================================================
 # setup-scout.sh — password-free kernel sampling for scout
 # ============================================================================
-# macOS:   root-owned /opt/scout/scout + sudoers rule (NOPASSWD, scout only)
+# macOS:   sudoers rule (NOPASSWD) for ~/.local/bin/scout only
 # Linux:   root-owned /opt/scout/scout + file capabilities (no sudo at run)
 # Windows: nothing to configure (admin terminal, UAC consent only)
 #
@@ -24,6 +24,7 @@ step()  { echo ""; echo "${GREEN}━━━ $1 ━━━${NC}"; }
 SCOUT_SOURCE="${1:-$HOME/Documents/Poems/dev/scout/Builds/Release/scout_artefacts/Release/scout}"
 SCOUT_DIRECTORY="/opt/scout"
 SCOUT_INSTALLED="$SCOUT_DIRECTORY/scout"
+SCOUT_PATH="$HOME/.local/bin/scout"
 SUDOERS_FILE="/etc/sudoers.d/scout"
 SCOUT_USER="$(id -un)"
 
@@ -35,15 +36,13 @@ install_binary() {
 }
 
 setup_macos() {
-    install_binary wheel
-
     local temporary
     temporary="$(mktemp)"
-    echo "$SCOUT_USER ALL=(root) NOPASSWD: $SCOUT_INSTALLED" > "$temporary"
+    echo "$SCOUT_USER ALL=(root) NOPASSWD: $SCOUT_PATH" > "$temporary"
     sudo visudo -cf "$temporary"
     sudo install -o root -g wheel -m 440 "$temporary" "$SUDOERS_FILE"
     rm -f "$temporary"
-    info "Sudoers rule: $SUDOERS_FILE"
+    info "Sudoers rule: $SUDOERS_FILE ($SCOUT_PATH)"
 }
 
 setup_linux() {
@@ -54,14 +53,11 @@ setup_linux() {
 
 step "scout kernel sampling setup"
 
-if [[ -f "$SCOUT_SOURCE" ]]; then
-    case "$(uname -s)" in
-        Darwin) setup_macos ;;
-        Linux)  setup_linux ;;
-        *MINGW*|*MSYS*|*CYGWIN*) info "Windows: nothing to configure (admin terminal, UAC consent only)" ;;
-        *) error "Unsupported OS: $(uname -s)"; exit 1 ;;
-    esac
-else
-    error "scout binary not found: $SCOUT_SOURCE"
-    exit 1
-fi
+case "$(uname -s)" in
+    Darwin)
+        if [[ -f "$SCOUT_PATH" ]]; then setup_macos; else error "scout binary not found: $SCOUT_PATH"; exit 1; fi ;;
+    Linux)
+        if [[ -f "$SCOUT_SOURCE" ]]; then setup_linux; else error "scout binary not found: $SCOUT_SOURCE"; exit 1; fi ;;
+    *MINGW*|*MSYS*|*CYGWIN*) info "Windows: nothing to configure (admin terminal, UAC consent only)" ;;
+    *) error "Unsupported OS: $(uname -s)"; exit 1 ;;
+esac
