@@ -86,6 +86,12 @@ local LAUNCH = {
 -- native triple from the compiler binary itself.
 local FLAG_SKIP = { ['-o'] = 2, ['-c'] = 1, ['-target'] = 2 }
 
+-- CMake's precompiled-header artefacts: the pch source entry in the compile
+-- database (cmake_pch_*.hxx.cxx) and the force-include on real sources
+-- (cmake_pch_*.hxx). Neither belongs in .clangd: the pch entry compiles a
+-- header, and JuceHeader.h reaches clangd through -include instead.
+local PCH_SOURCE = 'cmake_pch'
+
 -- A manifest cell authored as a code span (`...`) yields the span's
 -- content -- what jam::MarkdownDocument::getTableValues() yields, and what
 -- CAST renders for it.
@@ -230,11 +236,14 @@ local function getFlags(entry)
   local index = 2
   while index <= #tokens do
     local token, following = tokens[index], tokens[index + 1]
+    local isPchArgument = following ~= nil and following:find(PCH_SOURCE, 1, true) ~= nil
     local skip = FLAG_SKIP[token] or (token:find('^%-%-target=') and 1) or (token == entry.file and 1)
+      or (isPchArgument and (token:find('^%-Xarch_') or token == '-include') and 2)
+      or (token:find(PCH_SOURCE, 1, true) and 1)
     if skip then
       index = index + skip
     elseif token:sub(1, 1) == '-' then
-      local hasArgument = following ~= nil and following:sub(1, 1) ~= '-'
+      local hasArgument = following ~= nil and (token == '-Xclang' or following:sub(1, 1) ~= '-')
         and not token:find('=', 1, true) and following ~= entry.file
       local key = hasArgument and (token .. ' ' .. following) or token
       if not seen[key] then
@@ -256,11 +265,18 @@ local function getCompile(configurations, targetName)
     local database = configuration.buildDir .. '/' .. COMPILE_DATABASE
     if vim.fn.filereadable(database) == 1 then
       local entries = vim.json.decode(table.concat(vim.fn.readfile(database), '\n'))
-      assert(entries[1], 'cast: empty compile database ' .. database)
+      local sourceEntry
+      for _, candidate in ipairs(entries) do
+        if not candidate.file:find(PCH_SOURCE, 1, true) then
+          sourceEntry = candidate
+          break
+        end
+      end
+      assert(sourceEntry, 'cast: no source entry in compile database ' .. database)
       local juceHeader = configuration.buildDir .. '/' .. targetName .. '_artefacts/' .. JUCE_HEADER
       compile[key] = {
         database = database,
-        flags = getFlags(entries[1]),
+        flags = getFlags(sourceEntry),
         juceHeader = vim.fn.filereadable(juceHeader) == 1 and juceHeader or nil,
       }
     end
