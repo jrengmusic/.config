@@ -70,7 +70,8 @@ function M.apply(ast)
   local compile = require('core.project').getCompile(ast)
   if compile then
     local root = ast.manifest.root
-    local frameworkFlags = compile.juceHeader and { '-include', compile.juceHeader } or {}
+    local frameworkFlags = {}
+    for _, header in ipairs(compile.juceHeaders) do vim.list_extend(frameworkFlags, { '-include', header }) end
     copyDatabase(compile.database, root .. '/' .. COMPILE_DATABASE)
     writeIfDifferent(root .. '/' .. CLANGD_FILE, getLines(root, compile.flags, {}))
     writeIfDifferent(ast.dependencies.user.root .. '/' .. CLANGD_FILE, getLines(root, compile.flags, frameworkFlags))

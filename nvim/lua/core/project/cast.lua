@@ -19,7 +19,6 @@ M.TOOLCHAIN_MANIFEST = 'cast/spell.md'
 M.MANIFEST = 'project-info.md'
 local MANIFEST = M.MANIFEST
 local COMPILE_DATABASE = 'compile_commands.json'
-local JUCE_HEADER = 'JuceLibraryCode/JuceHeader.h'
 local DEFAULT_ARGUMENT = 'default'
 local DEBUGGER = 'whatdbg'
 local BENCHMARK_DIRECTORY = 'benchmark'
@@ -259,7 +258,7 @@ local function getFlags(entry)
   return flags
 end
 
-local function getCompile(configurations, targetName)
+local function getCompile(configurations)
   local compile = {}
   for key, configuration in pairs(configurations) do
     local database = configuration.buildDir .. '/' .. COMPILE_DATABASE
@@ -273,11 +272,16 @@ local function getCompile(configurations, targetName)
         end
       end
       assert(sourceEntry, 'cast: no source entry in compile database ' .. database)
-      local juceHeader = configuration.buildDir .. '/' .. targetName .. '_artefacts/' .. JUCE_HEADER
+      local flags = getFlags(sourceEntry)
+      local juceHeaders = {}
+      for _, flag in ipairs(flags) do
+        local module = flag:match('^%-DJUCE_MODULE_AVAILABLE_(juce_[%w_]+)=1$')
+        if module then juceHeaders[#juceHeaders + 1] = module .. '/' .. module .. '.h' end
+      end
       compile[key] = {
         database = database,
-        flags = getFlags(sourceEntry),
-        juceHeader = vim.fn.filereadable(juceHeader) == 1 and juceHeader or nil,
+        flags = flags,
+        juceHeaders = juceHeaders,
       }
     end
   end
@@ -356,9 +360,9 @@ function M.build(root, selection)
 
   local configurations = getConfigurations(root, byHeading['toolchain'])
   local targets = getTargets(cmake, byHeading['plugin format'], configurations)
-  local compile = getCompile(configurations, cmake.targetName)
+  local compile = getCompile(configurations)
   local benchmarkConfigurations, benchmarkManifests = getBenchmarkConfigurations(root)
-  local benchmarkCompile = getCompile(benchmarkConfigurations, cmake.targetName)
+  local benchmarkCompile = getCompile(benchmarkConfigurations)
 
   return {
     sources = getSources(manifest, compile, benchmarkManifests, benchmarkCompile),
