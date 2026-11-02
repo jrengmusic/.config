@@ -147,6 +147,12 @@ local function stopWatchers(root)
   watchers[root] = nil
 end
 
+local function getWatchTarget(path)
+  local directory = vim.fs.dirname(path)
+  if vim.uv.fs_stat(directory) then return directory, path end
+  return getWatchTarget(directory)
+end
+
 -- One non-recursive watcher per source directory, filtered to the exact
 -- source paths: robust to tools that replace a file by rename rather than
 -- rewriting it in place, and blind to the other files those directories
@@ -156,8 +162,9 @@ local function watch(root, ast)
 
   local paths, directories = {}, {}
   for _, source in ipairs(ast.sources) do
-    paths[source] = true
-    directories[vim.fs.dirname(source)] = true
+    local directory, path = getWatchTarget(source)
+    paths[path] = true
+    directories[directory] = true
   end
 
   local timer = assert(vim.uv.new_timer())

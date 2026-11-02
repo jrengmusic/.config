@@ -6,8 +6,6 @@
 -- output (CMakeLists.txt, .clangd).
 local M = {}
 
-local markdown = require('core.markdown-table')
-
 M.CAST_BINARY = vim.fn.has('win32') == 1 and 'cast.exe' or 'cast'
 M.TOOLCHAIN_MANIFEST = 'cast/spell.md'
 
@@ -19,6 +17,7 @@ M.TOOLCHAIN_MANIFEST = 'cast/spell.md'
 M.MANIFEST = 'project-info.md'
 local MANIFEST = M.MANIFEST
 local COMPILE_DATABASE = 'compile_commands.json'
+local TABLES_FLAG = '--tables'
 local DEFAULT_ARGUMENT = 'default'
 local DEBUGGER = 'whatdbg'
 local BENCHMARK_DIRECTORY = 'benchmark'
@@ -91,31 +90,30 @@ local FLAG_SKIP = { ['-o'] = 2, ['-c'] = 1, ['-target'] = 2 }
 -- header, and JuceHeader.h reaches clangd through -include instead.
 local PCH_SOURCE = 'cmake_pch'
 
--- A manifest cell authored as a code span (`...`) yields the span's
--- content -- what jam::MarkdownDocument::getTableValues() yields, and what
--- CAST renders for it.
-local function getContent(cell)
-  return cell:match('^`(.*)`$') or cell
-end
-
 -- A two-column table as key -> value.
 local function getValuesByKey(parsedTable, keyHeader, valueHeader)
   local values = {}
-  for _, record in ipairs(markdown.getRecords(parsedTable)) do
-    values[record[keyHeader]] = getContent(record[valueHeader])
+  for _, row in ipairs(parsedTable.rows) do
+    values[row[keyHeader]] = row[valueHeader]
   end
   return values
 end
 
-local function getValue(value, aliases)
-  return aliases[value] or value
+local function getRows(byHeading, heading)
+  local parsedTable = byHeading[heading]
+  return parsedTable and parsedTable.rows or {}
 end
 
--- A manifest path value as an absolute path: the @alias resolved, then
--- every ${VARIABLE} / $ENV{NAME} reference.
-local function getPath(value, aliases, variables)
-  local text = getValue(value, aliases)
-  text = text:gsub('%$ENV{([%w_]+)}', function(name) return os.getenv(name) or '' end)
+local function getColumn(rows, column)
+  local values = {}
+  for _, row in ipairs(rows) do values[#values + 1] = row[column] end
+  return values
+end
+
+-- A manifest path value as an absolute path: every ${VARIABLE} /
+-- $ENV{NAME} reference expanded.
+local function getPath(value, variables)
+  local text = value:gsub('%$ENV{([%w_]+)}', function(name) return os.getenv(name) or '' end)
   text = text:gsub('%${([%w_]+)}', function(name) return variables[name] or '' end)
   return vim.fn.simplify(text)
 end
@@ -129,7 +127,7 @@ local function getConfiguration(root, record)
   if buildDirectory then
     return {
       buildType = record.flag:match('CMAKE_BUILD_TYPE=(%S+)'),
-      buildDir = vim.fn.simplify(root .. '/' .. buildDirectory),
+      buildDir = vim.fn.simplify(vim.fn.isabsolutepath(buildDirectory) == 1 and buildDirectory or root .. '/' .. buildDirectory),
     }
   end
   return nil
@@ -137,7 +135,7 @@ end
 
 local function getConfigurations(root, toolchain)
   local configurations = {}
-  for _, record in ipairs(markdown.getRecords(toolchain)) do
+  for _, record in ipairs(toolchain.rows) do
     local configuration = getConfiguration(root, record)
     if configuration then
       local key = record.argument == '' and DEFAULT_ARGUMENT or record.argument
@@ -148,22 +146,20 @@ local function getConfigurations(root, toolchain)
   return configurations
 end
 
-local function getBenchmarkConfigurations(root)
+local function getBenchmarkConfigurations(root, benchmarkFiles)
   local configurations = {}
   local benchmarkManifests = {}
-  local manifests = vim.fn.glob(root .. '/' .. BENCHMARK_DIRECTORY .. '/*.md', false, true)
-  table.sort(manifests)
-  for _, path in ipairs(manifests) do
-    local key = vim.fn.fnamemodify(path, ':t:r')
-    for _, parsedTable in ipairs(markdown.getTables(path)) do
-      if parsedTable.heading:lower() == 'toolchain' then
-        for _, record in ipairs(markdown.getRecords(parsedTable)) do
+  for _, file in ipairs(benchmarkFiles) do
+    local key = vim.fn.fnamemodify(file.file, ':t:r')
+    for _, parsedTable in ipairs(file.tables) do
+      if parsedTable.name:lower() == 'toolchain' then
+        for _, record in ipairs(parsedTable.rows) do
           local configuration = getConfiguration(root, record)
           if configuration then configurations[key] = configuration end
         end
       end
     end
-    if configurations[key] then benchmarkManifests[#benchmarkManifests + 1] = path end
+    if configurations[key] then benchmarkManifests[#benchmarkManifests + 1] = file.file end
   end
   return configurations, benchmarkManifests
 end
@@ -171,7 +167,7 @@ end
 local function getLayouts(cmake, formats)
   if formats then
     local layouts = {}
-    for _, format in ipairs(markdown.getColumn(formats, 'value')) do
+    for _, format in ipairs(getColumn(formats.rows, 'value')) do
       layouts[#layouts + 1] = { name = format, layout = FORMAT_LAYOUT[format] }
     end
     return layouts
@@ -217,10 +213,10 @@ end
 
 -- Each ## user module row names its own root: the module lives at
 -- <root>/<name>.
-local function getUserModules(parsedTable, aliases, variables)
+local function getUserModules(rows, variables)
   local modules = {}
-  for _, record in ipairs(markdown.getRecords(parsedTable)) do
-    modules[#modules + 1] = { name = record.name, root = getPath(record.root, aliases, variables) .. '/' .. record.name }
+  for _, record in ipairs(rows) do
+    modules[#modules + 1] = { name = record.name, root = getPath(record.root, variables) .. '/' .. record.name }
   end
   return modules
 end
@@ -292,7 +288,7 @@ end
 -- benchmark manifest, and each distinct compile database -- the
 -- configurations' first, then the benchmarks' (configurations may share a
 -- build directory).
-local function getSources(manifest, compile, benchmarkManifests, benchmarkCompile)
+local function getSources(manifest, configurations, benchmarkManifests, benchmarkConfigurations)
   local sources, seen = { manifest }, { [manifest] = true }
   for _, path in ipairs(benchmarkManifests) do
     if not seen[path] then
@@ -300,11 +296,11 @@ local function getSources(manifest, compile, benchmarkManifests, benchmarkCompil
       sources[#sources + 1] = path
     end
   end
-  for _, databases in ipairs({ compile, benchmarkCompile }) do
-    local keys = vim.tbl_keys(databases)
+  for _, declared in ipairs({ configurations, benchmarkConfigurations }) do
+    local keys = vim.tbl_keys(declared)
     table.sort(keys)
     for _, key in ipairs(keys) do
-      local database = databases[key].database
+      local database = declared[key].buildDir .. '/' .. COMPILE_DATABASE
       if not seen[database] then
         seen[database] = true
         sources[#sources + 1] = database
@@ -314,12 +310,15 @@ local function getSources(manifest, compile, benchmarkManifests, benchmarkCompil
   return sources
 end
 
-local function getTablesByHeading(manifest)
-  local tables = markdown.getTables(manifest)
-  if not tables then return nil, MANIFEST .. ' not found' end
+local function getFiles(paths)
+  local result = vim.system(vim.list_extend({ M.CAST_BINARY, TABLES_FLAG }, paths), { text = true }):wait()
+  if result.code == 0 then return vim.json.decode(result.stdout) end
+  return nil, vim.trim(result.stderr)
+end
 
+local function getTablesByHeading(file)
   local byHeading = {}
-  for _, parsedTable in ipairs(tables) do byHeading[parsedTable.heading:lower()] = parsedTable end
+  for _, parsedTable in ipairs(file.tables) do byHeading[parsedTable.name:lower()] = parsedTable end
   for _, heading in ipairs(REQUIRED_TABLES) do
     if not byHeading[heading] then return nil, MANIFEST .. ' has no ## ' .. heading .. ' table' end
   end
@@ -337,40 +336,40 @@ end
 -- The CMake variables the manifest's own values reference, in dependency
 -- order: the two roots first, since every other path is written in their
 -- terms.
-local function getVariables(root, cmake, aliases)
+local function getVariables(root, cmake)
   local variables = { CMAKE_CURRENT_SOURCE_DIR = root }
-  variables.CAST_JUCE_PATH = getPath(cmake.jucePath, aliases, variables)
-  variables.CAST_USER_MODULE_PATH = getPath(cmake.userModulePath, aliases, variables)
+  variables.CAST_JUCE_PATH = getPath(cmake.jucePath, variables)
+  variables.CAST_USER_MODULE_PATH = getPath(cmake.userModulePath, variables)
   return variables
 end
 
 function M.build(root, selection)
   local manifest = root .. '/' .. MANIFEST
-  local byHeading, failure = getTablesByHeading(manifest)
-  if not byHeading then return nil, failure end
+  local benchmarkPaths = vim.fn.glob(root .. '/' .. BENCHMARK_DIRECTORY .. '/*.md', false, true)
+  table.sort(benchmarkPaths)
+  local files, failure = getFiles(vim.list_extend({ manifest }, benchmarkPaths))
+  if not files then return nil, failure end
+  local byHeading, tablesFailure = getTablesByHeading(table.remove(files, 1))
+  if not byHeading then return nil, tablesFailure end
   local cmake, cmakeFailure = getCmake(byHeading)
   if not cmake then return nil, cmakeFailure end
 
-  local aliases = getValuesByKey(byHeading['index'], 'alias', 'symbol')
   local info = getValuesByKey(byHeading['project info'], 'name', 'value')
-  cmake.productName = getValue(cmake.productName, aliases)
-  cmake.bundleIdentifier = getValue(cmake.bundleIdentifier, aliases)
-  info.projectName = getValue(info.projectName, aliases)
-  local variables = getVariables(root, cmake, aliases)
+  local variables = getVariables(root, cmake)
 
   local configurations = getConfigurations(root, byHeading['toolchain'])
   local targets = getTargets(cmake, byHeading['plugin format'], configurations)
   local compile = getCompile(configurations)
-  local benchmarkConfigurations, benchmarkManifests = getBenchmarkConfigurations(root)
+  local benchmarkConfigurations, benchmarkManifests = getBenchmarkConfigurations(root, files)
   local benchmarkCompile = getCompile(benchmarkConfigurations)
 
   return {
-    sources = getSources(manifest, compile, benchmarkManifests, benchmarkCompile),
+    sources = getSources(manifest, configurations, benchmarkManifests, benchmarkConfigurations),
     manifest = { root = root, name = info.projectName, version = info.versionString, id = cmake.bundleIdentifier },
     toolchain = { name = 'cast', manifest = M.TOOLCHAIN_MANIFEST },
     dependencies = {
-      juce = { root = variables.CAST_JUCE_PATH, modules = markdown.getColumn(byHeading['juce module'], 'value') },
-      user = { root = variables.CAST_USER_MODULE_PATH, modules = getUserModules(byHeading['user module'], aliases, variables) },
+      juce = { root = variables.CAST_JUCE_PATH, modules = getColumn(getRows(byHeading, 'juce module'), 'value') },
+      user = { root = variables.CAST_USER_MODULE_PATH, modules = getUserModules(getRows(byHeading, 'user module'), variables) },
     },
     configurations = configurations,
     targets = targets,
