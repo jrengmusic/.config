@@ -213,6 +213,7 @@ M.setup = function()
   hi('Title', { fg = colors.class, gui = 'bold' })
   hi('Directory', { fg = colors.func })
    hi('Underlined', { fg = colors.url, gui = 'underline' })
+   vim.api.nvim_set_hl(0, '@MarkdownShortcutLink', { fg = colors.fg, nocombine = true })
 
    -- Snacks picker
    hi('SnacksPicker', { bg = '#0A1620', nocombine = true })

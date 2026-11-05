@@ -95,7 +95,7 @@ elif [[ $OPERATING_SYSTEM == "macos-arm" || $OPERATING_SYSTEM == "macos-intel" ]
 fi
 
 # fzf colour scheme — END palette
-export FZF_DEFAULT_OPTS="--color=fg:#699DAA,bg:#090D12,hl:#FC704C,fg+:#00C8D8,bg+:#112130,hl+:#FC704C,info:#33535B,border:#33535B,prompt:#4E8C93,pointer:#00C8D8,marker:#FC704C,spinner:#01C2D2,header:#519299"
+export FZF_DEFAULT_OPTS="--color=fg:#699DAA,bg:16,hl:#FC704C,fg+:#00C8D8,bg+:#112130,hl+:#FC704C,info:#33535B,border:#33535B,prompt:#4E8C93,pointer:#00C8D8,marker:#FC704C,spinner:#01C2D2,header:#519299"
 
 # Custom fzf options
 export FZF_CTRL_T_OPTS="--preview '$HOME/.config/zsh/fzf-end.sh {}' \
@@ -178,7 +178,8 @@ fi
 # Oh my posh
 if [ "$TERM_PROGRAM" != "Apple_Terminal" ] && command -v oh-my-posh &>/dev/null; then
   eval "$(oh-my-posh init zsh --config ~/.config/omp/gfx.json)"
-  TRAPWINCH() { omp_repaint_prompt }
+  _omp_arm_repaint() { TRAPWINCH() { omp_repaint_prompt }; add-zsh-hook -d precmd _omp_arm_repaint }
+  add-zsh-hook precmd _omp_arm_repaint
 fi
 
 # zoxide — must be last

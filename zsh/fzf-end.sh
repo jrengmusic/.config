@@ -7,6 +7,15 @@ is_image() {
 }
 
 skit_signal() {
+    if command -v eve >/dev/null; then
+        if [[ -n "$1" ]]; then
+            eve preview "$1"
+        else
+            eve preview > /dev/tty
+        fi
+        return
+    fi
+
     case "$END_SKIT" in
         kitty)  printf '\033_GEND;%s\033\\' "$1" ;;
         iterm2) printf '\033]1337;END;%s\a' "$1" ;;

@@ -49,11 +49,11 @@
           "type": "git",
           "style": "plain",
           "foreground": "p:mediterranea",
-          "template": "{{ .HEAD | replace \"\uE725 \" \"<p:frostbite>\uE725 </><p:paradiso>\" }}</>{{ if .Ahead }} ⬆ {{ .Ahead }}{{ end }}{{ if .Behind }} ⬇ {{ .Behind }}{{ end }}{{ if .Working.Changed }} <p:preciousPersimmon>● {{ .Working.Modified }}</>{{ end }} ",
+          "template": "{{ .HEAD }}</>{{ if .Ahead }} ⬆ {{ .Ahead }}{{ end }}{{ if .Behind }} ⬇ {{ .Behind }}{{ end }}{{ if .Working.Changed }} <p:preciousPersimmon>● {{ .Working.Modified }}</>{{ end }} ",
           "properties": {
             "fetch_status": true,
             "fetch_push_status": true,
-            "branch_icon": "\uE725 "
+            "branch_icon": "<p:frostbite>\uE725 </><p:paradiso>"
           }
         }
       ],
