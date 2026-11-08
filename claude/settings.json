@@ -28,7 +28,6 @@
     ],
     "defaultMode": "bypassPermissions"
   },
-  "model": "sonnet",
   "hooks": {
     "SessionStart": [
       {
@@ -61,5 +60,6 @@
   "skipDangerousModePermissionPrompt": true,
   "showTurnDuration": false,
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "tui": "fullscreen"
 }

@@ -8,6 +8,8 @@
 !amp/**
 !bat/
 !bat/**
+!ccache/
+!ccache/**
 !cake/
 !cake/**
 !claude/

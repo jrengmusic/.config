@@ -298,6 +298,7 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-fzf"
     "${PKG_PREFIX}-bat"
     "${PKG_PREFIX}-gcc"
+    "${PKG_PREFIX}-ccache"
     "${PKG_PREFIX}-python"
     "${PKG_PREFIX}-python-pip"   # required by pipx
     "${PKG_PREFIX}-python-pipx"  # installs cmake-language-server (step 4d)

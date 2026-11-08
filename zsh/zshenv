@@ -1,2 +1,5 @@
 # CAROL CLI (carol) available in every shell
 export PATH="$HOME/.carol/bin:$PATH"
+
+# ccache shared configuration (one file for all machines)
+export CCACHE_CONFIGPATH="$HOME/.config/ccache/ccache.conf"

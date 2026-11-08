@@ -97,6 +97,7 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         tmux
         cmake
         ninja
+        ccache
         btop
         llvm
         lua-language-server
@@ -125,6 +126,7 @@ else
         tmux
         cmake
         ninja
+        ccache
         btop
         "clang-${LLVM_PORT_VERSION}"
         lua-language-server
