@@ -1,7 +1,7 @@
 {
   "env": {
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": "claude-fable-5-1",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "claude-fable-5-2",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5",
     "BASH_MAX_TIMEOUT_MS": "900000"
@@ -28,6 +28,7 @@
     ],
     "defaultMode": "bypassPermissions"
   },
+  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
@@ -49,10 +50,16 @@
   "effortLevel": "medium",
   "modelSettings": {
     "claude-opus-5-5": {
+      "effortLevel": "medium"
+    },
+    "claude-fable-5-2": {
+      "effortLevel": "medium"
+    },
+    "claude-sonnet-5-5": {
       "effortLevel": "high"
     },
-    "claude-fable-5-1": {
-      "effortLevel": "high"
+    "claude-haiku-5-5": {
+      "effortLevel": "medium"
     }
   },
   "promptSuggestionEnabled": false,
@@ -60,6 +67,5 @@
   "skipDangerousModePermissionPrompt": true,
   "showTurnDuration": false,
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
-  "tui": "fullscreen"
+  "agentPushNotifEnabled": true
 }

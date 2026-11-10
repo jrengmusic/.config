@@ -1,159 +1,94 @@
-## Handoff to MACHINIST: One shared clangd per project — conformance on the other three machines
+## Handoff to MACHINIST: One shared clangd per project, killed when idle — conformance on the other three machines
 
 **From:** MACHINIST (macOS ARM, M4)
-**Date:** 2026-11-02
-**Status:** Blocked
+**Date:** 2026-11-10
+**Status:** In Progress
 
 ### Read First
 1. This file. It holds the only record of the design and of the macOS ARM test runs. No RFC exists for this subject.
-2. `~/.carol/.claude-plugin/plugin.json` — the current `lspServers.clangd` entry. The agents' clangd starts from it.
-3. `~/.config/nvim/lua/lsp/clangd.lua` — nvim's clangd launch (`cmd`, lines 26-50) and its `root_dir` (lines 13-20).
-4. `~/.config/nvim/lua/core/clangd.lua` — writes the project `.clangd`, the user-module `.clangd`, and the root `compile_commands.json` copy (lines 69-79).
-5. `~/.config/bootstrap-windows.sh` — step 4, MSYS2 packages (lines 279-317), and the `$MSYSTEM` prefix table (lines 65-80).
-6. `~/.config/bootstrap-macos.sh` — the Homebrew branch (macOS ARM) and the MacPorts branch (macOS Intel), lines 47-140.
+2. `~/.carol/bin/carol-clangd.js` — the proxy. It holds the clangd arguments, the idle timeout, and the pipe path.
+3. `~/.carol/.claude-plugin/plugin.json` — `lspServers.clangd` starts the proxy in client mode.
+4. `~/.config/bootstrap-windows.sh` — step 4, MSYS2 packages (lines 279-317). It installs `${PKG_PREFIX}-nodejs` and `${PKG_PREFIX}-clang-tools-extra`.
+5. `~/.config/bootstrap-macos.sh` — Homebrew list (`go`, `node` at lines 86-87, `llvm` at line 102) and MacPorts list (`go`, `nodejs22` at lines 115-116).
 
 ### Context
 
-ARCHITECT reported CPU spikes and terminal freezes from clangd processes that agents start and leave running. The session measured the cause on macOS ARM and tested a fix there. The other three machines are not tested. ARCHITECT ruled that the Windows conformance work is a handoff.
+ARCHITECT reported clangd processes that use many GB of memory for hours and freeze the terminal. Two parallel sessions always froze it.
 
-The four machines (`bootstrap-macos.sh:47`, `bootstrap-windows.sh:65-80`):
+Facts measured on macOS ARM before the change:
 
-| Machine | Package channel | Package prefix or path |
-|---|---|---|
-| macOS ARM | Homebrew | `/opt/homebrew` |
-| macOS Intel | MacPorts | `/opt/local` |
-| Windows x64 | MSYS2 UCRT64 | `mingw-w64-ucrt-x86_64` |
-| Windows ARM64 | MSYS2 CLANGARM64 | `mingw-w64-clang-aarch64` |
+1. Claude Code starts one clangd for each session. The clangd lives as long as the session. Subagents run in the session process and share its clangd. Evidence: `ps` showed clangd 79286 with parent `claude … --agent COUNSELOR` (78019), and clangd 90607 with parent `claude … --agent ORACLE` (78602).
+2. Claude Code 2.1.322 keeps up to 50 documents open for each server, and sends `didClose` only on eviction. Evidence: the binary holds `var pYs=50` and `LSP: Sending didClose for evicted document`.
+3. jam's `.clangd` force-includes 13 JUCE module headers. One file builds a 145 MB preamble: `clangd --check=jam_core/jam_core.cpp` logged `Built preamble of size 145462636` and peaked at 1358512128 bytes RSS.
+4. With `--pch-storage=disk`, RSS does not grow with each open file. 20 open jam headers with `--background-index=false` gave 1.6-2.1 GB RSS. With the background index on (the clangd default), 8 headers gave 2.3 GB. clangd's own `$/memoryUsage` count was 174 MB and 711 MB. The rest is allocator memory that macOS malloc keeps. `--malloc-trim` exists only for Linux glibc.
+5. An idle clangd exits on stdin EOF. Test: `(sleep 3) | clangd --log=error --background-index` printed `Transport error: Input/output error` and exited.
+6. lspmux (the design of the 2026-11-02 handoff) cannot run on all four machines. MSYS2 has no package (`packages.msys2.org/api/search?query=lspmux` → `"exact":{}`). MacPorts has no port (`ports.macports.org/api/v1/ports/?search=lspmux` → `"count":0`). It ships only as a crates.io crate, and no bootstrap script installs Rust. lspmux also stops an instance only when no client is connected (README: "a … server instance with no clients connected will get killed"). An interactive session stays connected, so lspmux cannot kill clangd during an idle session.
 
-clangd comes from each machine's package channel:
-- macOS: `bootstrap-macos.sh:107`, `:135`, linked to `~/.local/bin/clangd` at `:347`.
-- Windows: `${PKG_PREFIX}-clang-tools-extra` at `bootstrap-windows.sh:304`.
+The fix: `~/.carol/bin/carol-clangd.js`, Node only. Node is in every bootstrap package list (Read First, items 4-5).
 
-Facts measured on macOS ARM, before any change:
-
-1. **One clangd for each Claude Code session.**
-   - A Pathfinder LSP call started clangd pid 5254 at 13:43:41. Its parent was the session's `claude` process (pid 98146), not the subagent. Its working directory was the session folder, `/Users/jreng/.config`.
-   - At 13:45:00, the COUNSELOR session (pid 93831) started its own clangd (pid 6661).
-   - nvim's clangd (pid 95702) served the same END database at the same time.
-2. **Lifetime.**
-   - The clangd process outlived the subagent. pid 5254 was alive and idle at 13:44:53, at 814 MB RSS.
-   - A headless `claude -p` session stopped its clangd when it exited (13:50:32).
-   - An interactive session exit was not tested.
-3. **Cost.** Two LSP calls (`documentSymbol` and `hover`) on `end/Source/Main.cpp` with the default plugin clangd took about 50 s of CPU at 67-284%. RSS peaked at 6.1 GB (13:43:55). END's index already existed on disk with 1485 shards. Only 24 shards (215 KB) were rewritten.
-4. **Worker count.** The plugin passes no `-j`. clangd then uses one worker per physical core, and the background index uses the same count (LLVM `clangd/TUScheduler.cpp:1613-1615`, `ClangdServer.cpp:255-257`, `llvm/lib/Support/Unix/Threading.inc:436-451`). `sysctl hw.physicalcpu` = 10 on the M4. nvim passes `-j` = half of `vim.uv.available_parallelism()` (`nvim/lua/lsp/clangd.lua:31`).
-5. **`--compile-commands-dir=<dir>`.** When the folder exists, clangd uses that one database for every file, also for files outside the folder (`clangd/GlobalCompilationDatabase.cpp:424-427`). It overrides a `.clangd` `CompilationDatabase` key (`ClangdMain.cpp:1010-1013`, flag provider applied last). Source: Librarian research on LLVM `main` and `release/22.x`.
-6. **Plugin fields.** Claude Code `lspServers` accepts `args`, `env`, `workspaceFolder`, `initializationOptions`, `shutdownTimeout`, `restartOnCrash` (default true), and `maxRestarts`. `${CLAUDE_PROJECT_DIR}` expands in `command`, `args`, `env`, and `workspaceFolder` (code.claude.com plugins manifest reference, from WebFetch summaries).
-
-The fix under test: lspmux 0.3.0 (`https://codeberg.org/p2502/lspmux`, crate `lspmux`). One `lspmux server` holds one clangd per project. Each client, whether a Claude Code session or nvim, connects through `lspmux client`.
+- **Client mode** is the plugin `command`, one per session. It connects to the server over `\\.\pipe\carol-clangd-<username>` on Windows, or `<os.tmpdir()>/carol-clangd-<uid>.sock` on macOS. If no server answers, it starts one detached, then tries again: 50 attempts, 100 ms apart. After the connection, it pipes stdin and stdout.
+- **Server mode** runs one per machine and starts on demand.
+  1. It keeps one clangd per project root (the `rootUri` of `initialize`). It sends `initialize` one time per clangd and gives the kept result to each client.
+  2. It maps request ids per client. It opens a document upstream (text from disk) on the first request that names it. It sends `didClose` when the last client closes it. It sends `didChange` and `didSave` upstream as full text from disk.
+  3. It answers clangd's requests itself (`workspace/configuration` → one `null` per item, others → `null`). It drops clangd's notifications.
+  4. It kills a clangd 30 s after its last reply, when no request is pending. The next request starts a new one.
+  5. It kills a project's clangd when the last client of that project disconnects. It exits when no project is left.
+  6. It sets clangd to `os.constants.priority.PRIORITY_LOW` (19). This replaces `nice -n 19`, which has no cross-platform equivalent in a plugin `command`.
 
 ### Completed
 
-macOS ARM only. All runs were in `~/Documents/Poems/dev/end`.
+macOS ARM only. Runs were in `~/Documents/Poems/dev/jam`.
 
-1. **Install.** `brew install lspmux` installed 0.3.0 (bottled). `lspmux config` defaults: `instance_timeout` 300, `gc_interval` 10, listen and connect `127.0.0.1:27631`, config file `~/Library/Application Support/lspmux/config.toml` (absent).
-2. **Argument rule.**
-   - Without a separator, `lspmux client --server-path clangd --background-index` fails with `Error: unexpected argument '--background-index' found`. Claude Code reported that as a clangd crash with exit code 2.
-   - The clangd flags need `--` after `--server-path clangd`.
-3. **Two Claude Code sessions share one clangd.**
-   - Two `claude -p` sessions ran at the same time with the test plugin below.
-   - Both got LSP results: 29 and 25 symbols, and the hover `cascadeLookAndFeelChange`.
-   - Only one clangd ran: pid 11896, parent `lspmux server` (pid 11274). Peak 125.5% CPU, 1.1-1.4 GB RSS.
-   - `lspmux status` showed one instance: `path: "/Users/jreng/Documents/Poems/dev/end"`, `server: "clangd" [...]`.
-4. **nvim shares the same clangd.** The nvim test script below connected to the same instance (pid 11896), with `root=/Users/jreng/Documents/Poems/dev/end`, and got `symbols=22 err=nil`. `lspmux status` listed the nvim client.
-5. **Idle stop.** The last client left at 13:52:49. clangd pid 11896 exited at 13:57:59, which is 310 s later: `instance_timeout` 300 plus `gc_interval` 10.
-6. **Instance key.** `lspmux status` shows each instance with its `server` arguments and its `path`. nvim and the agents share an instance only when both pass identical clangd arguments and the same project path. Today nvim passes `--clang-tidy`, `--header-insertion=never`, `--completion-style=detailed`, and `--header-insertion-decorators=false` (`nvim/lua/lsp/clangd.lua:33-45`). The plugin does not pass them (`~/.carol/.claude-plugin/plugin.json`).
-7. **Clean-up after the tests.** The test `lspmux server` is stopped. The test plugin was only in the session scratchpad. lspmux stays installed through Homebrew.
-
-Test plugin, used as `--plugin-dir <dir>` with this content at `<dir>/.claude-plugin/plugin.json`:
-
-```json
-{
-  "name": "muxtest",
-  "version": "0.0.1",
-  "lspServers": {
-    "clangd": {
-      "command": "lspmux",
-      "args": ["client", "--server-path", "clangd", "--", "--background-index", "--background-index-priority=low", "--log=error", "-j=5"],
-      "extensionToLanguage": { ".h": "cpp", ".cpp": "cpp", ".mm": "objective-cpp" },
-      "diagnostics": false
-    }
-  }
-}
-```
-
-nvim test script, run as `nvim --headless --clean -c "luafile <script>"` from the project root:
-
-```lua
-vim.lsp.config('mux', {
-  cmd = { 'lspmux', 'client', '--server-path', 'clangd', '--', '--background-index', '--background-index-priority=low', '--log=error', '-j=5' },
-  filetypes = { 'cpp' },
-  root_markers = { '.git' },
-})
-vim.lsp.enable('mux')
-vim.cmd('edit Source/Main.cpp')
-vim.defer_fn(function()
-  local client = vim.lsp.get_clients({ name = 'mux' })[1]
-  io.stdout:write('client=', tostring(client and client.id), ' root=', tostring(client and client.root_dir), '\n')
-  local result = client and client:request_sync('textDocument/documentSymbol', { textDocument = vim.lsp.util.make_text_document_params(0) }, 20000, 0)
-  io.stdout:write('symbols=', tostring(result and result.result and #result.result), ' err=', vim.inspect(result and result.err), '\n')
-  io.stdout:write(vim.fn.system('lspmux status 2>/dev/null'), '\n')
-  vim.cmd('qa!')
-end, 3000)
-```
+1. **Sharing, with two direct LSP clients.** Two scratch probe clients ran in parallel through client mode. One clangd ran (pid 3817, parent server 3770). Both clients got results. After both exited, no server and no clangd remained.
+2. **Idle kill.** One client stayed connected and did nothing for 40 s. At t=8 s, clangd 4096 ran under server 4094. At t=33 s, the server still ran, with no clangd. A request at about t=42 s started a new clangd and got its answer. After the client exited, no server remained (t=45 s).
+3. **No orphans.**
+   - `kill -9` on the client: the server and clangd were gone 2 s later.
+   - `kill -9` on the server: clangd was gone 3 s later.
+4. **Claude Code, two parallel sessions.** I ran this command two times in parallel from `jam`:
+   `claude -p "Use the LSP tool documentSymbol on jam_terminal/buffers/jam_TerminalBuffer.h at line 1 character 1. Reply with the symbol count and the first symbol name only." --plugin-dir ~/.carol --model haiku --allowedTools LSP < /dev/null`
+   - Both replied 71 symbols, first symbol `jam`. Direct clangd gave `71 jam` for the same file.
+   - `ps` showed two clients (6743, 6752), one server (6744), and one clangd (6746) whose parent was 6744.
+5. **Not tested on macOS ARM.** I did not test an interactive session left idle for more than 30 s, followed by a new LSP call. The probe in item 2 tested the same server path.
 
 ### Remaining
 
-In order. The owner of each step is MACHINIST on that machine, unless the step says ARCHITECT. Use a cast project that has a `compile_commands.json` at its root, for example END after a build. The commands are for an MSYS2 shell on Windows and zsh on macOS.
+In order, on each of: Windows x64 (MSYS2 UCRT64), Windows ARM64 (MSYS2 CLANGARM64), macOS Intel (MacPorts). The owner is MACHINIST on that machine. Use a project that has a `compile_commands.json`, for example END after a build. The commands are for an MSYS2 shell on Windows and zsh on macOS.
 
-1. **lspmux availability.** Run the line for the machine. Record which channel gives lspmux, and its version.
-   - Windows x64: `pacman -Ss lspmux`
-   - Windows ARM64: `pacman -Ss lspmux`
-   - Fallback on Windows, when pacman has no package: `pacman -S --noconfirm ${PKG_PREFIX}-rust`, then `cargo install lspmux`. `${PKG_PREFIX}` comes from `bootstrap-windows.sh:65-80`.
-   - macOS Intel: `port search lspmux`. Fallback: `cargo install lspmux`.
-2. **Server start.** Run `lspmux server` in one terminal. In a second terminal, `lspmux status` must answer without `Connection refused`.
-3. **Argument rule.** `lspmux client --server-path clangd -- --background-index < /dev/null` must not print `unexpected argument`.
-4. **Claude Code starts `lspmux` as an LSP `command`.**
-   - Write the test plugin above to a scratch folder.
-   - Windows only: replace `"-j=5"` with the half-core value of that machine.
-   - Run two sessions at the same time from the project root:
-     `claude -p "Use the LSP tool documentSymbol on Source/Main.cpp at line 1 character 1, then hover at line 4 character 15. Reply with the symbol count and the hovered function name only." --plugin-dir <scratch> --model haiku --allowedTools LSP < /dev/null`
-   - Pass: both reply with a symbol count, and `lspmux status` shows one instance whose `path` is the project root.
-   - On Windows, record whether Claude Code starts `lspmux.exe` by name from `PATH`. This is the open Windows question of the session. A native binary needs no bash wrapper.
-5. **Process count.**
-   - macOS: `ps -axo pid,ppid,command | grep "[c]langd"`
-   - Windows: `tasklist //FI "IMAGENAME eq clangd.exe"`
-   - Pass: one clangd for the project, whose parent is the `lspmux server` process.
-6. **nvim joins.** Run the nvim test script above from the project root. Pass: `err=nil`, a symbol count, and the same instance pid in `lspmux status`. On Windows, record the `root=` value. Its path form must match the `path` that the Claude Code clients registered, or the two get separate instances.
-7. **Idle stop.** After the last client exits, wait 310 s. Then run the step-5 command. Pass: the instance's clangd is gone.
-8. **Session-exit check without lspmux.** Run one `claude -p` LSP call with `--plugin-dir ~/.carol` (the current plugin). After it exits, run the step-5 command. Pass: no clangd remains from that session. This repeats the macOS ARM result of 13:50:32.
-9. **Clean-up.** Stop the test `lspmux server`. Delete the scratch plugin folder.
-10. **Report.** Write the results of steps 1-8 for each machine into this file, under `Completed`, with command output. Then ARCHITECT decides the open questions below.
+1. **Tools.** Run `node --version` and `command -v clangd`. Pass: both print a value.
+2. **Sync.** Run `cd ~/.carol && git pull`. Pass: `bin/carol-clangd.js` exists, and `.claude-plugin/plugin.json` has `"command": "node"`.
+3. **Two parallel sessions.** From the project root, run the Completed item 4 command two times in parallel, with a header of that project. During the run, list the processes:
+   - macOS: `ps -axo pid,ppid,command | grep -E "[c]langd|[c]arol-clangd"`
+   - Windows: `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \$_.Name -in 'clangd.exe','node.exe' } | Select-Object ProcessId,ParentProcessId,CommandLine"`
+   - Pass: both replies give the same symbol count, and exactly one clangd runs, whose parent is the `carol-clangd.js server` process.
+   - On Windows, record whether Claude Code starts `node` by name. Also record whether Node starts `clangd` by name (the libuv lookup of `.exe`).
+4. **Idle kill.** Start an interactive `claude --plugin-dir ~/.carol` in the project root. Ask for one LSP `documentSymbol` call. Wait 35 s and run the step 3 process command. Pass: the server runs and no clangd runs. Ask for a second LSP call. Pass: it returns symbols.
+5. **No orphans.** With the step 4 session open after an LSP call, kill the server: `pkill -9 -f "carol-clangd.js server"` on macOS, or `taskkill //F //PID <server pid>` on Windows. Pass: no clangd remains after 5 s.
+6. **Report.** Write the results of steps 1-5 for each machine into this file, under `Completed`, with command output.
 
 ### Key Decisions
 
-- ARCHITECT: "stop it. how to prevent claude code, or any harness using and leaving unnecessary clangd usage? by protocol? with carol skill? exact instruction? exact parameterised script?"
-- ARCHITECT, on the proposal to run the session-exit, lspmux, and Windows tests first: "go"
-- ARCHITECT: "windows conformance should be written as handoff."
+- ARCHITECT: "we need more deterministic way to make it never ever bloat memory. 7GB per session is unacceptable. 2 sessions in parallel guaranteed my terminal frozen"
+- ARCHITECT: "i mean why everything must be loaded into memory for the exact same read? this is fucking garbage. it doesnt matter 3gb, 7gb, all garbage. 3gb, 4 parallel agent already 12gb instantly without guarantee those instance killed"
+- ARCHITECT, on the option list (one shared clangd per project with idle kill; one per session with idle kill; one per query): "1. timeout 30s"
+- ARCHITECT: "must be crossplatform"
+- ARCHITECT, on the plan for `bin/carol-clangd.js`, the plugin change, and this handoff: "go"
+- ARCHITECT, 2026-11-02: "windows conformance should be written as handoff."
+- ARCHITECT, on the unused lspmux 0.3.0 from Homebrew: "lspmux uninstalled."
 
 ### Files Modified
-- `/opt/homebrew` (macOS ARM) — `brew install lspmux` added lspmux 0.3.0.
-- `/Users/jreng/.config/HANDOFF-clangd-sharing.md` — this file.
-
-No file in `~/.carol` or `~/.config/nvim` changed for this subject.
+- `~/.carol/bin/carol-clangd.js` — new. The client and server modes described in Context.
+- `~/.carol/.claude-plugin/plugin.json` — `lspServers.clangd` `command` is `node`, and `args` is `["${CLAUDE_PLUGIN_ROOT}/bin/carol-clangd.js", "client"]`. The clangd arguments moved into the script's `CLANGD_ARGS`.
+- `~/.config/HANDOFF-clangd-sharing.md` — this file. It replaces the lspmux handoff of 2026-11-02.
 
 ### Open Questions
 
 Each item is ARCHITECT's decision.
 
-1. **Adopt lspmux** on all four machines, after the Remaining steps pass. If yes: add it to `bootstrap-macos.sh` (Homebrew and MacPorts branches) and `bootstrap-windows.sh` step 4, through the channel that step 1 finds. Also decide how `lspmux server` runs: `brew services start lspmux` on macOS ARM (the formula prints this command), or another service on each platform.
-2. **One clangd argument set** for nvim and the agents, so they share an instance (Completed, item 6). Which flags stay: `--clang-tidy`, `--header-insertion=never`, `--completion-style=detailed`, `--header-insertion-decorators=false`, and the `--query-driver` list?
-3. **`-j` value.** A fixed number in `plugin.json` is the same on all four machines. The half-core rule that nvim uses (`nvim/lua/lsp/clangd.lua:31`) needs a computed value, which a plugin `args` entry cannot compute. Options: one fixed number; or a launch subcommand in `~/.carol/bin/carol` (bash) that computes it. The second option depends on Remaining step 4 on Windows.
-4. **Compile database per project.** Add `--compile-commands-dir=${CLAUDE_PROJECT_DIR}` to the plugin arguments, and `--compile-commands-dir=<project root>` to nvim's arguments. Then stop writing the user-module `.clangd` (`nvim/lua/core/clangd.lua:78`), and give framework headers explicit entries in the root `compile_commands.json` copy. The flag value is part of the lspmux instance key, so it is also a sharing question.
-5. **Interactive session exit.** Test it, or rely on lspmux's idle stop alone.
+1. **nvim.** nvim still starts its own clangd (`~/.config/nvim/lua/lsp/clangd.lua`). Its arguments differ from `CLANGD_ARGS`. Should nvim connect through `carol-clangd.js client` too?
+2. **Compile database per project.** This is open from the 2026-11-02 handoff. The framework `.clangd` points at the project that nvim loaded last (`~/.config/nvim/lua/core/clangd.lua`).
 
 ### Next Steps
 
-- Trigger: ARCHITECT opens a MACHINIST session on a Windows machine, or on the macOS Intel machine, and points it at this file.
-- That session runs `Remaining` steps 1-10 on its machine, then reports.
-- When all three machines report, ARCHITECT settles `Open Questions` 1-5. MACHINIST then plans the change to `plugin.json`, `nvim/lua/lsp/clangd.lua`, `nvim/lua/core/clangd.lua`, and both bootstrap scripts.
-- Separate subject, not in this file: the nvim clean-up of `core/markdown-table.lua` with `cast --tables`. cast 0.1.0 (2a616a2) now prints `--tables` (`cast --help`).
+- Trigger: ARCHITECT opens a MACHINIST session on a Windows machine or on the macOS Intel machine, and points it at this file.
+- That session runs `Remaining` steps 1-6 on its machine.
+- Sessions that were open before the change still use the old plugin entry. Each picks up `carol-clangd.js` when it starts again.

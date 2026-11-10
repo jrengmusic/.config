@@ -13,7 +13,7 @@
 
 PREDEFINED += KUASSA_VULKAN_RUNTIME_SHADER_COMPILER=1
 PREDEFINED += JAM_VULKAN_RUNTIME_SHADER_COMPILER=1
-
+PREDEFINED += JUCE_WINDOWS=1
 #---------------------------------------------------------------------------
 # Per-lib overrides
 #---------------------------------------------------------------------------
@@ -42,3 +42,4 @@ GENERATE_TAGFILE       = tagfile.xml
 TAGFILES               = __TAGFILES__
 DOT_GRAPH_MAX_NODES    = __DOT_MAX_NODES__
 DOT_NUM_THREADS        = __DOT_NUM_THREADS__
+
