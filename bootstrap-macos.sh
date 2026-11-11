@@ -104,6 +104,8 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         stylua
         pyright
         cmake-language-server
+        doxygen
+        graphviz
     )
     CLANGD_TARGET="/opt/homebrew/opt/llvm/bin/clangd"
 else
@@ -133,6 +135,8 @@ else
         stylua
         pyright
         cmake-language-server
+        doxygen
+        graphviz
     )
     CLANGD_TARGET="/opt/local/libexec/llvm-${LLVM_PORT_VERSION}/bin/clangd"
 fi

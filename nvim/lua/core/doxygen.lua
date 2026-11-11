@@ -134,15 +134,31 @@ local function relpath(from_dir, to_dir)
   return table.concat(parts, '/')
 end
 
--- Reads TEMPLATE_JUCE, substitutes __DOT_NUM_THREADS__, writes to a temp file.
--- Returns temp path. JUCE runs from juce.doxy_dir so @INCLUDE = Doxyfile
--- resolves correctly.
-local function make_juce_doxyfile()
+-- Tag line that doxygen 1.18 reports obsolete. Its value is the default, so
+-- dropping the line changes no setting on any doxygen version.
+local OBSOLETE_TAG_LINE = '\nDOT_MULTI_TARGETS[^\n]*'
+
+-- Text of JUCE's own Doxyfile without the obsolete tag line. The JUCE
+-- checkout stays untouched.
+local function get_juce_doxyfile_text(juce)
+  local jf = io.open(juce.doxyfile, 'r')
+  assert(jf, '[doxygen] Missing JUCE Doxyfile: ' .. juce.doxyfile)
+  local content = jf:read('*a')
+  jf:close()
+  return (content:gsub(OBSOLETE_TAG_LINE, ''))
+end
+
+-- Reads TEMPLATE_JUCE, substitutes __DOT_NUM_THREADS__ and __JUCE_DOXYFILE__,
+-- writes to a temp file. Returns temp path. JUCE runs from juce.doxy_dir so the
+-- relative paths in JUCE's Doxyfile resolve correctly.
+local function make_juce_doxyfile(juce)
   local tf = io.open(TEMPLATE_JUCE, 'r')
   assert(tf, '[doxygen] Missing template: ' .. TEMPLATE_JUCE)
   local content = tf:read('*a')
   tf:close()
   content = content:gsub('__DOT_NUM_THREADS__', tostring(dot_num_threads()))
+  local juce_text = get_juce_doxyfile_text(juce)
+  content = content:gsub('__JUCE_DOXYFILE__', function() return juce_text end)
   local tmp = vim.fn.tempname()
   local out = io.open(tmp, 'w')
   assert(out, '[doxygen] Cannot write temp Doxyfile')
@@ -163,7 +179,6 @@ local function make_lib_doxyfile(juce, lib_root, name, brief)
 
   local juce_rel = relpath(lib_root .. '/docs', juce.root)
 
-  content = content:gsub('__JUCE_DOXYFILE__', juce.doxyfile)
   content = content:gsub('__PROJECT_NAME__',  name)
   content = content:gsub('__PROJECT_BRIEF__', brief)
   content = content:gsub('__INPUT__',         lib_root)
@@ -171,6 +186,8 @@ local function make_lib_doxyfile(juce, lib_root, name, brief)
   content = content:gsub('__DOT_MAX_NODES__',    tostring(DOT_MAX_NODES))
   content = content:gsub('__DOT_NUM_THREADS__',  tostring(dot_num_threads()))
   content = content:gsub('__EXCLUDE_PATTERNS__', format_exclude_patterns())
+  local juce_text = get_juce_doxyfile_text(juce)
+  content = content:gsub('__JUCE_DOXYFILE__', function() return juce_text end)
 
   local tmp = vim.fn.tempname()
   local out = io.open(tmp, 'w')
@@ -333,7 +350,7 @@ function M.build(root)
     root = normalize_path(project.manifest.root)
     local lib_root = M.detect_lib_root(root)
     local juce     = get_juce(project)
-    local juce_tmp = make_juce_doxyfile()
+    local juce_tmp = make_juce_doxyfile(juce)
     local lib_tmp  = make_lib_doxyfile_for(juce, lib_root)
     local proj_tmp = make_project_doxyfile(juce, lib_root, root)
     local proj_dir = ensure_project_docs_dir(root)
@@ -366,7 +383,7 @@ local function build_stale(project)
   if juce_stale or lib_stale or proj_stale then
     run_in_terminal(
       juce,
-      juce_stale and make_juce_doxyfile() or nil,
+      juce_stale and make_juce_doxyfile(juce) or nil,
       lib_stale  and make_lib_doxyfile_for(juce, lib_root) or nil,
       lib_stale  and lib_root or '',
       proj_stale and make_project_doxyfile(juce, lib_root, root) or nil,

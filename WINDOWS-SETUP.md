@@ -141,6 +141,7 @@ Via `pacman` (prefix is `mingw-w64-x86_64-` on x64, `mingw-w64-clang-aarch64-` o
 - `<prefix>-python`, `<prefix>-python-pip`, `<prefix>-python-pipx`
 - `<prefix>-eza`, `<prefix>-fzf`, `<prefix>-bat`, `<prefix>-gcc`
 - `<prefix>-fd`, `<prefix>-ripgrep`, `<prefix>-jq`
+- `<prefix>-doxygen`, `<prefix>-graphviz` (`dot` for the JUCE inheritance graphs)
 
 ### 4b. Bun
 

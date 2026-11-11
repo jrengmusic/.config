@@ -1,6 +1,6 @@
 # Doxyfile.lib — JRENG framework library template
 # Generated per-lib by doxygen.lua — do not run directly.
-# Ground of truth: JUCE/docs/doxygen/Doxyfile (inherited via @INCLUDE).
+# Ground of truth: JUCE/docs/doxygen/Doxyfile (inlined below by doxygen.lua).
 # Run from: {lib}/docs/   (OUTPUT_DIRECTORY blank → cwd)
 # Output:   {lib}/docs/html/  {lib}/docs/xml/  {lib}/docs/tagfile.xml
 #           {lib}/DOCS.html   (root redirect, written by build-doxygen.sh)
@@ -9,7 +9,7 @@
 #   JUCE_DOXYFILE, PROJECT_NAME, PROJECT_BRIEF
 #   INPUT, TAGFILES, DOT_MAX_NODES, DOT_NUM_THREADS, EXCLUDE_PATTERNS
 
-@INCLUDE = __JUCE_DOXYFILE__
+__JUCE_DOXYFILE__
 
 PREDEFINED += KUASSA_VULKAN_RUNTIME_SHADER_COMPILER=1
 PREDEFINED += JAM_VULKAN_RUNTIME_SHADER_COMPILER=1
