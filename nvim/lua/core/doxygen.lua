@@ -4,8 +4,8 @@
 -- All lib docs built from unified ~/.config/nvim/doxygen/Doxyfile.lib template.
 -- Output: {lib}/docs/html/, {lib}/docs/xml/, {lib}/DOCS.html (root redirect)
 --
--- leader bd  → build_clean  (always rebuild all, manual)
--- build_incremental (rebuild only stale) is triggered by the debounced
+-- leader bd  → build  (always rebuild all, HTML + XML, manual)
+-- build_incremental (rebuild only stale, XML only) is triggered by the debounced
 -- source-tree watcher in core/autocommands.lua, not by any keymap.
 local M = {}
 
@@ -148,15 +148,25 @@ local function get_juce_doxyfile_text(juce)
   return (content:gsub(OBSOLETE_TAG_LINE, ''))
 end
 
--- Reads TEMPLATE_JUCE, substitutes __DOT_NUM_THREADS__ and __JUCE_DOXYFILE__,
--- writes to a temp file. Returns temp path. JUCE runs from juce.doxy_dir so the
--- relative paths in JUCE's Doxyfile resolve correctly.
-local function make_juce_doxyfile(juce)
+-- The two output sets a JUCE or library build runs. The XML is byte-identical
+-- in both; the full set adds the HTML pages and the dot graphs they embed.
+local OUTPUTS = {
+  full = { generate_html = 'YES', have_dot = 'YES' },
+  xml  = { generate_html = 'NO',  have_dot = 'NO' },
+}
+
+-- Reads TEMPLATE_JUCE, substitutes __DOT_NUM_THREADS__, __GENERATE_HTML__,
+-- __HAVE_DOT__ and __JUCE_DOXYFILE__, writes to a temp file. Returns temp path.
+-- JUCE runs from juce.doxy_dir so the relative paths in JUCE's Doxyfile resolve
+-- correctly.
+local function make_juce_doxyfile(juce, output)
   local tf = io.open(TEMPLATE_JUCE, 'r')
   assert(tf, '[doxygen] Missing template: ' .. TEMPLATE_JUCE)
   local content = tf:read('*a')
   tf:close()
   content = content:gsub('__DOT_NUM_THREADS__', tostring(dot_num_threads()))
+  content = content:gsub('__GENERATE_HTML__',   output.generate_html)
+  content = content:gsub('__HAVE_DOT__',        output.have_dot)
   local juce_text = get_juce_doxyfile_text(juce)
   content = content:gsub('__JUCE_DOXYFILE__', function() return juce_text end)
   local tmp = vim.fn.tempname()
@@ -171,7 +181,7 @@ end
 -- TAGFILES path: relative from {lib}/docs/ (cwd) to the JUCE root, computed via relpath().
 -- HTML-side gets one extra '..': generated HTML pages live in {lib}/docs/html/, one level
 -- deeper than cwd, so doxygen resolves that half relative to the html/ output dir.
-local function make_lib_doxyfile(juce, lib_root, name, brief)
+local function make_lib_doxyfile(juce, lib_root, name, brief, output)
   local tf = io.open(TEMPLATE_LIB, 'r')
   assert(tf, '[doxygen] Missing template: ' .. TEMPLATE_LIB)
   local content = tf:read('*a')
@@ -186,6 +196,8 @@ local function make_lib_doxyfile(juce, lib_root, name, brief)
   content = content:gsub('__DOT_MAX_NODES__',    tostring(DOT_MAX_NODES))
   content = content:gsub('__DOT_NUM_THREADS__',  tostring(dot_num_threads()))
   content = content:gsub('__EXCLUDE_PATTERNS__', format_exclude_patterns())
+  content = content:gsub('__GENERATE_HTML__',    output.generate_html)
+  content = content:gsub('__HAVE_DOT__',         output.have_dot)
   local juce_text = get_juce_doxyfile_text(juce)
   content = content:gsub('__JUCE_DOXYFILE__', function() return juce_text end)
 
@@ -204,10 +216,10 @@ local LIB_IDENTITY = {
   ___cium___ = { name = 'CIUM',   brief = 'CIUM v1.0' },
 }
 
-local function make_lib_doxyfile_for(juce, lib_root)
+local function make_lib_doxyfile_for(juce, lib_root, output)
   local tail = vim.fn.fnamemodify(lib_root, ':t')
   local identity = LIB_IDENTITY[tail] or { name = tail, brief = tail }
-  return make_lib_doxyfile(juce, lib_root, identity.name, identity.brief)
+  return make_lib_doxyfile(juce, lib_root, identity.name, identity.brief, output)
 end
 
 -- Reads TEMPLATE_PROJECT, substitutes __INPUT__ and __TAGFILES__, writes to a temp file. Returns temp path.
@@ -350,8 +362,8 @@ function M.build(root)
     root = normalize_path(project.manifest.root)
     local lib_root = M.detect_lib_root(root)
     local juce     = get_juce(project)
-    local juce_tmp = make_juce_doxyfile(juce)
-    local lib_tmp  = make_lib_doxyfile_for(juce, lib_root)
+    local juce_tmp = make_juce_doxyfile(juce, OUTPUTS.full)
+    local lib_tmp  = make_lib_doxyfile_for(juce, lib_root, OUTPUTS.full)
     local proj_tmp = make_project_doxyfile(juce, lib_root, root)
     local proj_dir = ensure_project_docs_dir(root)
     run_in_terminal(juce, juce_tmp, lib_tmp, lib_root, proj_tmp, proj_dir)
@@ -370,8 +382,9 @@ function M.get_watch_dirs(root)
   return { get_juce(project).modules, M.detect_lib_root(root), normalize_path(project.manifest.root) .. '/Source' }
 end
 
--- Rebuild only what is stale. Called by the doxygen source-tree watcher
--- (core/autocommands.lua), debounced — not tied to binary build completion.
+-- Rebuild only what is stale, XML only (the XML is what agents read). Called by
+-- the doxygen source-tree watcher (core/autocommands.lua), debounced — not tied
+-- to binary build completion. The HTML pages refresh on the full build.
 local function build_stale(project)
   local root = normalize_path(project.manifest.root)
   local lib_root = M.detect_lib_root(root)
@@ -383,8 +396,8 @@ local function build_stale(project)
   if juce_stale or lib_stale or proj_stale then
     run_in_terminal(
       juce,
-      juce_stale and make_juce_doxyfile(juce) or nil,
-      lib_stale  and make_lib_doxyfile_for(juce, lib_root) or nil,
+      juce_stale and make_juce_doxyfile(juce, OUTPUTS.xml) or nil,
+      lib_stale  and make_lib_doxyfile_for(juce, lib_root, OUTPUTS.xml) or nil,
       lib_stale  and lib_root or '',
       proj_stale and make_project_doxyfile(juce, lib_root, root) or nil,
       proj_stale and ensure_project_docs_dir(root) or nil

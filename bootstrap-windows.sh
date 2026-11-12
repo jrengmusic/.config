@@ -288,9 +288,9 @@ fi
 
 PACMAN_PKGS=(
     zsh
-    git
     unzip
     zip
+    "${PKG_PREFIX}-git"
     "${PKG_PREFIX}-git-lfs"
     "${PKG_PREFIX}-go"
     "${PKG_PREFIX}-nodejs"

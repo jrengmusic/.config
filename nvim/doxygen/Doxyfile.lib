@@ -7,7 +7,8 @@
 #
 # Substitution markers (applied by doxygen.lua):
 #   JUCE_DOXYFILE, PROJECT_NAME, PROJECT_BRIEF
-#   INPUT, TAGFILES, DOT_MAX_NODES, DOT_NUM_THREADS, EXCLUDE_PATTERNS
+#   INPUT, TAGFILES, DOT_MAX_NODES, DOT_NUM_THREADS, EXCLUDE_PATTERNS,
+#   GENERATE_HTML, HAVE_DOT
 
 __JUCE_DOXYFILE__
 
@@ -28,7 +29,8 @@ STRIP_FROM_PATH        = __INPUT__
 FILE_PATTERNS          = *.h *.mm
 RECURSIVE              = YES
 EXCLUDE_PATTERNS       = __EXCLUDE_PATTERNS__
-GENERATE_HTML          = YES
+GENERATE_HTML          = __GENERATE_HTML__
+HAVE_DOT               = __HAVE_DOT__
 HTML_OUTPUT            = html
 HTML_HEADER            =
 HTML_FOOTER            =

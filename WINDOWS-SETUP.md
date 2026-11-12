@@ -134,8 +134,8 @@ Also sets `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled` = 
 ### 4. MSYS2 Packages
 
 Via `pacman` (prefix is `mingw-w64-x86_64-` on x64, `mingw-w64-clang-aarch64-` on ARM64):
-- `zsh`, `git`, `unzip`
-- `<prefix>-git-lfs`
+- `zsh`, `unzip`, `zip` (msys only, no UCRT or ARM64 build)
+- `<prefix>-git`, `<prefix>-git-lfs`
 - `<prefix>-go`
 - `<prefix>-nodejs` (includes npm)
 - `<prefix>-python`, `<prefix>-python-pip`, `<prefix>-python-pipx`
