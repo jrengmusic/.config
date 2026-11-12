@@ -70,7 +70,6 @@ case "$MSYSTEM" in
         NSIS_PKG="mingw-w64-x86_64-nsis"   # no clang-aarch64 build; x64 package runs under emulation
         NSIS_WIN_DIR="mingw64"
         BUN_ARCH="windows-aarch64"
-        OMP_ARCH="arm64"
         ZOXIDE_PATTERN="aarch64-pc-windows-msvc"
         WHATDBG_ASSET="whatdbg-win-arm64"
         ;;
@@ -84,7 +83,6 @@ case "$MSYSTEM" in
         NSIS_PKG="${PKG_PREFIX}-nsis"
         NSIS_WIN_DIR="ucrt64"
         BUN_ARCH="windows-x64"
-        OMP_ARCH="amd64"
         ZOXIDE_PATTERN="x86_64-pc-windows-msvc"
         WHATDBG_ASSET="whatdbg-win-x64"
         ;;
@@ -388,21 +386,11 @@ else
 fi
 
 # ============================================================================
-# 5. Download standalone tools (oh-my-posh, zoxide)
+# 5. Download standalone tools (zoxide)
 # ============================================================================
 step "5. Standalone tools"
 
 mkdir -p "$WINDOWS_HOME/.local/bin"
-
-# oh-my-posh
-if [[ -f "$WINDOWS_HOME/.local/bin/oh-my-posh.exe" ]]; then
-    info "oh-my-posh already installed"
-else
-    warn "Downloading oh-my-posh ($OMP_ARCH)..."
-    curl -fsSL "https://github.com/JanDeDobbeleer/oh-my-posh/releases/latest/download/posh-windows-${OMP_ARCH}.exe" \
-        -o "$WINDOWS_HOME/.local/bin/oh-my-posh.exe"
-    info "oh-my-posh installed"
-fi
 
 # whatdbg (DAP adapter — dbgeng-based, reads PDB natively)
 if [[ -f "$WINDOWS_HOME/.local/bin/whatdbg.exe" ]]; then
@@ -684,6 +672,7 @@ The following should be installed via winget or manually:
   winget install Neovim.Neovim
   winget install GoLang.Go
   winget install oven-sh.Bun
+  winget install JanDeDobbeleer.OhMyPosh
   winget install Git.Git
   winget install aristocratos.btop4win    # x64-only, runs under emulation on ARM64
   winget install Microsoft.VisualStudio.2022.Community
@@ -729,7 +718,7 @@ Key paths:
   Config repo:    ~/.config/
   nvim config:    ~/AppData/Local/nvim → ~/.config/nvim
   Build:          cast toolchain (~/.local/bin/cast, driven by nvim <leader>b*)
-  CLI tools:      ~/.local/bin/ (oh-my-posh, zoxide, carol, END)
+  CLI tools:      ~/.local/bin/ (zoxide, carol, END)
   Carol:          ~/.carol/bin/carol
   Claude Code:    npm global (@anthropic-ai/claude-code)
   MSYS2 toolchain: ${MINGW_DIR}/bin/

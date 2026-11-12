@@ -58,7 +58,7 @@ Install these manually before running the setup script:
 3. **Neovim** — `winget install Neovim.Neovim`
 4. **btop4win** — `winget install aristocratos.btop4win` (x64-only, runs under emulation on ARM64)
 
-Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, jq, zoxide, oh-my-posh, clangd, pyright, cmake-language-server, lua-language-server, stylua) is installed by the setup script.
+Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, jq, zoxide, clangd, pyright, cmake-language-server, lua-language-server, stylua) is installed by the setup script.
 
 > **ARM64 note:** `uname -m` always returns `x86_64` in every MSYS2 environment — the MSYS2 runtime is an x64 binary running under Windows x64 emulation ([msys2-runtime#171](https://github.com/msys2/msys2-runtime/issues/171)). `PROCESSOR_ARCHITECTURE` is also unreliable: Windows reports `AMD64` for x64 bash processes even on ARM64 hardware ([MSYS2-packages#4960](https://github.com/msys2/MSYS2-packages/issues/4960)).
 >
