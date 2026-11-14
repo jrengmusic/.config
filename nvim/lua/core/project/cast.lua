@@ -20,7 +20,7 @@ local COMPILE_DATABASE = 'compile_commands.json'
 local TABLES_FLAG = '--tables'
 local DEFAULT_ARGUMENT = 'default'
 local DEBUGGER = 'whatdbg'
-local BENCHMARK_DIRECTORY = 'benchmark'
+local PROFILE_MANIFEST = 'profile-info.md'
 
 -- The manifest contract: every table and every ## cmake key the AST is
 -- built from. A manifest missing any of them is not a project.
@@ -146,22 +146,16 @@ local function getConfigurations(root, toolchain)
   return configurations
 end
 
-local function getBenchmarkConfigurations(root, benchmarkFiles)
+-- The profile lanes: the ## toolchain table of profile-info.md, keyed by
+-- argument like the manifest's own lanes. Its rows run at the project root.
+local function getProfileConfigurations(root, profileFiles)
   local configurations = {}
-  local benchmarkManifests = {}
-  for _, file in ipairs(benchmarkFiles) do
-    local key = vim.fn.fnamemodify(file.file, ':t:r')
+  for _, file in ipairs(profileFiles) do
     for _, parsedTable in ipairs(file.tables) do
-      if parsedTable.name:lower() == 'toolchain' then
-        for _, record in ipairs(parsedTable.rows) do
-          local configuration = getConfiguration(root, record)
-          if configuration then configurations[key] = configuration end
-        end
-      end
+      if parsedTable.name:lower() == 'toolchain' then configurations = getConfigurations(root, parsedTable) end
     end
-    if configurations[key] then benchmarkManifests[#benchmarkManifests + 1] = file.file end
   end
-  return configurations, benchmarkManifests
+  return configurations
 end
 
 local function getLayouts(cmake, formats)
@@ -284,19 +278,19 @@ local function getCompile(configurations)
   return compile
 end
 
--- Every file the AST was built from, once each: the manifest, each
--- benchmark manifest, and each distinct compile database -- the
--- configurations' first, then the benchmarks' (configurations may share a
--- build directory).
-local function getSources(manifest, configurations, benchmarkManifests, benchmarkConfigurations)
+-- Every file the AST was built from, once each: the manifest, the profile
+-- manifest, and each distinct compile database -- the configurations'
+-- first, then the profile lanes' (configurations may share a build
+-- directory).
+local function getSources(manifest, configurations, profileManifests, profileConfigurations)
   local sources, seen = { manifest }, { [manifest] = true }
-  for _, path in ipairs(benchmarkManifests) do
+  for _, path in ipairs(profileManifests) do
     if not seen[path] then
       seen[path] = true
       sources[#sources + 1] = path
     end
   end
-  for _, declared in ipairs({ configurations, benchmarkConfigurations }) do
+  for _, declared in ipairs({ configurations, profileConfigurations }) do
     local keys = vim.tbl_keys(declared)
     table.sort(keys)
     for _, key in ipairs(keys) do
@@ -345,9 +339,9 @@ end
 
 function M.build(root, selection)
   local manifest = root .. '/' .. MANIFEST
-  local benchmarkPaths = vim.fn.glob(root .. '/' .. BENCHMARK_DIRECTORY .. '/*.md', false, true)
-  table.sort(benchmarkPaths)
-  local files, failure = getFiles(vim.list_extend({ manifest }, benchmarkPaths))
+  local profileManifest = root .. '/' .. PROFILE_MANIFEST
+  local profileManifests = vim.fn.filereadable(profileManifest) == 1 and { profileManifest } or {}
+  local files, failure = getFiles(vim.list_extend({ manifest }, profileManifests))
   if not files then return nil, failure end
   local byHeading, tablesFailure = getTablesByHeading(table.remove(files, 1))
   if not byHeading then return nil, tablesFailure end
@@ -360,11 +354,11 @@ function M.build(root, selection)
   local configurations = getConfigurations(root, byHeading['toolchain'])
   local targets = getTargets(cmake, byHeading['plugin format'], configurations)
   local compile = getCompile(configurations)
-  local benchmarkConfigurations, benchmarkManifests = getBenchmarkConfigurations(root, files)
-  local benchmarkCompile = getCompile(benchmarkConfigurations)
+  local profileConfigurations = getProfileConfigurations(root, files)
+  local profileCompile = getCompile(profileConfigurations)
 
   return {
-    sources = getSources(manifest, configurations, benchmarkManifests, benchmarkConfigurations),
+    sources = getSources(manifest, configurations, profileManifests, profileConfigurations),
     manifest = { root = root, name = info.projectName, version = info.versionString, id = cmake.bundleIdentifier },
     toolchain = { name = 'cast', manifest = M.TOOLCHAIN_MANIFEST },
     dependencies = {
@@ -375,7 +369,7 @@ function M.build(root, selection)
     targets = targets,
     launch = getLaunch(targets),
     compile = compile,
-    benchmarkCompile = benchmarkCompile,
+    profileCompile = profileCompile,
     selection = selection,
   }
 end

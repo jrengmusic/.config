@@ -64,8 +64,10 @@
   },
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "showTurnDuration": false,
+  "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true
 }
