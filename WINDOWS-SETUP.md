@@ -54,11 +54,11 @@ Install these manually before running the setup script:
 1. **MSYS2** — https://www.msys2.org/ (install to `C:\msys64`)
    - On ARM64 Windows (UTM on Apple Silicon): install MSYS2 ARM64, then launch via **CLANGARM64** shortcut
    - On x64 Windows: install MSYS2 x64, launch via **UCRT64** shortcut
-2. **Visual Studio 2022+** — with the "Desktop development with C++" workload AND the "C++ Clang tools for Windows" optional component (provides `clang-cl.exe`/`llvm-rc.exe` plus the MSVC STL/SDK they consume — `bootstrap-windows.sh` step 3 points `CC`/`CXX`/`RC` at these; no standalone LLVM for the build)
+2. **Visual Studio 2026 (v18)** — with the "Desktop development with C++" workload AND the "C++ Clang tools for Windows" optional component (provides `clang-cl.exe`/`llvm-rc.exe`/`clangd.exe` plus the MSVC STL/SDK they consume — `bootstrap-windows.sh` step 3 points `CC`/`CXX`/`RC` at these; no standalone LLVM for the build)
 3. **Neovim** — `winget install Neovim.Neovim`
 4. **btop4win** — `winget install aristocratos.btop4win` (x64-only, runs under emulation on ARM64)
 
-Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, jq, zoxide, clangd, pyright, cmake-language-server, lua-language-server, stylua) is installed by the setup script.
+Everything else (git, go, node, npm, bun, python, cmake, ninja, eza, fzf, bat, jq, zoxide, pyright, cmake-language-server, lua-language-server, stylua) is installed by the setup script.
 
 > **ARM64 note:** `uname -m` always returns `x86_64` in every MSYS2 environment — the MSYS2 runtime is an x64 binary running under Windows x64 emulation ([msys2-runtime#171](https://github.com/msys2/msys2-runtime/issues/171)). `PROCESSOR_ARCHITECTURE` is also unreliable: Windows reports `AMD64` for x64 bash processes even on ARM64 hardware ([MSYS2-packages#4960](https://github.com/msys2/MSYS2-packages/issues/4960)).
 >
@@ -87,7 +87,7 @@ bash /c/Users/$(whoami)/.config/bootstrap.sh
 Then restart MSYS2.
 
 Notes:
-- LSP servers: clangd and pyright from MSYS2, cmake-language-server from pipx, lua-language-server and stylua from GitHub releases. No Mason.
+- LSP servers: clangd from the VS Llvm folder (beside clang-cl), pyright from MSYS2, cmake-language-server from pipx, lua-language-server and stylua from GitHub releases. No Mason.
 - The DAP adapter is whatdbg, installed by bootstrap.sh to `~/.local/bin/whatdbg.exe`.
 
 ## What the Setup Script Does
@@ -214,8 +214,8 @@ The build is the cast toolchain on every platform: `cast cast/spell.md --debug` 
 
 | | macOS | Windows |
 |---|---|---|
-| Binary | `~/.local/bin/clangd` → brew `llvm` (ARM) or MacPorts `clang-23` (Intel) | MSYS2 `clang-tools-extra` (`${MINGW_DIR}/bin/clangd.exe`) |
-| `--query-driver` | `/usr/bin/c++,/usr/bin/clang++` | `/ucrt64/bin/g++` |
+| Binary | `~/.local/bin/clangd` → `/usr/bin/clangd` (the `xcrun` shim of `/usr/bin/c++`) | VS Llvm folder (`$LLVM_BIN_DIR\clangd.exe`, beside `clang-cl.exe`, on user PATH) |
+| `--query-driver` | `/usr/bin/c++,/usr/bin/clang++` | none |
 
 nvim and Claude Code both start `clangd` from PATH: one binary, one index per machine.
 
@@ -326,7 +326,7 @@ Terminal behavior on build:
 The build is using GCC instead of clang-cl: `CC`/`CXX`/`RC` are not set, or MSYS2's `gcc` PATH entry precedes them. Re-run `bootstrap-windows.sh` (step 3 sets `CC`/`CXX`/`RC` via vswhere; needs Visual Studio with the C++ Clang tools installed) and restart the shell.
 
 ### clangd not starting
-Run `which -a clangd` in the MSYS2 shell. The first hit is the clangd nvim and Claude Code start. If it is missing, re-run `bootstrap-windows.sh` (step 4 installs `${PKG_PREFIX}-clang-tools-extra`).
+Run `which -a clangd` in the MSYS2 shell. The first hit is the clangd nvim and Claude Code start. If it is missing, re-run `bootstrap-windows.sh` (step 3 puts the VS Llvm folder on user PATH; step 4 removes `${PKG_PREFIX}-clang-tools-extra`, which would win on PATH).
 
 ### "Host not running" error on `leader br`
 The host hasn't started within the attach delay (`LAUNCH_DELAY_MS` in `core/build.lua`). Either increase the delay or launch the host manually before running `leader br`.

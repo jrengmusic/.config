@@ -24,12 +24,8 @@ end
     clangd = {
       root_dir = clangdRootDir,
       cmd = (function()
-        local is_windows = vim.fn.has('win32') == 1
-        local query_driver = is_windows
-          and '--query-driver=/ucrt64/bin/g++'
-          or '--query-driver=/usr/bin/c++,/usr/bin/clang++'
         local index_jobs = math.max(1, math.floor(vim.uv.available_parallelism() / 2))
-        return {
+        local arguments = {
           'clangd',
           '--log=error',
           '--background-index',
@@ -45,8 +41,14 @@ end
           '--clang-tidy',
           '--completion-style=detailed',
           '--header-insertion-decorators=false',
-          query_driver,
         }
+
+        -- clang-cl on Windows is not a gcc-compatible driver, so only macOS queries one.
+        if vim.fn.has('mac') == 1 then
+          table.insert(arguments, '--query-driver=/usr/bin/c++,/usr/bin/clang++')
+        end
+
+        return arguments
       end)(),
     },
       lua_ls = {

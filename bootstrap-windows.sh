@@ -263,6 +263,7 @@ if [[ -f "$VSWHERE" ]]; then
             set_win_env "RC" "$LLVM_BIN_DIR\\llvm-rc.exe"
             add_to_user_path "$VS_INSTALL_PATH\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
             add_to_user_path "$VS_INSTALL_PATH\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+            add_to_user_path "$LLVM_BIN_DIR"
         else
             warn "clang-cl.exe not found at $LLVM_BIN_DIR — CC/CXX/RC not set. Install the \"C++ Clang tools for Windows\" VS component. If this VS layout doesn't use a $LLVM_ARCH_DIR subfolder, update LLVM_ARCH_DIR in bootstrap-windows.sh."
         fi
@@ -300,7 +301,6 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-python"
     "${PKG_PREFIX}-python-pip"   # required by pipx
     "${PKG_PREFIX}-python-pipx"  # installs cmake-language-server (step 4d)
-    "${PKG_PREFIX}-clang-tools-extra"  # clangd for nvim and Claude Code
     "${PKG_PREFIX}-pyright"
     "${PKG_PREFIX}-fd"           # snacks.nvim file finder (find is disabled on Windows by snacks)
     "${PKG_PREFIX}-ripgrep"      # snacks.nvim grep search (<leader>fg)
@@ -318,6 +318,14 @@ for pkg in "${PACMAN_PKGS[@]}"; do
         pacman -S --noconfirm "$pkg"
     fi
 done
+
+# clangd comes from the VS Llvm folder (step 3), the folder of the build compiler.
+# The MSYS2 package would win on PATH, so it is removed.
+SUPERSEDED_CLANGD_PKG="${PKG_PREFIX}-clang-tools-extra"
+if pacman -Q "$SUPERSEDED_CLANGD_PKG" &>/dev/null; then
+    warn "Removing: $SUPERSEDED_CLANGD_PKG"
+    pacman -R --noconfirm "$SUPERSEDED_CLANGD_PKG"
+fi
 
 # ============================================================================
 # 4b. bun (not in MSYS2 repos)
@@ -534,7 +542,8 @@ info "XDG_CONFIG_HOME is set → nvim uses ~/.config/nvim directly"
 step "9. Neovim LSP tools"
 
 echo "Notes:"
-echo "  - clangd, pyright: MSYS2 (step 4) — ${MINGW_DIR}/bin, shared by nvim and Claude Code"
+echo "  - clangd: VS Llvm folder (step 3), the folder of clang-cl — shared by nvim and Claude Code"
+echo "  - pyright: MSYS2 (step 4) — ${MINGW_DIR}/bin"
 echo "  - cmake-language-server: pipx (step 4d)"
 echo "  - stylua, lua-language-server: GitHub releases (step 5)"
 echo "  - DAP adapter: whatdbg on both platforms"
@@ -675,12 +684,14 @@ The following should be installed via winget or manually:
   winget install JanDeDobbeleer.OhMyPosh
   winget install Git.Git
   winget install aristocratos.btop4win    # x64-only, runs under emulation on ARM64
-  winget install Microsoft.VisualStudio.2022.Community
+  winget install Microsoft.VisualStudio.Community
     (with "Desktop development with C++" workload)
 
 Visual Studio provides:
   - clang-cl.exe + llvm-rc.exe: the compiler and resource compiler (step 3
     points CC/CXX/RC at these; they locate the MSVC STL/SDK themselves)
+  - clangd.exe: the language server of the same Llvm folder (step 3 puts the
+    folder on user PATH)
   - cmake + ninja: bundled with VS, used by the cast toolchain and build.bat
   - JUCE rejects MinGW, so the VS-provided C++ workload is required
 

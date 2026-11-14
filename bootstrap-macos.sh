@@ -99,7 +99,6 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         ninja
         ccache
         btop
-        llvm
         lua-language-server
         stylua
         pyright
@@ -107,9 +106,7 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         doxygen
         graphviz
     )
-    CLANGD_TARGET="/opt/homebrew/opt/llvm/bin/clangd"
 else
-    LLVM_PORT_VERSION="23"
     PACKAGES=(
         git
         git-lfs
@@ -130,7 +127,6 @@ else
         ninja
         ccache
         btop
-        "clang-${LLVM_PORT_VERSION}"
         lua-language-server
         stylua
         pyright
@@ -138,8 +134,10 @@ else
         doxygen
         graphviz
     )
-    CLANGD_TARGET="/opt/local/libexec/llvm-${LLVM_PORT_VERSION}/bin/clangd"
 fi
+
+# The xcrun shim that /usr/bin/c++ also uses: clangd and the build compiler follow xcode-select together.
+CLANGD_TARGET="/usr/bin/clangd"
 
 for pkg in "${PACKAGES[@]}"; do
     printf "  checking %s... " "$pkg"
@@ -351,11 +349,13 @@ info "nvim uses XDG_CONFIG_HOME (~/.config/nvim) by default on macOS"
 
 mkdir -p "$HOME/.local/bin"
 link_dotfile "$CLANGD_TARGET" "$HOME/.local/bin/clangd"
+link_dotfile "$(xcrun --find clang-format)" "$HOME/.local/bin/clang-format"
 
 echo ""
 echo "Notes:"
 echo "  - LSP servers and stylua come from the package manager (step 2)"
 echo "  - clangd: ~/.local/bin/clangd → $CLANGD_TARGET (shared by nvim and Claude Code)"
+echo "  - clang-format: ~/.local/bin/clang-format → the Xcode toolchain (xcrun --find)"
 echo "  - DAP adapter: whatdbg (~/.local/bin/whatdbg)"
 
 # ============================================================================
