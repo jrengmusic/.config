@@ -307,6 +307,7 @@ PACMAN_PKGS=(
     "${PKG_PREFIX}-jq"           # JSON processor (used by carol for settings.json merge)
     "${PKG_PREFIX}-doxygen"      # build-doxygen.sh
     "${PKG_PREFIX}-graphviz"     # dot: JUCE Doxyfile sets HAVE_DOT = YES
+    "${PKG_PREFIX}-diffutils"    # diff, cmp, diff3, sdiff
     "$NSIS_PKG"                  # makensis
 )
 
