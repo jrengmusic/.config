@@ -45,12 +45,14 @@
     "type": "command",
     "command": "~/.carol/bin/carol-statusline.sh"
   },
-  "enabledPlugins": {},
+  "enabledPlugins": {
+    "lua-lsp@claude-plugins-official": true
+  },
   "outputStyle": "CAROL",
   "effortLevel": "medium",
   "modelSettings": {
     "claude-opus-5-5": {
-      "effortLevel": "high"
+      "effortLevel": "medium"
     },
     "claude-fable-5-2": {
       "effortLevel": "medium"
@@ -66,6 +68,7 @@
   "awaySummaryEnabled": false,
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
+  "switchModelsOnFlag": false,
   "showTurnDuration": false,
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,

@@ -225,6 +225,13 @@ else
     info "Enabled: LongPathsEnabled"
 fi
 
+# Windows sudo runs in this console. The default (forceNewWindow) opens a new
+# window per call, and pacman needs input for its confirm prompt.
+if [[ -f /c/Windows/System32/sudo.exe ]]; then
+    sudo.exe config --enable normal
+    info "Set: sudo mode normal (inline)"
+fi
+
 # cast toolchain (clang-cl) — Visual Studio provides clang-cl.exe/llvm-rc.exe
 # directly; no vcvarsall.bat activation needed (RFC.md, cast repo: byte-identical
 # builds from an activated vs. bare shell). VC/Tools/Llvm carries distinct

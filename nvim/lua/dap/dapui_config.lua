@@ -97,6 +97,17 @@ function M.setup()
     end
   end
 
+  vim.api.nvim_create_autocmd('TermClose', {
+    group = vim.api.nvim_create_augroup('dap-terminal-delete', { clear = true }),
+    callback = function(event)
+      if vim.b[event.buf]['dap-type'] ~= nil then
+        vim.schedule(function()
+          vim.api.nvim_buf_delete(event.buf, { force = true })
+        end)
+      end
+    end,
+  })
+
   -- Breakpoint signs
   vim.fn.sign_define('DapBreakpoint', { text = '●', texthl = 'DapBreakpoint', linehl = '', numhl = '' })
   vim.fn.sign_define('DapBreakpointCondition', { text = '◆', texthl = 'DapBreakpointCondition', linehl = '', numhl = '' })
