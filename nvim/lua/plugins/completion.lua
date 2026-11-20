@@ -58,7 +58,7 @@ return {
           name = 'nvim_lsp',
           priority = 50,
           entry_filter = function(entry)
-            -- Block clangd's auto-include insertions
+            -- Block LSP auto-include insertions
             local item = entry:get_completion_item()
             if item.additionalTextEdits then
               for _, edit in ipairs(item.additionalTextEdits) do

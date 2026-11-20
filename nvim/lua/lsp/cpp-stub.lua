@@ -129,9 +129,9 @@ local function findClassName(bufnr)
 end
 
 local function switchToSource(callback)
-  local client = vim.lsp.get_clients({ name = 'clangd' })[1]
+  local client = vim.lsp.get_clients({ name = 'ling' })[1]
   if not client then
-    vim.notify('clangd not attached', vim.log.levels.ERROR)
+    vim.notify('ling not attached', vim.log.levels.ERROR)
     return
   end
   
@@ -280,7 +280,7 @@ function M.toggleCommentPair()
   local hStart, hEnd = findDeclarationRange(bufnr, cursorPos[1])
   toggleCommentRange(bufnr, hStart, hEnd)
   
-  local client = vim.lsp.get_clients({ name = 'clangd' })[1]
+  local client = vim.lsp.get_clients({ name = 'ling' })[1]
   if not client then
     vim.notify(string.format('Toggled comment: %s::%s (header only)', className, decl.funcName), vim.log.levels.INFO)
     return
@@ -454,9 +454,9 @@ function M.generateAllStubs()
     return
   end
   
-  local client = vim.lsp.get_clients({ name = 'clangd' })[1]
+  local client = vim.lsp.get_clients({ name = 'ling' })[1]
   if not client then
-    vim.notify('clangd not attached', vim.log.levels.ERROR)
+    vim.notify('ling not attached', vim.log.levels.ERROR)
     return
   end
   

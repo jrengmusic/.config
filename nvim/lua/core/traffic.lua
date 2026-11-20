@@ -4,12 +4,9 @@
 -- machine enforces the single-active-job invariant that was previously
 -- scattered across per-spawn-site guards (activeBuildJob, isAborted flags).
 --
--- LSP is deliberately absent from this machine: clangd runs continuously
--- for the whole session. Its compilation database lives at the project
--- root (core/clangd.lua) so the index shards sit outside
--- Builds/ — a clean can't destroy them or race clangd's file handles, and
--- clangd hot-reloads a reconfigured CDB by itself. Nothing here ever needs
--- to stop or restart an LSP client.
+-- LSP is deliberately absent from this machine: ling runs continuously
+-- for the whole session. Nothing here ever needs to stop or restart an LSP
+-- client.
 local M = {}
 
 -- Output batching: piped job output is coalesced and delivered to the

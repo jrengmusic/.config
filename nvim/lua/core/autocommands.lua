@@ -4,9 +4,8 @@ local M = {}
 local DOXYGEN_WATCH_DEBOUNCE_MS = 300000
 
 -- Nvim mirrors every LSP client's stderr into stdpath('log')/lsp.log at
--- ERROR severity with no rotation (vim/lsp/log.lua). clangd's own stderr
--- chatter during indexing floods it unbounded across months of sessions, so
--- each session starts from an empty file instead of accumulating history.
+-- ERROR severity with no rotation (vim/lsp/log.lua). Each session starts
+-- from an empty file instead of accumulating history.
 local function truncateLspLog()
   local log_path = vim.lsp.log.get_filename()
   if vim.fn.filereadable(log_path) == 1 then
@@ -70,15 +69,10 @@ function M.setup()
 
   -- Listeners register before the project state loads: the first parse
   -- already emits ProjectChanged.
-  require('core.clangd').setup()
 
-  -- Load the project state on startup (its ProjectChanged listeners write
-  -- .clangd and the root CDB copy -- covering a build that happened while
-  -- nvim was closed), then arm the doxygen source-tree watcher. A build
-  -- re-parses the state from core/build.lua's on_exit (deterministic: the
-  -- build process itself signals completion). clangd itself is never
-  -- restarted for any of this — it hot-reloads the root CDB copy on its
-  -- own (see core/clangd.lua).
+  -- Load the project state on startup, then arm the doxygen source-tree watcher.
+  -- A build re-parses the state from core/build.lua's on_exit (deterministic: the
+  -- build process itself signals completion).
   vim.api.nvim_create_autocmd('VimEnter', {
     once = true,
     callback = function()
@@ -102,8 +96,7 @@ function M.setup()
   })
 
   -- Stop any build/clean/doxygen job still running on quit. Nvim itself only
-  -- guarantees this for LSP clients (vim.lsp's own VimLeavePre asks clangd to
-  -- shut down); jobstart/termopen jobs are never auto-killed by Nvim on any
+  -- guarantees this for LSP clients; jobstart/termopen jobs are never auto-killed by Nvim on any
   -- platform — on Unix they're spawned detached (setsid) so :qa leaves them
   -- running regardless, on Windows the OS Job Object only catches direct
   -- children on crash, not this cooperative-quit path. Identical on both OS:

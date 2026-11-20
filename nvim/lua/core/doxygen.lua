@@ -14,10 +14,8 @@ local is_windows = vim.fn.has('win32') == 1
 local DOT_MAX_NODES = 100
 local TERMINAL_HEIGHT = 15
 
--- Half of logical cores, floor, minimum 1 — identical formula to the clangd
--- `-j` cap (nvim/lua/lsp/clangd.lua), same vim.uv API on both platforms, so
--- doxygen's dot-graph rendering never saturates every core the way clangd's
--- unthrottled background-index did.
+-- Half of logical cores, floor, minimum 1 — same vim.uv API on both platforms,
+-- so doxygen's dot-graph rendering never saturates every core.
 local function dot_num_threads()
   return math.max(1, math.floor(vim.uv.available_parallelism() / 2))
 end

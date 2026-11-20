@@ -2,7 +2,7 @@
 -- The project state: one AST for the current project root, built once from
 -- the project's sources by a toolchain locator, materialised to
 -- <root>/.project for visibility, and replaced whole -- never patched --
--- whenever a source changes. Every editor operation (build, debug, clangd,
+-- whenever a source changes. Every editor operation (build, debug, LSP,
 -- doxygen, navigator) reads this registry and reacts to the ProjectChanged
 -- event; none derives a project fact on its own.
 --
@@ -156,7 +156,7 @@ end
 -- One non-recursive watcher per source directory, filtered to the exact
 -- source paths: robust to tools that replace a file by rename rather than
 -- rewriting it in place, and blind to the other files those directories
--- hold (the root compile-database copy, .clangd, .project).
+-- hold (the root compile-database copy, .project).
 local function watch(root, ast)
   stopWatchers(root)
 
@@ -235,7 +235,7 @@ function M.setSelection(root, selection)
   return M.parse(root, selection)
 end
 
--- The compile section clangd and the navigator follow: a profile lane's
+-- The compile section the navigator follows: a profile lane's
 -- database wins when one exists (the first in key order); otherwise the
 -- selected configuration once it has been built, else the first built
 -- configuration in key order.

@@ -295,7 +295,7 @@ M.setup = function()
   -- Template-dependent types: use type color, not preprocessor
   hi('@lsp.type.dependent', { fg = colors.type })
 
-  -- Missing clangd semantic token types
+  -- Semantic token types
   hi('@lsp.type.namespace', { fg = colors.type })
   hi('@lsp.type.enumMember', { fg = colors.constant })
   hi('@lsp.type.typeParameter', { fg = colors.type })

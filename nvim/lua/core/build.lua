@@ -10,10 +10,8 @@
 -- sequencing). The toolchain itself is core/cast-build.lua; what to launch
 -- afterwards is the state's selection (dap/launch.lua).
 --
--- clangd is never touched here: its CDB and index shards live at the
--- project root, outside Builds/ (see core/clangd.lua), so builds and
--- cleans neither contend with its file handles nor require an LSP restart
--- — clangd hot-reloads a reconfigured CDB on its own.
+-- LSP is never touched here: ling runs continuously across builds and
+-- cleans without requiring a restart.
 --
 -- Runtime buffer-local keymaps spawned by behavior (bindAbort's <Esc>, the
 -- build-failure q-to-close) live here by design — KEYMAPS.md covers
@@ -291,14 +289,12 @@ end
 -- have touched anything the project locator reads (project-info.md,
 -- Builds/, compile_commands.json) -- cast-build.lua's framework-manifest
 -- regen stage is pure codegen at the user-module root and never does, so it
--- passes false to avoid a redundant reparse/ProjectChanged/.clangd-copy
+-- passes false to avoid a redundant reparse/ProjectChanged
 -- cycle ahead of the project build stage that actually reconfigures.
 -- on_exit reparses on both success and failure when reconfiguresProject is
--- true: a failing compile after a clean rebuild still reconfigured (fresh
--- compile_commands.json) before the first file ever failed to compile — the
--- project state needs the re-parse regardless. Its listeners refresh
--- .clangd and the root CDB copy; clangd notices the refreshed copy by
--- itself (compilationDatabase.automaticReload).
+-- true: a failing compile after a clean rebuild still reconfigured before
+-- the first file ever failed to compile — the project state needs the re-parse
+-- regardless.
 function M.runBuildJob(args, onSuccess, reconfiguresProject)
   local traffic = require('core.traffic')
   local log_buf, log_win, appendLines = openLogWindow(LOG_WINDOW_HEIGHT)
@@ -392,9 +388,7 @@ end
 
 -- cast regeneration is idempotent write-if-different, so clean is simply
 -- removing every build directory the configurations declare. The state is
--- re-parsed so its compile section reflects the empty trees. clangd's CDB
--- and index shards live at the project root (core/clangd.lua), so the
--- rm -rf neither destroys the index nor races clangd's open file handles.
+-- re-parsed so its compile section reflects the empty trees.
 local function runClean(onDone)
   local project = getProject()
   if project then

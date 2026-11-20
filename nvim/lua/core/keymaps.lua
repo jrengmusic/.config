@@ -79,11 +79,10 @@ function M.setupLsp(event)
   vim.keymap.set('n', '<leader>ws', function() actions.splitSyncOnce(); Snacks.picker.lsp_workspace_symbols() end, { buffer = event.buf, desc = 'LSP: Workspace symbols' })
   vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { buffer = event.buf, desc = 'LSP: Rename symbol' })
   vim.keymap.set({ 'n', 'x' }, '<leader>ca', vim.lsp.buf.code_action, { buffer = event.buf, desc = 'LSP: Code action' })
-  vim.keymap.set('n', '<leader>ls', function() require('lsp.clangd').restart() end, { buffer = event.buf, desc = 'LSP: Force clangd reindex + restart' })
 
   local client = vim.lsp.get_client_by_id(event.data.client_id)
-  if client and client.name == 'clangd' then
-    vim.keymap.set('n', 'gh', '<cmd>ClangdSwitchSourceHeader<CR>', { buffer = event.buf, desc = 'LSP: Switch header/source' })
+  if client and client.name == 'ling' then
+    vim.keymap.set('n', 'gh', '<cmd>LingSwitchSourceHeader<CR>', { buffer = event.buf, desc = 'LSP: Switch header/source' })
     vim.keymap.set('n', '<leader>cc', function() require('lsp.cpp-stub').generateStub() end, { buffer = event.buf, desc = 'LSP: Generate C++ definition stub' })
     vim.keymap.set('n', '<leader>cv', function() require('lsp.cpp-stub').generateAllStubs() end, { buffer = event.buf, desc = 'LSP: Generate all missing C++ stubs' })
     vim.keymap.set('n', '<leader>c/', function() require('lsp.cpp-stub').toggleCommentPair() end, { buffer = event.buf, desc = 'LSP: Toggle comment in header + cpp' })

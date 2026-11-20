@@ -20,14 +20,14 @@
 +-----------------------------------------------+-----------+-------------------------------------------------------------------------------------------------+------+
 | - [list]: @keymaps:requires:group=lsp         |           | @lua:module                                                                                     | @out |
 | - [list]: @keymaps:keys:group=lsp             |           |                                                                                                 |      |
-| - [list]: @keymaps:keys:group=lsp-clangd      |           | @lua:function-client                                                                            |      |
+| - [list]: @keymaps:keys:group=lsp-ling        |           | @lua:function-client                                                                            |      |
 | - [list]: @keymaps:keys:group=lsp-inlay       |           | - name: setupLsp                                                                                |      |
 | - [list]: @keymaps:keys:options               |           | - parameter: event                                                                              |      |
 | - [list]: @keymaps:keys:options               |           | - [list]: @lua:require                                                                          |      |
 | - [list]: @keymaps:keys:options               |           | - [list]: @lua:key                                                                              |      |
 |                                               |           |                                                                                                 |      |
 |                                               |           | @lua:guard                                                                                      |      |
-|                                               |           | - condition: client and client.name == 'clangd'                                                 |      |
+|                                               |           | - condition: client and client.name == 'ling'                                                   |      |
 |                                               |           | - [list]: @lua:key                                                                              |      |
 |                                               |           |                                                                                                 |      |
 |                                               |           | @lua:guard                                                                                      |      |
