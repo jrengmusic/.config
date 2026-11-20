@@ -77,6 +77,23 @@ function M.setup()
     dapui.close()
   end
 
+  -- dapui hands every session the same console buffer as its terminal. A
+  -- terminal job that outlives the session (dap.terminate does not stop the
+  -- whatdbg launcher) leaves that buffer a terminal with content, and the
+  -- next jobstart(term=true) is rejected. Deleting the buffer at session end
+  -- kills the job and makes dapui create a clean console. Attach sessions
+  -- have no terminal (term_buf nil); one session fires several of these
+  -- events, so the buffer may already be gone.
+  local function deleteSessionTerminal(session)
+    if session.term_buf ~= nil and vim.api.nvim_buf_is_valid(session.term_buf) then
+      vim.api.nvim_buf_delete(session.term_buf, { force = true })
+    end
+  end
+
+  for _, event in ipairs({ 'event_terminated', 'event_exited', 'disconnect', 'terminate' }) do
+    dap.listeners.after[event].delete_session_terminal = deleteSessionTerminal
+  end
+
   -- Focus nvim pane when breakpoint hit (macOS only — Hammerspoon not on Windows)
   dap.listeners.after.event_stopped.focus_nvim = function()
     hs_call("require('debug-layout').focusNvimPane()")
@@ -102,7 +119,10 @@ function M.setup()
     callback = function(event)
       if vim.b[event.buf]['dap-type'] ~= nil then
         vim.schedule(function()
-          vim.api.nvim_buf_delete(event.buf, { force = true })
+          -- deleteSessionTerminal may have deleted it at session end.
+          if vim.api.nvim_buf_is_valid(event.buf) then
+            vim.api.nvim_buf_delete(event.buf, { force = true })
+          end
         end)
       end
     end,
