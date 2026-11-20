@@ -26,9 +26,19 @@
       "Bash(git clean*)",
       "Bash(git branch -D*)"
     ],
+    "deny": [
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "ScheduleWakeup",
+      "EnterWorktree",
+      "ExitWorktree",
+      "NotebookEdit",
+      "TodoWrite"
+    ],
     "defaultMode": "bypassPermissions"
   },
-  "model": "opus",
+  "model": "sonnet",
   "hooks": {
     "SessionStart": [
       {
@@ -46,19 +56,29 @@
     "command": "~/.carol/bin/carol-statusline.sh"
   },
   "enabledPlugins": {
-    "lua-lsp@claude-plugins-official": true
+    "lua-lsp@claude-plugins-official": true,
+    "cc-plugin-easel@builtin": false
+  },
+  "attribution": false,
+  "includeGitInstructions": false,
+  "skillOverrides": {
+    "dataviz": "off",
+    "claude-api": "off",
+    "schedule": "off",
+    "loop": "off",
+    "run": "off"
   },
   "outputStyle": "CAROL",
   "effortLevel": "medium",
   "modelSettings": {
     "claude-opus-5-5": {
-      "effortLevel": "medium"
+      "effortLevel": "high"
     },
     "claude-fable-5-2": {
       "effortLevel": "medium"
     },
     "claude-sonnet-5-5": {
-      "effortLevel": "high"
+      "effortLevel": "medium"
     },
     "claude-haiku-5-5": {
       "effortLevel": "medium"
