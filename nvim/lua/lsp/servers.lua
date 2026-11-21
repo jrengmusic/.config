@@ -2,6 +2,9 @@
 local M = {}
 
 local LING_FILETYPES = { 'c', 'cpp', 'objc', 'objcpp', 'markdown', 'mermaid', 'json', 'css', 'xml', 'html' }
+local PROJECT_EVENT = 'ProjectChanged'
+
+local lingConfigurations = {}
 
 local function lingRootDir(bufnr, on_dir)
   local name = vim.api.nvim_buf_get_name(bufnr)
@@ -16,13 +19,25 @@ local function lingRootDir(bufnr, on_dir)
   end
 end
 
+local function getLingConfiguration(root)
+  local project = require('core.project')
+  local ast = project.getOrCreate(root)
+  if ast then
+    local key = project.getBuiltConfiguration(ast)
+    local argument = key and ast.configurations[key] and ast.configurations[key].argument or ''
+    return key, argument
+  end
+  return nil, ''
+end
+
 local function lingCmd(dispatchers, config)
   local root = config.root_dir
   local argv = { 'ling', 'project-info.md' }
   if root then
-    local ast = require('core.project').getOrCreate(root)
-    if ast and ast.selection and ast.selection.configuration then
-      argv[#argv + 1] = '--' .. ast.selection.configuration
+    local key, argument = getLingConfiguration(root)
+    lingConfigurations[root] = key or false
+    if argument ~= '' then
+      argv[#argv + 1] = '--' .. argument
     end
   end
   return vim.lsp.rpc.start(argv, dispatchers, {
@@ -53,6 +68,23 @@ function M.setup(capabilities)
   end
 
   vim.lsp.enable(vim.tbl_keys(servers))
+
+  vim.api.nvim_create_autocmd('User', {
+    pattern = PROJECT_EVENT,
+    group = vim.api.nvim_create_augroup('lsp-ling-project', { clear = true }),
+    callback = function(event)
+      local root = event.data and event.data.root
+      if root then
+        local key = getLingConfiguration(root)
+        local nextKey = key or false
+        for _, client in ipairs(vim.lsp.get_clients({ name = 'ling' })) do
+          if client.config.root_dir == root and lingConfigurations[root] ~= nextKey then
+            client:_restart(client.exit_timeout)
+          end
+        end
+      end
+    end,
+  })
 end
 
 function M.setupAttachHandlers()

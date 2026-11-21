@@ -248,6 +248,17 @@ function M.getCompile(ast)
   return ast.compile[keys[1]]
 end
 
+-- The built configuration name for a consumer that targets a toolchain lane
+-- (ling LSP): the selected configuration when built, else the first built
+-- configuration in key order, or nil when no configuration has been built.
+function M.getBuiltConfiguration(ast)
+  if ast.selection and ast.selection.configuration and ast.compile[ast.selection.configuration] then
+    return ast.selection.configuration
+  end
+  local keys = getSortedKeys(ast.compile)
+  return keys[1]
+end
+
 local function isUnder(path, root)
   return path:lower():sub(1, #root + 1) == root:lower() .. '/'
 end
