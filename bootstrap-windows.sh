@@ -655,6 +655,17 @@ EOF
     info "Seeded settings.local.json with carol-marketplace → $WINDOWS_HOME/.carol"
 fi
 
+# MCP servers — user scope lives in ~/.claude.json, which is not synced, so register here.
+for MCP_SERVER in "whatdbg --mcp" "scout --mcp" "ling --mcp project-info.md"; do
+    MCP_NAME="${MCP_SERVER%% *}"
+    if claude mcp get "$MCP_NAME" &>/dev/null; then
+        info "MCP server $MCP_NAME already registered"
+    else
+        claude mcp add --scope user "$MCP_NAME" -- $MCP_SERVER
+        info "Registered MCP server $MCP_NAME"
+    fi
+done
+
 # CAROL output style — symlink from carol repo to ~/.claude/output-styles/
 mkdir -p "$WINDOWS_HOME/.claude/output-styles"
 STYLE_SRC="$WINDOWS_HOME/.carol/output-styles.md"
