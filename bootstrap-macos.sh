@@ -87,10 +87,8 @@ if [[ "$PLATFORM" == "macos-arm" ]]; then
         node
         eza
         fzf
-        bat
         fd
         ripgrep
-        jq
         zsh-syntax-highlighting
         oh-my-posh
         zoxide
@@ -115,10 +113,8 @@ else
         nodejs22
         eza
         fzf
-        bat
         fd
         ripgrep
-        jq
         zsh-syntax-highlighting
         oh-my-posh
         zoxide

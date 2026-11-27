@@ -4,7 +4,8 @@
     "ANTHROPIC_DEFAULT_FABLE_MODEL": "claude-fable-5-2",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5",
-    "BASH_MAX_TIMEOUT_MS": "900000"
+    "BASH_MAX_TIMEOUT_MS": "900000",
+    "ENABLE_TOOL_SEARCH": "true"
   },
   "attribution": {
     "commit": "",
@@ -16,10 +17,7 @@
     "allow": [
       "Bash(*)",
       "Read",
-      "Write",
-      "Edit",
       "Glob",
-      "Grep",
       "WebFetch(*)",
       "WebSearch(*)"
     ],
@@ -31,6 +29,9 @@
       "EnterWorktree",
       "ExitWorktree",
       "NotebookEdit",
+      "Edit",
+      "Write",
+      "Grep",
       "TodoWrite"
     ],
     "ask": [
@@ -40,7 +41,10 @@
       "Bash(git reset*)",
       "Bash(git stash*)",
       "Bash(git clean*)",
-      "Bash(git branch -D*)"
+      "Bash(git branch -D*)",
+      "Bash(python*)",
+      "Bash(python3*)",
+      "Bash(lua*)"
     ],
     "defaultMode": "bypassPermissions"
   },

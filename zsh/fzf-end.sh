@@ -34,5 +34,5 @@ elif is_image "$file"; then
     skit_signal "$(realpath "$file")"
 else
     skit_signal ""
-    bat --color=always --style=numbers --line-range=:500 "$file"
+    saw page --color=always --decorations=always --style=numbers -r :500 "$file"
 fi
